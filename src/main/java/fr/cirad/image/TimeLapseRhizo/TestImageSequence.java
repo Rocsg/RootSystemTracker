@@ -54,7 +54,7 @@ public class TestImageSequence {
 	static int SIZE_FACTOR=8;
 	static int TYPICAL_SPEED=100/8;//pixels/timestep. pix=19µm , timestep=8h, meaning TYPICAL=237 µm/h
 	static double OUT_OF_SILHOUETTE_PENALTY=100;//5+2*daymax 50 100 1000
-	static double REVERSE_TIME_PENALTY=100;
+	static double REVERSE_TIME_PENALTY=100;//
 	static double SEMI_PENALTY=50;
 	static double IDENTITY_PENALTY=100;
 	static int MIN_SIZE=5;
