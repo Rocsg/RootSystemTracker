@@ -1,60 +1,26 @@
 package fr.cirad.image.TimeLapseRhizo;
 
-import java.awt.Rectangle;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Set;
-
-import org.apache.commons.math3.analysis.interpolation.AkimaSplineInterpolator;
-import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
-import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
-import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
-//import org.jgrapht.Graph;
-import org.jgrapht.Graphs;
-import org.jgrapht.graph.DefaultDirectedWeightedGraph;
-import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
-import org.jgrapht.graph.WeightedPseudograph;
-import org.openxmlformats.schemas.presentationml.x2006.main.impl.CTApplicationNonVisualDrawingPropsImpl;
-import org.jgrapht.alg.interfaces.SpanningTreeAlgorithm.SpanningTree;
-import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
-import org.jgrapht.alg.spanning.KruskalMinimumSpanningTree;
-
-
-import fr.cirad.image.common.MostRepresentedFilter;
 import fr.cirad.image.common.Timer;
-import fr.cirad.image.common.TransformUtils;
 import fr.cirad.image.common.VitimageUtils;
 import fr.cirad.image.fijiyama.RegistrationAction;
-import fr.cirad.image.TimeLapseRhizo.HungarianAlgorithm;
 import fr.cirad.image.registration.BlockMatchingRegistration;
 import fr.cirad.image.registration.ItkTransform;
 import fr.cirad.image.registration.Transform3DType;
+import fr.cirad.image.rsmlviewer.Node;
+import fr.cirad.image.rsmlviewer.Root;
+import fr.cirad.image.rsmlviewer.RootModel;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
-import ij.gui.PolygonRoi;
-import ij.gui.Roi;
-import ij.gui.ShapeRoi;
 import ij.plugin.Duplicator;
-import ij.plugin.Scaler;
-import ij.plugin.frame.RoiManager;
-import inra.ijpb.binary.geodesic.GeodesicDistanceTransform3DFloat;
-import inra.ijpb.binary.geodesic.GeodesicDistanceTransformFloat;
-import inra.ijpb.morphology.Morphology;
-import inra.ijpb.morphology.Strel3D;
-import net.imagej.table.DefaultByteTable;
+import ij.plugin.RGBStackMerge;
 
-
+//TODO : when registering, do the crop partly before, then registration, then partly after. In order to avoid to have bogus reconstructed BG at the extremities, what can have an impact
+//TODO : times all is an image name where distance is displayed in pixel. It should be avoided
+//TODO : list the steps and the step parameters settings in order to identify parameterizable operations, in order to adapt to new datasets
 
 
 public class TestImageSequence {	
@@ -62,11 +28,9 @@ public class TestImageSequence {
 	static final String mainDataDir=testing ? "/home/rfernandez/Bureau/A_Test/RSML"
 			: "/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Second_dataset_2021_07/Processing";
 
-//TODO 1 : Retirer toutes les composantes génantes qui posent probleme dans la suite
-	
-
 	
 	public static void main(String[]args) {
+		//VitimageUtils.waitFor(50000);
 		ImageJ ij=new ImageJ();
 		//SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph=readGraphFromFile(mainDataDir+"/3_Graphs_Raw/"+"ML"+ml+"_Boite_"+boite);
 //		testGraph(graph);
@@ -109,43 +73,35 @@ public class TestImageSequence {
 		//runComputeMaskAndRemoveLeaves();
 		//VitimageUtils.waitFor(50000000);
 		for(int mli=1;mli<=1;mli++) {
-			for(int boi=1;boi<=1;boi++) {
+			for(int boi=5;boi<=5;boi++) {
 				String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
 				String ml=""+mli;
 				Timer t=new Timer();
-				t.print("Start");
+				t.print("Start"+mli+"-"+boi);
 				System.out.println("Processing ML"+ml+"_Boite_"+boite);
 				//runImportSequences(ml,boite);
-				//runRegisterSequences(ml,boite);
-				//runComputeMaskAndRemoveLeaves(ml,boite);//9 secondes
-				//runDateEstimation(ml,boite);//2.61 secondes
-				//buildAndProcessGraph(ml,boite);
+//				runRegisterSequences(ml,boite);
+//				runComputeMaskAndRemoveLeaves(ml,boite);//9 secondes
+//				runDateEstimation(ml,boite);//2.61 secondes
+				buildAndProcessGraph(ml,boite);
 				computeTimes(ml, boite);
-				t.print("Stop");
-				IJ.showMessage("Done");
-				VitimageUtils.waitFor(600000000);
-				System.exit(0);
+				t.print("Stop"+mli+"-"+boi);
 			}
 		}
-		//	runImportSequences();
-		//runDateEstimation();
-		//runRegisterSequences();
-//		  runDateEstimation();
-//		runDateEstimation() ;
+		IJ.showMessage("Done");
+		VitimageUtils.waitFor(600000000);
+		System.exit(0);
 	}
 
 	
 	
-	/**Test sequences ***********************************************************************************************************************/
-	
+	/**Test sequences ***********************************************************************************************************************/	
 	public static void testDateEstimation() {
 		int ml=1;
 		String boite="00002";
 		System.out.println("Processing ML"+ml+"_Boite_"+boite);
 		ImagePlus imgIn=IJ.openImage(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
 		ImagePlus imgMask=IJ.openImage(mainDataDir+"/1_Mask/ML"+ml+"_Boite_"+boite+".tif");
-		
-//		imgIn=new Duplicator().run(imgIn,1,1,1,15,1,1);
 		ImagePlus mire=computeMire(imgIn);
 		imgIn=VitimageUtils.addSliceToImage(mire, imgIn);
 		imgIn.show();
@@ -163,10 +119,8 @@ public class TestImageSequence {
 		ImagePlus imgRef=IJ.openImage("/home/rfernandez/Bureau/t1.tif");
 		imgMov=VitimageUtils.resize(imgMov, imgMov.getWidth()/4, imgMov.getHeight()/4, 1);
 		imgRef=VitimageUtils.resize(imgRef, imgRef.getWidth()/4, imgRef.getHeight()/4, 1);
-		//		VitimageUtils.compositeNoAdjustOf(imgMov, imgRef).show();
-//		VitimageUtils.waitFor(500000);
 		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/Temp/gg3/step_2_after_rig.tif");
-		ImagePlus mask=null;//IJ.openImage(mainDataDir+"/N_Others/maskNew.tif");
+		ImagePlus mask=null;
 
 		if(true) {
 		boolean viewRegistrations=true;
@@ -179,8 +133,6 @@ public class TestImageSequence {
 			regAct.strideY=4;
 			regAct.neighX=1;
 			regAct.neighY=1;
-//			regAct2.bhsX-=2;
-//			regAct2.bhsY-=2;
 			regAct.sigmaDense/=6;
 			regAct.selectLTS=99;
 			BlockMatchingRegistration bm= BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
@@ -195,7 +147,6 @@ public class TestImageSequence {
 				bm.displayRegistration=2; 
 				bm.adjustZoomFactor(512.0/imgRef.getWidth());
 			}
-//				bm2.minBlockVariance/=2;
 			ItkTransform tr=bm.runBlockMatching(null, false);			
 			IJ.showMessage("\n\n\n\nDONE\n");
  			if(viewRegistrations) {
@@ -221,8 +172,6 @@ public class TestImageSequence {
 			regAct2.strideY=4;
 			regAct2.neighX=2;
 			regAct2.neighY=2;
-//			regAct2.bhsX-=2;
-//			regAct2.bhsY-=2;
 			regAct2.sigmaDense/=12;
 			regAct2.selectLTS=99;
 			BlockMatchingRegistration bm2= BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct2);
@@ -236,7 +185,6 @@ public class TestImageSequence {
 				bm2.displayRegistration=2;
 				bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());
 			}
-//				bm2.minBlockVariance/=2;
 			trComposed[n1]=bm2.runBlockMatching(tr, false);			
 			IJ.showMessage("\n\n\n\nDONE\n");
 			VitimageUtils.waitFor(600000000);
@@ -283,7 +231,7 @@ public class TestImageSequence {
 		System.out.println("Did !");
 		System.out.println("Saving as "+mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
 		IJ.saveAsTiff(imgs[1], mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");				
-		IJ.saveAsTiff(imgs[0], mainDataDir+"/1_Registered_High/ML"+ml+"_Boite_"+boite+".tif");				
+		if(imgs[0]!=null)	IJ.saveAsTiff(imgs[0], mainDataDir+"/1_Registered_High/ML"+ml+"_Boite_"+boite+".tif");				
 	}
 
 	public static void runComputeMaskAndRemoveLeaves(String ml, String boite) {
@@ -297,7 +245,7 @@ public class TestImageSequence {
 		imgMaskN.setDisplayRange(0, 1);
 		IJ.saveAsTiff(imgMaskN, mainDataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
 
-		ImagePlus imgMask2=	VitimageUtils.erosionCircle2D(imgMask1, 250*(highRes ? 4 : 1));
+		ImagePlus imgMask2=	MorphoUtils.erosionCircle2D(imgMask1, 250*(highRes ? 4 : 1));
 		imgMask2.setDisplayRange(0, 1);
 		IJ.saveAsTiff(imgMask2, mainDataDir+"/1_Mask_Feuilles/ML"+ml+"_Boite_"+boite+".tif");		
 
@@ -315,12 +263,10 @@ public class TestImageSequence {
 		ImagePlus imgMaskN=IJ.openImage(mainDataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
 		ImagePlus imgMaskOfLeaves=IJ.openImage(mainDataDir+"/1_Mask_Of_Leaves/ML"+ml+"_Boite_"+boite+".tif");
 		
-//				imgIn=new Duplicator().run(imgIn,1,1,1,15,1,1);
 		ImagePlus mire=computeMire(imgIn);
 		imgIn=VitimageUtils.addSliceToImage(mire, imgIn);
 		if(imgIn==null)return;
 		imgIn.show();
-		//ImagePlus imgOut=projectTimeLapseSequenceInColorspace(imgIn, imgMask,30);
 		ImagePlus imgOut=projectTimeLapseSequenceInColorspaceCombined(imgIn, imgMask1,imgMaskN,imgMaskOfLeaves,20,20);
 		imgOut=VitimageUtils.makeOperationBetweenTwoImages(imgOut, imgMaskN, 2, true);
 		ImagePlus img2=VitimageUtils.thresholdImage(imgOut, 0.5, 100000);
@@ -339,40 +285,6 @@ public class TestImageSequence {
 		//ImagePlus imgOut=buildAndProcessGraph(""+ml,boite);
 		//IJ.saveAsTiff(imgOut, mainDataDir+"/3_Graphs/ML"+ml+"_Boite_"+boite);
 	}
-
-	/*
-	public static void editGraph(SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph) {
-		ArrayList<int[]>listToAdd=new ArrayList<int[]>();
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		listToAdd.add( {   ,  ,  ,  ,  ,  });
-		for(int[]tab : listToAdd) {
-			CC source=getCC(graph,tab[0],tab[1]/SIZE_FACTOR,tab[2]/SIZE_FACTOR);
-			CC target=getCC(graph,tab[3],tab[4]/SIZE_FACTOR,tab[5]/SIZE_FACTOR);
-			graph.addEdge(source, target);
-		}
-		
-		ArrayList<int[]>listToRemove=new ArrayList<int[]>();
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		listToRemove.add( {   ,  ,  ,  ,  ,  });
-		for(int[]tab : listToRemove) {
-			CC source=getCC(graph,tab[0],tab[1]/SIZE_FACTOR,tab[2]/SIZE_FACTOR);
-			CC target=getCC(graph,tab[3],tab[4]/SIZE_FACTOR,tab[5]/SIZE_FACTOR);
-			graph.removeEdge(source, target);
-		}
-
-	}
-	*/
-	
 	
 
 
@@ -393,12 +305,12 @@ public class TestImageSequence {
 		for(int z=1;z<tabInit.length;z++) {
 			//Get the big elements of object under the menisque
 			ImagePlus img=VitimageUtils.makeOperationBetweenTwoImages(tabInit[z], imgMaskInit, 2, true);
-			img=VitimageUtils.dilationCircle2D(img, 2*factor);
+			img=MorphoUtils.dilationCircle2D(img, 2*factor);
 			img=VitimageUtils.gaussianFiltering(img, 3*factor, 3*factor, 0);
 			ImagePlus biggas=VitimageUtils.thresholdImage(img, -100, 120);
 			tabMaskOut[z]=VitimageUtils.binaryOperationBetweenTwoImages(imgMask2.duplicate(), biggas, 2);
 			tabMaskOut[z]=VitimageUtils.binaryOperationBetweenTwoImages(imgMaskInit, tabMaskOut[z], 2);
-			tabMaskOut[z]=VitimageUtils.dilationCircle2D(tabMaskOut[z], 2*factor);
+			tabMaskOut[z]=MorphoUtils.dilationCircle2D(tabMaskOut[z], 2*factor);
 //			tabMaskOut[z]=VitimageUtils.dilationCircle2D(tabMaskOut[z], 20);
 //			tabMaskOut[z]=VitimageUtils.erosionCircle2D(tabMaskOut[z], 10);
 			tabMaskOut[z].setDisplayRange(0, 1);
@@ -412,7 +324,7 @@ public class TestImageSequence {
 			tabMaskIn[z]=VitimageUtils.invertBinaryMask(tabMaskOut[z]);
 
 			//Replace area masked with surrounding areas
-			ImagePlus imgInitDil=VitimageUtils.dilationLine2D(tabInit[z], 50*factor, true);
+			ImagePlus imgInitDil=MorphoUtils.dilationLine2D(tabInit[z], 50*factor, true);
 			ImagePlus imgPart1=VitimageUtils.makeOperationBetweenTwoImages(tabMaskIn[z], tabInit[z], 2, false);
 			ImagePlus imgPart2=VitimageUtils.makeOperationBetweenTwoImages(tabMaskOut[z], imgInitDil, 2, false);
 			tabTot[z]=VitimageUtils.makeOperationBetweenTwoImages(imgPart1, imgPart2, 1, false);
@@ -424,36 +336,54 @@ public class TestImageSequence {
 		img2.setDisplayRange(0, 1);
 		return new ImagePlus [] {img1,img2};
 	}
-	
-	
-	
-	
-	/// Various helpers for graph manipulation //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	@SuppressWarnings("unchecked")
-	public static void buildAndProcessGraph(String ml, String boite) {
-		//Import and oversample image of dates
-		ImagePlus imgDatesTmp=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
-		//if(imgDatesTmp==null)return null;
-		RegionAdjacencyGraphUtils.buildAndProcessGraph(imgDatesTmp,mainDataDir,ml,boite,true);
-	}
-	
+			
 	public static void computeTimes(String ml, String boite) {
 		ImagePlus dates=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
-		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphUtils.readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus distOut=RegionAdjacencyGraphUtils.getDistOut(dates,false);
-		RegionAdjacencyGraphUtils.refinePlongementOfCCGraph(graph,distOut);
-		ImagePlus allInfo=RegionAdjacencyGraphUtils.drawDistanceTime(dates,graph,4,false);
-		ImagePlus times=RegionAdjacencyGraphUtils.drawDistanceTime(dates,graph,0,false);
+		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphUtils.readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".ser");
+		ImagePlus distOut=MorphoUtils.getDistOut(dates,false);
+		RootModel rm=RegionAdjacencyGraphUtils.refinePlongementOfCCGraph(graph,distOut,0.9);
+		rm.writeRSML3D(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml", "",true);
+		rm=RootModel.RootModelWildReadFromRsml(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml");
+		ImagePlus skeletonTime=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,3);
+		ImagePlus skeletonDay=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,2);
+		ImagePlus allTimes=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,false,1);
+		//rm.createGrayScaleImage(skeletonTime,0,false,true,1).show(); 
 
-		times.setDisplayRange(0, 23);
-		IJ.saveAsTiff(times, mainDataDir+"/4_Times/ML"+ml+"_Boite_"+boite+".tif");
-		IJ.saveAsTiff(allInfo, mainDataDir+"/4_Times_all/ML"+ml+"_Boite_"+boite+".tif");
 
+	//	rm.writeRSML3D(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml","TEST",true);
+
+		createTimeSequenceSuperposition(ml,boite,rm,skeletonTime,false);
+		
+		skeletonDay.setDisplayRange(0, 23);
+		skeletonTime.setDisplayRange(0, 23);
+		allTimes.setDisplayRange(0, 23);
+		IJ.saveAsTiff(skeletonTime, mainDataDir+"/4_Times_skeleton/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(skeletonTime, mainDataDir+"/4_Times_skeleton/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(skeletonDay, mainDataDir+"/4_Day_skeleton/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(allTimes, mainDataDir+"/4_Times/ML"+ml+"_Boite_"+boite+".tif");
 	}
+	
+	public static void createTimeSequenceSuperposition(String ml, String boite,RootModel rm,ImagePlus refSize,boolean highRes){
+		ImagePlus imgReg=(highRes) ? IJ.openImage(mainDataDir+"/1_Registered"+(highRes ? "_High" : "")+"/ML"+ml+"_Boite_"+boite+".tif") :  IJ.openImage(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
+		ImagePlus[]tabRes=VitimageUtils.stackToSlices(imgReg);
+		Timer t=new Timer();
+		for(int i=0;i<tabRes.length;i++) {
+			t.print("I="+i);
+			ImagePlus imgRSML=rm.createGrayScaleImageWithTime(refSize,(highRes ? 4 : 1),false,(i+1),true,new boolean[] {true,true,true,false,true},new double[] {highRes ? 6 : 1,highRes ? 4 : 1});
+			tabRes[i]=RGBStackMerge.mergeChannels(new ImagePlus[] {tabRes[i],imgRSML}, false);
+			IJ.run(tabRes[i],"RGB Color","");
+		}
+		//ImagePlus res=VitimageUtils.slicesWithChannelsToStackWithChannels(tabRes);
+		ImagePlus res=VitimageUtils.slicesToStack(tabRes);
+		res.show();
+	}
+
+	
+	
 	
 	
 	/**
-    STEP 01 : Import a 2D time-lapse series as a 3D volume (Time=Z axis, from 0 to N-1)
+    STEP 00 : Import a 2D time-lapse series as a 3D volume (Time=Z axis, from 0 to N-1)
     If no dataDir is given, open the image into rfernandez's DATA drive
     */
 	public static ImagePlus importTimeLapseSerie(String ml, String boite,String extension,String dataDir,boolean verbose) {
@@ -490,24 +420,28 @@ public class TestImageSequence {
 		return imgStack;
 
 	}
-	
+		
 	 /**
-    STEP 02 : Register stack comprising successive 2D images of root systems.
+    STEP 01 : Register stack comprising successive 2D images of root systems.
     If no dataDir is given, open the image into rfernandez's DATA drive
     */
 	public static ImagePlus []registerImageSequence(String ml, String boite,int additionnalIterationsUsingMeanImage,boolean viewRegistrations) {
+		boolean makeHighRes=false;
 		ImagePlus mask=IJ.openImage(mainDataDir+"/N_Others/maskNewLong.tif");
 		ImagePlus imgInit2=IJ.openImage(mainDataDir+"/0_Stacked/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgInit2High=IJ.openImage(mainDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite+".tif");
+		ImagePlus imgInit2High=null;
+		if(makeHighRes)imgInit2High=IJ.openImage(mainDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite+".tif");
 		ImagePlus imgInit=VitimageUtils.cropImage(imgInit2, 122,152,0,1348,1226,imgInit2.getStackSize());
-		ImagePlus imgInitHigh=VitimageUtils.cropImage(imgInit2High, 122*4,152*4,0,1348*4,1226*4,imgInit2High.getStackSize());
+		ImagePlus imgInitHigh=null;
+		if(makeHighRes)imgInitHigh=VitimageUtils.cropImage(imgInit2High, 122*4,152*4,0,1348*4,1226*4,imgInit2High.getStackSize());
 		ImagePlus imgOut=imgInit.duplicate();
 		IJ.run(imgOut,"32-bit","");
 
 		int N=imgInit.getStackSize();
 		ImagePlus []tabImg=VitimageUtils.stackToSlices(imgInit);
 		ImagePlus []tabImg2=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImgHigh=VitimageUtils.stackToSlices(imgInitHigh);
+		ImagePlus []tabImgHigh=null;
+		if(makeHighRes)tabImgHigh=VitimageUtils.stackToSlices(imgInitHigh);
 		ImagePlus []tabImgSmall=VitimageUtils.stackToSlices(imgInit);
 		ItkTransform []tr=new ItkTransform[N];
 		ItkTransform []trComposed=new ItkTransform[N];
@@ -596,10 +530,11 @@ public class TestImageSequence {
 			}
 			tabImg[n1]=trComposed[n1].transformImage(tabImg2[n1], tabImg2[n1]);
 			VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg2/den_"+n1, n1);
-			tabImgHigh[n1]=trComposed[n1].transformImage(tabImgHigh[n1],tabImgHigh[n1]);
+			if(makeHighRes)tabImgHigh[n1]=trComposed[n1].transformImage(tabImgHigh[n1],tabImgHigh[n1]);
 			listAlreadyRegistered.add(tabImg[n1]);
 		}
-		ImagePlus resultHigh=VitimageUtils.slicesToStack(tabImgHigh);
+		ImagePlus resultHigh=null;
+		if(makeHighRes)resultHigh=VitimageUtils.slicesToStack(tabImgHigh);
 		result2=VitimageUtils.slicesToStack(tabImg);
 		result2.setTitle("step 3");
 		IJ.saveAsTiff(result2, "/home/rfernandez/Bureau/Temp/gg3/step_3_after_rig.tif");
@@ -608,156 +543,10 @@ public class TestImageSequence {
 
 		return new ImagePlus[] {resultHigh,result2};
 	}
-	
-	public static ImagePlus []registerImageSequenceOLD(ImagePlus imgInit2,int additionnalIterationsUsingMeanImage,boolean viewRegistrations,ImagePlus mask) {
-		mask=IJ.openImage(mainDataDir+"/N_Others/maskNew.tif");
-		ImagePlus imgInit=VitimageUtils.cropImage(imgInit2, 122,152,0,1388,1226,imgInit2.getStackSize());
-		boolean makeDense=true;
-		viewRegistrations=false;
-		int N=imgInit.getStackSize();
-		ImagePlus imgOut=imgInit.duplicate();
-		IJ.run(imgOut,"32-bit","");
-		ImagePlus []tabImg=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImgNoMove=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImg2=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImgSmall=VitimageUtils.stackToSlices(imgInit);
-		for(int i=0;i<tabImgSmall.length;i++) {tabImgSmall[i]=VitimageUtils.cropImage(tabImgSmall[i], 0, 0,0, tabImgSmall[i].getWidth(),tabImgSmall[i].getHeight()/2,1);}
-		ItkTransform []tr=new ItkTransform[N];
-		ItkTransform []trComposed=new ItkTransform[N];
-		Timer t=new Timer();
-		t.log("Start");
-		for(int n=0;(n<N-1);n++) {
-			t.log("n="+n);
-			RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n],tabImg[n+1],null,false);
-			regAct.setLevelMaxLinear(4);
-			regAct.setLevelMinLinear(1);
-			regAct.strideX=8;
-			regAct.strideY=8;
-			regAct.neighX=3;
-			regAct.neighY=3;
-			regAct.selectLTS=90;
-			regAct.setIterationsBM(8);
-			BlockMatchingRegistration bm= BlockMatchingRegistration.setupBlockMatchingRegistration(tabImgSmall[n+1], tabImgSmall[n], regAct);
-			bm.mask=mask.duplicate();
-		    bm.defaultCoreNumber=VitimageUtils.getNbCores();
-		    bm.minBlockVariance/=4;
-			if(viewRegistrations) {
-				bm.displayRegistration=2;
-				bm.adjustZoomFactor(512.0/tabImg[n].getWidth());
-				bm.flagSingleView=true;
-			}
-		    tr[n]=bm.runBlockMatching(null, false);			
-			if(viewRegistrations) {
-			    bm.closeLastImages();
-			    bm.freeMemory();
-			}
-			VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg/"+(n), n);
-		}
-		for(int n1=0;n1<N-1;n1++) {
-			trComposed[n1]=new ItkTransform(tr[n1]);
-			for(int n2=n1+1;n2<N-1;n2++) {
-				trComposed[n1].addTransform(tr[n2]);
-			}
-			tabImg[n1]=trComposed[n1].transformImage(tabImg[n1], tabImg[n1]);
-		}
-		ImagePlus result1=VitimageUtils.slicesToStack(tabImg);
-		result1.setTitle("step 1");
-		IJ.saveAsTiff(result1, "/home/rfernandez/Bureau/Temp/gg3/step_1_after_rig.tif");
-		ImagePlus result2=null;
 		
-		//Second step 
-		if(additionnalIterationsUsingMeanImage>0) {
-			viewRegistrations=false;
-			for(int n1=0;n1<N-1;n1++) {
-				RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[0],tabImg[0],null,false);
-				regAct.setLevelMaxLinear(2);
-				regAct.setLevelMinLinear(-1);
-				regAct.strideX=5;
-				regAct.strideY=5;
-				regAct.setIterationsBM(6);
-				regAct.selectLTS=90;
-				regAct.selectRandom=90;
-				regAct.setIterationsBM(6);
-				BlockMatchingRegistration bm= BlockMatchingRegistration.setupBlockMatchingRegistration(tabImg2[N-1], tabImg2[n1], regAct);
-				bm.mask=mask.duplicate();
-			    bm.defaultCoreNumber=VitimageUtils.getNbCores();
-				if(viewRegistrations) {
-					bm.displayRegistration=2;
-					bm.adjustZoomFactor(512.0/tabImg[0].getWidth());
-				}
-				bm.minBlockVariance/=2;
-				trComposed[n1]=bm.runBlockMatching(trComposed[n1], false);			
-				if(viewRegistrations) {
-				    bm.closeLastImages();
-				    bm.freeMemory();
-				}
-				tabImg[n1]=trComposed[n1].transformImage(tabImg2[n1], tabImg2[n1]);
-				VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg2/rig_"+n1, n1);
-			}				
-			result2=VitimageUtils.slicesToStack(tabImg);
-			result2.setTitle("step 2");
-			IJ.saveAsTiff(result2, "/home/rfernandez/Bureau/Temp/gg3/step_2_after_rig.tif");
-
-			if(makeDense) {
-				viewRegistrations=false;
-				for(int n1=0;n1<N;n1++) {
-					RegistrationAction regAct2=new RegistrationAction().defineSettingsFromTwoImages(tabImg[0],tabImg[0],null,false);				
-					regAct2.setLevelMaxNonLinear(1);
-					regAct2.setLevelMinNonLinear(-1);
-					regAct2.setIterationsBMNonLinear(4);
-					regAct2.typeTrans=Transform3DType.DENSE;
-					regAct2.strideX=4;
-					regAct2.strideY=4;
-					regAct2.neighX=2;
-					regAct2.neighY=2;
-					regAct2.bhsX-=2; 
-					regAct2.bhsY-=2;
-					regAct2.sigmaDense/=6;
-					regAct2.selectLTS=80;
-					BlockMatchingRegistration bm2= BlockMatchingRegistration.setupBlockMatchingRegistration(tabImg2[N-1], tabImg2[n1], regAct2);
-					bm2.mask=mask.duplicate();
-				    bm2.defaultCoreNumber=VitimageUtils.getNbCores();
-				    bm2.minBlockVariance=10;
-				    bm2.minBlockScore=0.10;
-					if(viewRegistrations) {
-						bm2.displayRegistration=2;
-						bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());
-					}
-	//				bm2.minBlockVariance/=2;
-					trComposed[n1]=bm2.runBlockMatching(trComposed[n1], false);			
-					if(viewRegistrations) {
-					    bm2.closeLastImages();
-					    bm2.freeMemory();
-					}
-					tabImg[n1]=trComposed[n1].transformImage(tabImg2[n1], tabImg2[n1]);
-					VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg2/den_"+n1, n1);
-				}
-				result2=VitimageUtils.slicesToStack(tabImg);
-				result2.setTitle("step 3");
-				IJ.saveAsTiff(result2, "/home/rfernandez/Bureau/Temp/gg3/step_3_after_rig.tif");
-			}
-		}
-		result2=VitimageUtils.slicesToStack(tabImg);
-		result2.setTitle("final result");
-
-		return new ImagePlus[] {result1,result2};
-	}
-	
-	
 	/**
-    STEP 03 : Identify pixel-wise the first date of presence of any root. Build a datemap
+    STEP 02 : Identify pixel-wise the first date of presence of any root. Build a datemap
     */
-	public static ImagePlus projectTimeLapseSequenceInColorspaceMaxRuptureDown(ImagePlus imgSeq,ImagePlus interestMask1,ImagePlus interestMaskN,ImagePlus maskOutLeaves,int threshold) {
-		ImagePlus[]tab=VitimageUtils.stackToSlices(imgSeq);
-		IJ.run(maskOutLeaves,"32-bit","");
-		ImagePlus[]tabLeavesOut=VitimageUtils.stackToSlices(maskOutLeaves);
-		for(int i=0;i<tab.length;i++) {
-			tab[i]=VitimageUtils.makeOperationBetweenTwoImages(tab[i],i<2 ? interestMask1 : interestMaskN, 2, true);
-		}
-		ImagePlus res=indRuptureDownOfImageArrayDouble(tab,tabLeavesOut,threshold);
-		return res;
-	}
-	
 	public static ImagePlus projectTimeLapseSequenceInColorspaceCombined(ImagePlus imgSeq,ImagePlus interestMask1,ImagePlus interestMaskN,ImagePlus maskOfLeaves,int thresholdRupture,int thresholdSlope) {
 		ImagePlus result1=projectTimeLapseSequenceInColorspaceMaxRuptureDown(imgSeq,interestMask1,interestMaskN,maskOfLeaves,thresholdRupture);
 		ImagePlus result2=projectTimeLapseSequenceInColorspaceMaxSlope(imgSeq,interestMask1,interestMaskN,thresholdSlope);
@@ -768,8 +557,19 @@ public class TestImageSequence {
 		return result2;
 	}
 
+	/**
+	 *  STEP 03 : Compute graphs
+	 */
+	@SuppressWarnings("unchecked")
+	public static void buildAndProcessGraph(String ml, String boite) {
+		//Import and oversample image of dates
+		ImagePlus imgDatesTmp=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
+		RegionAdjacencyGraphUtils.buildAndProcessGraphStraight(imgDatesTmp,mainDataDir,ml,boite,true,true);
+	}
 
-
+	
+	
+	
 	
 	
 	
@@ -872,6 +672,17 @@ public class TestImageSequence {
 		ImagePlus res=VitimageUtils.indMaxOfImageArrayDouble(imgs,threshold);
 		return res;
 	}
+
+	public static ImagePlus projectTimeLapseSequenceInColorspaceMaxRuptureDown(ImagePlus imgSeq,ImagePlus interestMask1,ImagePlus interestMaskN,ImagePlus maskOutLeaves,int threshold) {
+		ImagePlus[]tab=VitimageUtils.stackToSlices(imgSeq);
+		IJ.run(maskOutLeaves,"32-bit","");
+		ImagePlus[]tabLeavesOut=VitimageUtils.stackToSlices(maskOutLeaves);
+		for(int i=0;i<tab.length;i++) {
+			tab[i]=VitimageUtils.makeOperationBetweenTwoImages(tab[i],i<2 ? interestMask1 : interestMaskN, 2, true);
+		}
+		ImagePlus res=indRuptureDownOfImageArrayDouble(tab,tabLeavesOut,threshold);
+		return res;
+	}
 	
 	public static ImagePlus computeMire(ImagePlus imgIn) {
 		ImagePlus img=new Duplicator().run(imgIn,1,1,1,1,1,1);
@@ -920,6 +731,47 @@ public class TestImageSequence {
 		return retInd;
 	}
 	
+	public static ImagePlus getMenisque(ImagePlus img,boolean highRes) {
+		//Calculer la difference entre une ouverture horizontale et une ouverture verticale
+		int factor=highRes ? 4 : 1;
+		ImagePlus img2=MorphoUtils.dilationLine2D(img, 8*factor,false);
+		img2=MorphoUtils.erosionLine2D(img2, 8*factor,false);
+		ImagePlus img3=MorphoUtils.dilationLine2D(img, 8*factor,true);
+		img3=MorphoUtils.erosionLine2D(img3, 8*factor,true);
+		ImagePlus img4=VitimageUtils.makeOperationBetweenTwoImages(img2, img3, 4, true);
+		
+		//Ouvrir cette difference, la binariser et la dilater, puis selectionner la plus grande CC > 70, et la dilater un peu
+		ImagePlus img5=MorphoUtils.dilationLine2D(img4, 15*factor,true);
+		img5=MorphoUtils.erosionLine2D(img5, 15*factor,true);
+		ImagePlus img6=VitimageUtils.thresholdImage(img5, 20, 500);
+		img6=MorphoUtils.dilationLine2D(img6, 50, true);
+		img6=MorphoUtils.dilationLine2D(img6, 2*factor,true);
+		img6=MorphoUtils.dilationLine2D(img6, 1*factor,false);
+		img6=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img6, 4, 1);
+		img6=MorphoUtils.dilationLine2D(img6, 3*factor,false);
+		IJ.run(img6,"8-bit","");
+		return img6;
+	}
+		
+	public static ImagePlus getInterestAreaMask(ImagePlus img,boolean highRes) {
+		ImagePlus img2=getMenisque(img,highRes);
+		ImagePlus img3=VitimageUtils.invertBinaryMask(img2);
+		ImagePlus img4=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img3, 4, 1);
+		IJ.run(img4,"8-bit","");
+		return img4;
+	}
+
+	public static double meanBetweenIncludedIndices(double[]tab,int ind1,int ind2) {
+		double tot=0;
+		for(int i=ind1;i<=ind2;i++)tot+=tab[i];
+		return (tot/(ind2-ind1+1));
+	}
+				
+	public static int ruptureDetectionDown(int[]vals,double threshold,boolean blabla) {
+		double[]d=new double[vals.length];
+		for(int i=0;i<d.length;i++)d[i]=vals[i];
+		return ruptureDetectionDown(d,threshold,blabla);
+	}
 
 	//Return the index which is the first point of the second distribution
 	public static int ruptureDetectionDown(double[]vals,double threshold,boolean blabla) {
@@ -941,55 +793,6 @@ public class TestImageSequence {
 		return (diffMax>threshold ? indMax : 0);
 	}
 	
-	
-
-	public static ImagePlus getMenisque(ImagePlus img,boolean highRes) {
-		//Calculer la difference entre une ouverture horizontale et une ouverture verticale
-		int factor=highRes ? 4 : 1;
-		ImagePlus img2=VitimageUtils.dilationLine2D(img, 8*factor,false);
-		img2=VitimageUtils.erosionLine2D(img2, 8*factor,false);
-		ImagePlus img3=VitimageUtils.dilationLine2D(img, 8*factor,true);
-		img3=VitimageUtils.erosionLine2D(img3, 8*factor,true);
-		ImagePlus img4=VitimageUtils.makeOperationBetweenTwoImages(img2, img3, 4, true);
-		
-		//Ouvrir cette difference, la binariser et la dilater, puis selectionner la plus grande CC > 70, et la dilater un peu
-		ImagePlus img5=VitimageUtils.dilationLine2D(img4, 15*factor,true);
-		img5=VitimageUtils.erosionLine2D(img5, 15*factor,true);
-		ImagePlus img6=VitimageUtils.thresholdImage(img5, 20, 500);
-		img6=VitimageUtils.dilationLine2D(img6, 50, true);
-		img6=VitimageUtils.dilationLine2D(img6, 2*factor,true);
-		img6=VitimageUtils.dilationLine2D(img6, 1*factor,false);
-		img6=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img6, 4, 1);
-		img6=VitimageUtils.dilationLine2D(img6, 3*factor,false);
-		IJ.run(img6,"8-bit","");
-		return img6;
-	}
-	
-	
-	public static ImagePlus getInterestAreaMask(ImagePlus img,boolean highRes) {
-		ImagePlus img2=getMenisque(img,highRes);
-		ImagePlus img3=VitimageUtils.invertBinaryMask(img2);
-		ImagePlus img4=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img3, 4, 1);
-		IJ.run(img4,"8-bit","");
-		return img4;
-	}
-	
-
-	
-	
-	public static double meanBetweenIncludedIndices(double[]tab,int ind1,int ind2) {
-		double tot=0;
-		for(int i=ind1;i<=ind2;i++)tot+=tab[i];
-		return (tot/(ind2-ind1+1));
-	}
-				
-
-	public static int ruptureDetectionDown(int[]vals,double threshold,boolean blabla) {
-		double[]d=new double[vals.length];
-		for(int i=0;i<d.length;i++)d[i]=vals[i];
-		return ruptureDetectionDown(d,threshold,blabla);
-	}
-
 
 }
 

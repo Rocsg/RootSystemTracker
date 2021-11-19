@@ -1,15 +1,22 @@
 package fr.cirad.image.TimeLapseRhizo;
 
 import java.io.Serializable;
+import java.util.List;
+
+import fr.cirad.image.common.VitimageUtils;
+import ij.ImagePlus;
+import ij.process.ImageProcessor;
 
 public class Pix implements Serializable{
 	public boolean isSkeleton=false;
 	public double distOut=0;
 	public Pix previous=null;
 	public double distanceToSkeleton=0;
-	public double time;
+	public double time=-1;
 	public double timeOut;
 	public int x;
+	public int offX;
+	public int offY;
 	public int y;
 	public int stamp=0;
 	public double wayFromPrim;
@@ -24,5 +31,16 @@ public class Pix implements Serializable{
 	public String toString(){
 		return"Pix="+(x+","+y+") , way="+wayFromPrim+" , dist="+dist+" time="+time);
 	}
+	public static ImagePlus drawPathway(ImagePlus img,List<Pix> listPixs) {
+		ImagePlus res=VitimageUtils.convertToFloat(img);
+		ImageProcessor ip=img.getStack().getProcessor(1);
+		for(int i=0;i<listPixs.size();i++) {
+			ip.set(listPixs.get(i).x, listPixs.get(i).y,255);
+		}
+		ImagePlus imRes=new ImagePlus("",ip);
+		return imRes;
+	}
+
+	
 }
 
