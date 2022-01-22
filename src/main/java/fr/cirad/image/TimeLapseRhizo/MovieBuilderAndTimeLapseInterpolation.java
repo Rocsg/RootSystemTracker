@@ -35,11 +35,12 @@ public class MovieBuilderAndTimeLapseInterpolation {
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();	
+		IJ.showMessage("la partie racinaire n'est pas proportinelle à la tige");
 		//testGridAndFire();
 		//		testFullBehaviourOnSingleSimpleRoot();
 		//testFullBehaviour();
 //		testRootSpeed();
-		runInterpolation_V2("1", "00003",vMaxInUse,timeStep);
+		runInterpolation_V2("1", "0005",vMaxInUse,timeStep);
 		VitimageUtils.waitFor(200000);
 		System.exit(0);
 	}
@@ -164,7 +165,6 @@ public class MovieBuilderAndTimeLapseInterpolation {
 		else          IJ.saveAsTiff(mixFgBg,dataDir+"/5_Timelapse/ML"+ml+"_Boite_"+boite+"_V3.tif");		
 		tim.print("Saved");
 		mixFgBg.show();
-		VitimageUtils.waitFor(1000000);
 	}
 
 	

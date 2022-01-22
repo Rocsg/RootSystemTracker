@@ -36,9 +36,6 @@ public class DouglasPeuckerSimplify {
     
     
 	public static List<Pix> simplify(List<Pix> listIn,List<Integer>fixedTmp,double tolerance){
-		System.out.println("LIST IN length="+listIn.size());
-		System.out.println("fixed=");
-		for(int in:fixedTmp)System.out.println(in);
 		List<Integer>fixed=new ArrayList<Integer>();
 		if(fixedTmp.size()==0) {fixed.add(0);fixed.add(listIn.size()-1);}
 		else {

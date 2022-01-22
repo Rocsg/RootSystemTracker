@@ -44,7 +44,7 @@ public class ProcessImages {
 		ImagePlus img2=extractAreaBarCode(img);
 		img2.show();
 		VitimageUtils.waitFor(1000000);
-*/		prepareDirs();
+;,*/		prepareDirs();
 		int nBarcodeGood=0;
 		int nBarcode=0;
 		String[]dirNames=new File(mainDataPath,"0_Source").list();

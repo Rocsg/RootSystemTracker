@@ -22,6 +22,7 @@ import ij.gui.Roi;
 import ij.process.ImageProcessor;
 
 public class CC implements Serializable{
+	public CC lastCCinLat=null;
 	public static double ratioFuiteBordSurLongueur=1;
 	private static final long serialVersionUID = 1L;
 	public boolean finalRS=false;
@@ -30,11 +31,27 @@ public class CC implements Serializable{
 	public boolean isPrimEnd=false;
 	public boolean isLatStart=false;
 	public boolean isLatEnd=false;
+	public boolean isLateral=false;
+	public CC associatePrev=null;
+	public CC associateSuiv=null;
+	public boolean changedRecently=false;
+	public int deltaTimeFromStart=0;
+	public int deltaTimeBefore=0;
+	public double lengthFromStart=0;
+	public double lengthBefore=0;
+	public int surfaceFromStart=0;
+	public boolean nonValidLatStart=false;
 	public boolean trunk=false;
+	public int goesToTheLeft=0;
 	public CC ccPrev=null;
+	public CC ccLateralStart=null;
+	public ArrayList<CC>pathFromStart=null;
 	public int nPixels;
 	public  int day;
+	public boolean isOut=false;
+	public int lateralStamp=-1;
 	public ImagePlus thisSeg=null;
+	public CC incidentCC=null;
 	public int n;
 	public Roi r;
 	double x;
@@ -43,6 +60,7 @@ public class CC implements Serializable{
 	int yB;
 	public int stamp=0;
 	public int stamp2=0;
+	public double stampDist=0;
 	public int componentLabel=0;
 	public boolean illConnected=false;
 	SimpleWeightedGraph<Pix,Bord>pixGraph;
@@ -66,6 +84,29 @@ public class CC implements Serializable{
 		if(debug)System.out.println(("X="+x+" Y="+y+" Total="+(2*score0/*+score1-cost1*/+2*score2)+" score0="+score0+"  score1="+score1+" cost1="+cost1+" score2="+score2+" with exp="+expectedX+","+expectedY));
 		return (2*score0+/*score1-cost1*/+2*score2);
 	}
+	
+	
+	public void lightOffLateralRoot() {
+		if(!isLatStart)return;
+		CC ccOld=this;
+		CC ccTmp=this;
+		ConnectionEdge edge=null;
+		while(ccTmp.bestOutgoingActivatedCC()!=null) {
+			ccOld=ccTmp;
+			ccTmp=ccOld.bestOutgoingActivatedCC();
+			edge=ccTmp.bestIncomingActivatedEdge();
+			graph.removeVertex(ccOld);
+			graph.removeEdge(edge);
+		}
+		graph.removeVertex(ccTmp);
+	}
+	
+	public void setOut() {
+		this.isOut=true;
+		for(ConnectionEdge edge : graph.outgoingEdgesOf(this))edge.isOut=true;
+		for(ConnectionEdge edge : graph.incomingEdgesOf(this))edge.isOut=true;
+	}
+	
 	
 	public static CC fuseListOfCCIntoSingleCC(List<CC>list) {
 		int nCC=list.size();
@@ -805,7 +846,7 @@ public class CC implements Serializable{
 
 	public void interpolateTimeFromReferencePointsUsingLinearInterpolator(double[]espaceSource,double []timeSource) {
 		for(Pix p:pixGraph.vertexSet()) {
-			p.time=SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim,espaceSource,timeSource);
+			p.time=SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, espaceSource, timeSource);//  SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim,espaceSource,timeSource);
 			p.timeOut=SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim+p.distOut,espaceSource,timeSource);
 		}
 	}
@@ -1098,4 +1139,5 @@ public class CC implements Serializable{
 		if(y2>Y1+1)return false;
 		return true;
 	}
+
 }

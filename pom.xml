@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.phenomen</groupId>
-  <artifactId>RSMLViewer</artifactId>
+  <groupId>fr.cirad.image</groupId>
+  <artifactId>RootSystemTracker</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <name>RSMLViewer</name>
+  <name>RootSystemTracker</name>
 	<scm>
 		<connection>scm:git:git://github.com/Rocsg/RootSystemTracker</connection>
 		<developerConnection>scm:git:git@github.com:Rocsg/RootSystemTracker</developerConnection>
@@ -20,10 +20,10 @@
 	</ciManagement>
 
 	<properties>
-		<package-name>com.phenomen.rsmlviewer</package-name>
+		<package-name>fr.cirad.image.TimeLapseRhizo</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
-		<main-class>RSMLGui</main-class>
-		<license.copyrightOwners>com.phenomen</license.copyrightOwners>
+		<main-class>TestImageSequence</main-class>
+		<license.copyrightOwners>fr.cirad</license.copyrightOwners>
   	    <maven.compiler.source>1.8</maven.compiler.source>
 	    <maven.compiler.target>1.8</maven.compiler.target>
 	    
@@ -79,6 +79,11 @@
 		    <scope>system</scope>
 			<systemPath>${basedir}/lib/Fijiyama/Fijiyama-jar/4.0.0/Fijiyama-4.0.0.jar</systemPath>
 		</dependency> 
+       <dependency>
+            <groupId>sc.fiji</groupId>
+            <artifactId>imagescience</artifactId>
+            <version>3.0.0</version>
+        </dependency>
 			
 			<dependency>
 			    <groupId>com.manyangled</groupId>

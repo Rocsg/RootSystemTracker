@@ -12,6 +12,7 @@ public class ConnectionEdge extends DefaultWeightedEdge implements Serializable 
 	double distanceConnectionTrunk=0;
 	boolean activated=true;
 	public CC source;
+	public boolean isOut=false;
 	public CC target;
 	public int axisX;
 	public int axisY;
