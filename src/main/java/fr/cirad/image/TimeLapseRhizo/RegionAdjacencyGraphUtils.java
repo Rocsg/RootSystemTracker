@@ -32,7 +32,7 @@ public class RegionAdjacencyGraphUtils {
 	public static int minDistanceBetweenLateralInitiation=4;
 	public static int minLateralStuckedToOtherLateral=30;
 	public static int MIN_SIZE_CC=5;
-	static int SIZE_FACTOR=4;
+	static int SIZE_FACTOR=6;
 	static int MAX_SPEED_LAT=33;
 	static int TYPICAL_SPEED=100/8;//pixels/timestep. pix=19µm , timestep=8h, meaning TYPICAL=237 µm/h
 	static double PENALTY_COST=0.5;
@@ -274,7 +274,7 @@ public class RegionAdjacencyGraphUtils {
 					if(ccLast.day<(dMax)) {
 						System.out.println("\nDebug : tracking lateral false stop from"+ccLast);
 						
-						if(ccStart.pathFromStart.size()<3) {
+						if(ccStart.pathFromStart.size()<2) {
 							rejectionCause+="Ending too early, and too small";
 							ccStart.nonValidLatStart=true;
 							System.out.println("B REJECT Concluding too small");
@@ -348,7 +348,7 @@ public class RegionAdjacencyGraphUtils {
 							if(ccl.lengthFromStart<minLenForBranchThatStop) {
 								rejectionCause+="Ending too early, and too small";
 								ccStart.nonValidLatStart=true;
-								System.out.println("A REJECT Concluding too small");
+								rejectionCause+="A REJECT Concluding too small";
 							}
 						}
 						else {//Incidence
@@ -515,8 +515,7 @@ public class RegionAdjacencyGraphUtils {
 					}
 					for(int i=0;i<6;i++)rejectionCause+=(" ["+tempStd[i]+"] ");
 					rejectionCause+="\n";
-
-					for(int i=0;i<6;i++) {
+					if(cc !=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1 ) )for(int i=0;i<6;i++) {
 						if(tempStd[i]>=nMaxSigma) {
 							rejectionCause+=("\n Rejection at node "+nCur+" for cause "+i+" = "+tempStd[i]);
 							ccStart.nonValidLatStart=true;
@@ -571,7 +570,7 @@ public class RegionAdjacencyGraphUtils {
 		int thickness=5;
 		int sizeFactor=SIZE_FACTOR;
 		int connexity=8;
-		int nSteps=6;
+		int nSteps=4;
 		int nbTrees=5;
 		boolean goStraightPlease=false;
 		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=null;
@@ -579,13 +578,26 @@ public class RegionAdjacencyGraphUtils {
 			
 			graph=buildGraphFromDateMap(imgDatesTmp,connexity);
 			pruneGraph(graph, nbTrees,true);
-			setFirstOrderCosts(graph);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step1.ser");
+			setFirstOrderCosts_phase1(graph);
+//			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step1.ser");
 			identifyTrunks(graph);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step2.ser");
-			setFirstOrderCosts(graph);
+//			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step2.ser");
+			setFirstOrderCosts_phase2(graph);
 			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step3.ser");
+			CC cctest=getCC(graph,5767,1735);
+			System.out.println("DEB HHH");
+			for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
+				System.out.println(edge);
+			}
 			computeMinimumDirectedConnectedSpanningTree(graph);//TODO : les deux étapes là sont redondantes. Le disconnect suffit
+
+			CC ccTest=getCC(graph,5767,1735);
+			System.out.println("DEB HHHHHHH");
+			for(ConnectionEdge edge : graph.outgoingEdgesOf(ccTest)) {
+				System.out.println(edge);
+			}
+
+			//VitimageUtils.waitFor(50000);
 			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step4.ser");
 			reconnectDisconnectedBranches_v2(imgDatesTmp,graph,1,true,false);		//reconnectSingleBranches(graph4);
 			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step5.ser");
@@ -604,8 +616,8 @@ public class RegionAdjacencyGraphUtils {
 			ImagePlus dates;
 			ImagePlus graphs;
 			if(doDebugImages) {
-				ImagePlus[]graphsImgs=new ImagePlus[6];
-				ImagePlus[]backImgs=new ImagePlus[6];
+				ImagePlus[]graphsImgs=new ImagePlus[4];
+				ImagePlus[]backImgs=new ImagePlus[4];
 				if(goStraightPlease) {
 					graphsImgs=new ImagePlus[3];
 					backImgs=new ImagePlus[3];
@@ -623,10 +635,11 @@ public class RegionAdjacencyGraphUtils {
 				}
 				else {
 					for(int i=0;i<nSteps;i++) {
-						SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(i+1)+".ser");
+						SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(i+3)+".ser");
 						graphsImgs[i]=drawGraph(imgDatesTmp, gg, ray, thickness,sizeFactor);		
 						backImgs[i]=imgDatesHigh.duplicate();
 					}
+					//VitimageUtils.waitFor(5000000);
 				}
 				graphs=VitimageUtils.slicesToStack(graphsImgs);
 				graphs=VitimageUtils.convertFloatToByteWithoutDynamicChanges(graphs);
@@ -643,7 +656,7 @@ public class RegionAdjacencyGraphUtils {
 			ImagePlus glob=VitimageUtils.hyperStackingChannels(new ImagePlus[] {dates,graphs});
 			glob.setDisplayRange(0, nDays);
 			IJ.run(graphs,"Fire","");
-			glob.show();
+			//glob.show();
 			IJ.saveAsTiff(glob, mainDataDir+"/3_Graphs_Tif/ML"+ml+"_Boite_"+boite+".tif");
 		}
 		return graph;
@@ -848,7 +861,13 @@ public class RegionAdjacencyGraphUtils {
 		
 	public static void computeMinimumDirectedConnectedSpanningTree(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph) {		
 		System.out.print("Computing connected directed minimum spanning tree");
-
+		CC cctest=getCC(graph,5767,1735);
+		System.out.println("DEB 1");
+		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
+			System.out.println(edge);
+		}
+		System.out.println("DEB 2");
+		
 		//Initialize connexe traversal from the virtual start (day=0)
 		int maxDay=0;int currentCC=1;
 		for(CC cc:graph.vertexSet()) {
@@ -856,11 +875,13 @@ public class RegionAdjacencyGraphUtils {
 			if(cc.day>maxDay)maxDay=cc.day;
 		}
 
-		//From day to day, 
+		
+		
+		//From day to day, select for each CC the best supplying edge
 		for(int i=1;i<=maxDay;i++) {
 			for(CC cc:graph.vertexSet()) {
 				if(cc.day!=i)continue;
-				boolean debug=(cc==getCC(graph, 18, 5605, 1893));
+				boolean debug=(cc==getCC(graph, 18, 5719, 1874));
 				ConnectionEdge edgeMin=null;
 				double minCost=1E16;
 				ConnectionEdge edgeMinConnected=null;
@@ -876,13 +897,13 @@ public class RegionAdjacencyGraphUtils {
 						edgeMin=edge;
 					}
 				}
-				if(edgeMinConnected!=null) {
-					if(debug)System.out.println("H1, with edgeMinCon="+edgeMinConnected);
-					for(ConnectionEdge edge:graph.incomingEdgesOf(cc))edge.activated=(edge==edgeMinConnected);
-					cc.stamp=1;
-					if(debug)System.out.println("H11, with edgeMinCon="+edgeMinConnected);
-				}
-				else if(edgeMin!=null) {
+				//if(edgeMinConnected!=null) {
+				//	if(debug)System.out.println("H1, with edgeMinCon="+edgeMinConnected);
+				//	for(ConnectionEdge edge:graph.incomingEdgesOf(cc))edge.activated=(edge==edgeMinConnected);
+				//	cc.stamp=1;
+				//	if(debug)System.out.println("H11, with edgeMinCon="+edgeMinConnected);
+				//}
+				if(edgeMin!=null) {
 					if(debug)System.out.println("H2");
 					for(ConnectionEdge edge:graph.incomingEdgesOf(cc))edge.activated=(edge==edgeMin);
 					cc.stamp=graph.getEdgeSource(edgeMin).stamp;
@@ -894,7 +915,26 @@ public class RegionAdjacencyGraphUtils {
 				}
 			}
 		}				
-		//disactivateNonOptimalLateralBranches
+		System.out.println("DEB 2");
+		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
+			System.out.println(edge);
+		}
+		System.out.println("DEB 2");
+		updateCostAndDisconnectNonOptimalLateralBranches_V2(graph);
+		System.out.println("DEB 3");
+		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
+			System.out.println(edge);
+		}
+		System.out.println("DEB 3");
+		System.out.println("\n -> End of minimum directed connected spanning tree. Total number of components = "+currentCC+" (higher than expected nTrees means probably disconnected laterals emerged)");
+		//VitimageUtils.waitFor(40000000);
+	}
+
+	
+	
+	public static void updateCostAndDisconnectNonOptimalLateralBranches_V1(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph){
+		//update costs and disactivateNonOptimalLateralBranches
+	
 		for(CC cc:graph.vertexSet()) {
 			boolean debug=(cc==getCC(graph, 17, 5605, 1796));
 			if(debug)System.out.println("Disactivate neighbours of ?"+cc);
@@ -908,10 +948,32 @@ public class RegionAdjacencyGraphUtils {
 				}
 			}
 		}
-		System.out.println("\n -> End of minimum directed connected spanning tree. Total number of components = "+currentCC+" (higher than expected nTrees means probably disconnected laterals emerged)");
 	}
-
 	
+	public static void updateCostAndDisconnectNonOptimalLateralBranches_V2(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph){
+		//The idea : coming from N-1, for each CC that is no trunk, select the successor with the biggest number of followers, counted in pixels
+		int maxDay=getMaxDay(graph);
+		for(int i=maxDay;i>0;i--) {
+			for(CC cc:graph.vertexSet()) {
+			if(cc.trunk || cc.day!= i)continue;
+				if(i==maxDay) {cc.count=cc.nPixels;continue;}
+				
+				
+				ConnectionEdge bestEdge=cc.bestCountOutgoingEdge_v2();
+				cc.count=cc.nPixels;
+				for(ConnectionEdge edge : graph.outgoingEdgesOf(cc)){
+					cc.count+=graph.getEdgeTarget(edge).count;
+				}
+				for(ConnectionEdge edge : graph.outgoingEdgesOf(cc)) {
+					//if(debug)System.out.println("Processing an edge "+edge);
+					if(edge!=bestEdge)  {
+						//if(debug)System.out.println("Disactivating this." );
+						edge.activated=false;
+					}
+				}
+			}
+		}		
+	}
 
 	
 	
@@ -1021,8 +1083,8 @@ public class RegionAdjacencyGraphUtils {
 		double[][]costMatrix=new double[Nstop][Nstart];
 		while(!finished) {
 
-			CC ccstoptest=getCC(graph,3307,1184);
-			CC ccstarttest=getCC(graph,3281,1190);
+			CC ccstoptest=getCC(graph,2026,2498);
+			CC ccstarttest=getCC(graph,2025,2550);
 			
 			Timer t2=new Timer();
 			t2.print("1");
@@ -1040,8 +1102,12 @@ public class RegionAdjacencyGraphUtils {
 	            			else{
 	            				nStill++;
 	            				if(listStop.get(i).changedRecently || listStart.get(j).changedRecently) {	
+	            					if(listStop.get(i)==ccstoptest && listStart.get(j)==ccstarttest) {debug=true;}
 	            					costMatrix[i][j]=weightingOfPossibleHiddenEdge_v2(img,graph,listStop.get(i),listStart.get(j),debug);
-	            					//if(listStop.get(i)==ccstoptest && listStart.get(j)==ccstarttest)IJ.showMessage("Cost="+costMatrix[i][j]);
+	            					if(debug) {
+	            						//IJ.showMessage("Cost="+costMatrix[i][j]);
+	            						//VitimageUtils.waitFor(50000);
+	            					}
 	            					if(Double.isNaN(costMatrix[i][j]))	System.out.println("I="+i+" J="+j);
 	            					
 	            				}
@@ -1096,12 +1162,15 @@ public class RegionAdjacencyGraphUtils {
 			if(bestI==-1) {finished=true;continue;}
 			CC ccStop=listStop.get(bestI);
 			CC ccStart=listStart.get(bestJ);
+			boolean deb=(ccStop==getCC(graph,953,4070 ));
 		    System.out.println("\n\nHungarian iterative at step "+stepHung+" N associated="+N+" meanscore="+(meanScore/N)+".\n   Chosen link with score="+bestW+" : "+ccStop+" --> "+ccStart);
 		    weightingOfPossibleHiddenEdge_v2(img,graph,listStop.get(bestI),listStart.get(bestJ),true);
-			   System.out.println("H2");
+		    if(deb)IJ.showMessage("There");
+		    System.out.println("H2");
 			//if(testCycle(graph,ccStop,ccStart)) {finished=true;continue;}
 		    if(bestW>=thresholdScore) {System.out.println("Best exceeds. Break loop");finished=true;continue;}
-
+		    
+		    
 		    
 		    double xCon=ccStop.r.getContourCentroid()[0]*0.5+ccStart.r.getContourCentroid()[0]*0.5;
 			double yCon=ccStop.r.getContourCentroid()[1]*0.5+ccStart.r.getContourCentroid()[1]*0.5;
@@ -1776,7 +1845,7 @@ public class RegionAdjacencyGraphUtils {
 	}
 	
 
-	//Compute how much the staight computed path is far away from expected structures.
+	//Compute how much the straight computed path is far away from expected structures.
 	//For path going lower than 5 pixels, path is at no cost
 	//For 5-10, each pixel contributes to mean from 0.0 to 1.0
 	//For 10-20, each pixel contributes to mean from 1.0 to 3.0
@@ -1810,7 +1879,7 @@ public class RegionAdjacencyGraphUtils {
 			int y=toInt(yy);
 			int val=toInt(tab[y*X+x]);
 			if(val<2)total+=0;
-			else total+=(val-1)*0.5;
+			else total+=(val-1)*2;//0.5;
 		}
 		if(N==0)return 0.5;
 		else return (total/N);
@@ -1822,6 +1891,126 @@ public class RegionAdjacencyGraphUtils {
 	
 	//Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
 	public static double weightingOfPossibleHiddenEdge_v2(ImagePlus img,SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
+		//if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
+		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
+		if(ccStop==ccStart)return REVERSE_TIME_PENALTY;
+		if(ccStop.bestIncomingActivatedCC()==ccStart)return REVERSE_TIME_PENALTY;
+		if(ccStart.bestIncomingActivatedCC()==ccStop)return REVERSE_TIME_PENALTY;
+		int nStop=1;
+		int nStart=1;
+		CC ccPrec=null;
+		CC ccSuiv=null;
+		
+		if(ccStart.bestOutgoingActivatedCC()==null) {}
+		else {
+			ccSuiv=ccStart.bestOutgoingActivatedCC();
+			nStart=2;
+			if(ccSuiv.bestOutgoingActivatedCC()==null) {}
+			else {
+				ccSuiv=ccSuiv.bestOutgoingActivatedCC();
+				nStart=3;
+			}
+		}
+		if(debug)System.out.println("Nstart="+nStart);
+
+		if(ccStop.bestIncomingActivatedCC()==null) {}
+		else {
+			ccPrec=ccStop.bestIncomingActivatedCC();
+			nStop=2;
+			if(ccPrec.bestIncomingActivatedCC()==null) {}
+			else {
+				ccPrec=ccPrec.bestIncomingActivatedCC();
+				nStop=3;
+			}
+		}
+		if(debug)System.out.println("Nstop="+nStop);
+
+		double valWstop=(nStop==3 ? 1 : (nStop==2 ? 0.5 : 1));
+		double valWstart=(nStart==3 ? 1 : (nStart==2 ? 0.5 : 1));
+		double[]tabW=new double[] {valWstop,valWstart,valWstop,valWstart,1,1,1,1,1,1};
+		double[]tabGamma=new double[10];
+		
+
+		//Angle score
+		if(nStop>1)  tabGamma[0]=2*(1-prodScal(ccPrec, ccStop, ccStop, ccStart));
+		else tabGamma[0]=0.5;
+		if(nStart>1)tabGamma[1]=2*(1-prodScal(ccStop, ccStart, ccStart, ccSuiv));
+		else tabGamma[1]=0.5;
+		if(Double.isNaN(tabGamma[0]))tabGamma[0]=0.5;
+		if(Double.isNaN(tabGamma[1]))tabGamma[1]=0.5;
+		
+		
+		
+		//Speed score
+		double dtCross=ccStart.day-ccStop.day;
+		if(dtCross==0)dtCross=0.7;
+		double crossSpeed=ccStop.euclidianDistanceToCC(ccStart)/dtCross;
+		double dtStop=0;
+		double stopSpeed=0;
+		double dtStart=0;
+		double startSpeed=0;
+		if(nStop>1) {
+			dtStop=ccStop.day-ccPrec.day;
+			if(dtStop==0)dtStop=0.7;
+			stopSpeed=ccStop.euclidianDistanceToCC(ccPrec)/dtStop;
+			tabGamma[2]=1-VitimageUtils.similarity(stopSpeed,crossSpeed);
+		}
+		else tabGamma[2]=0.5;
+		
+		if(nStart>1) {
+			dtStart=ccSuiv.day-ccStart.day;
+			if(dtStart==0)dtStart=0.7;
+			startSpeed=ccStart.euclidianDistanceToCC(ccSuiv)/dtStart;
+			tabGamma[3]=1-VitimageUtils.similarity(startSpeed,crossSpeed);
+		}
+		else tabGamma[3]=0.5;
+		
+		
+		//Orientation score
+		tabGamma[4]=(1-0.5*orientationDownwards(ccStop, ccStart));
+		if(Double.isNaN(tabGamma[4]))tabGamma[4]=1;
+		
+		//Connection score
+		int nbSteps=areConnectedByPathOfCC_v2(graph,ccStop,ccStart,debug);
+		int lNorm=3;
+		tabGamma[5]=(1.0/lNorm)*Math.abs(nbSteps-dtCross-2.5)+(dtCross<2 ? 0 : 0.15*(dtCross-1));
+		
+		//Glob Orientation score
+		if(nStop==1 || nStart==1) {tabGamma[6]=0.5;tabGamma[7]=0.5;tabW[6]=0.5;tabW[7]=0.5;}
+		else {
+			if(nStop==3 && nStart==3) {tabW[6]=1.0;tabW[7]=1.0;}
+			else {tabW[6]=0.75;tabW[7]=0.75;}
+			tabGamma[6]= (1-prodScal(ccPrec, ccStop, ccStart, ccSuiv));
+			tabGamma[7]=1-VitimageUtils.similarity(startSpeed,stopSpeed);
+		}
+
+		tabGamma[8]=costDistanceOfPathToObject(img,ccStop.x ,ccStop.y,ccStart.x,ccStart.y);
+		tabGamma[9]=0.5;
+		double maxSpeedLat=MAX_SPEED_LAT;
+		double meanSpeedLat=10;
+		if(  ((ccStop.euclidianDistanceToCC(ccStart))/(Math.max(0.7, ccStart.day-ccStop.day))) >maxSpeedLat) {
+			tabGamma[9]=5*(  ((ccStop.euclidianDistanceToCC(ccStart))/(Math.max(0.7, ccStart.day-ccStop.day)))-maxSpeedLat)/maxSpeedLat;
+		}
+		
+//		tabGamma[10]=  20.0/ccStop.nPixels;
+//		tabGamma[11]=  20.0/ccStart.nPixels;
+		
+		double globScore=0;
+		double globWeight=0;
+
+//10 si nPixels=1 , 7 si ça vaut 2 , 5 si ça vaut 3, 4 si ça vaut 4, 3 si ça vaut 5, 		
+		for(int i=0;i<10;i++) {
+			if(debug)System.out.println("Score "+i+"="+tabGamma[i]+" weight="+tabW[i]);
+			if(Double.isNaN( tabGamma[i]))tabGamma[i]=1;
+			globScore+=(tabGamma[i]*tabW[i]);
+			globWeight+=tabW[i];
+		}
+		if(debug)System.out.println("Result="+(globScore/globWeight));
+		return globScore/globWeight;
+	}
+
+	//Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
+	public static double weightingOfPossibleHiddenEdge_v3(ImagePlus img,SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
 		//if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
 		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
 		if(ccStop==ccStart)return REVERSE_TIME_PENALTY;
@@ -1938,6 +2127,7 @@ public class RegionAdjacencyGraphUtils {
 	}
 
 
+
 	public static double weightingOfPossibleHiddenEdge(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
 		if(debug)System.out.println("\nH021 weighting with "+ccStop);
 		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
@@ -2042,7 +2232,13 @@ public class RegionAdjacencyGraphUtils {
 		return null;
 	}
 	
-	public static void setFirstOrderCosts(SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph) {
+	public static void setFirstOrderCosts_phase2(SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph) {
+		int nDays=getMaxDay(graph);
+		for(ConnectionEdge edge:graph.edgeSet()) {
+			graph.setEdgeWeight(edge, getCostFirstOrderConnection_phase2(edge,nDays));
+		}
+	}
+	public static void setFirstOrderCosts_phase1(SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph) {
 		int nDays=getMaxDay(graph);
 		for(ConnectionEdge edge:graph.edgeSet()) {
 			graph.setEdgeWeight(edge, getCostFirstOrderConnection(edge,nDays));
@@ -2238,7 +2434,7 @@ public class RegionAdjacencyGraphUtils {
 			}
 			boolean extremity =isExtremity(cc,graph);
 			if(extremity) {
-				if(cc.nPixels>=MIN_SIZE_CC)VitimageUtils.drawCircleIntoImage(imgGraph, vx*(factor*circleRadius+4+(cc.trunk ? 2 : 0)), (int)Math.round(ccx*sizeFactor), (int)Math.round(ccy*sizeFactor), 0,12);
+				if(cc.nPixels>=2)VitimageUtils.drawCircleIntoImage(imgGraph, vx*(factor*circleRadius+3+(cc.trunk ? 2 : 0)), (int)Math.round(ccx*sizeFactor), (int)Math.round(ccy*sizeFactor), 0,12);
 			}
 			else {
 				VitimageUtils.drawCircleIntoImage(imgGraph, vx*(factor*circleRadius+2+(cc.trunk ? 2 : 0)), (int)Math.round(ccx*sizeFactor), (int)Math.round((ccy)*sizeFactor), 0,255);
@@ -2360,6 +2556,24 @@ public class RegionAdjacencyGraphUtils {
 		return cost;//TODO : on peut laisser dday-1, le cas ne sert pas, à tester
 	}
 	
+	public static double getCostFirstOrderConnection_phase2(ConnectionEdge edge,int nDays) {
+		CC source=edge.source;
+		CC target=edge.target;
+		if(source.day==0)return (-1000);
+		if(source.day>target.day)return (10000);
+		double dx=target.r.getContourCentroid()[0]-source.r.getContourCentroid()[0];
+		double dy=target.r.getContourCentroid()[1]-source.r.getContourCentroid()[1];
+		double dday=Math.abs(target.day-source.day);
+		double prodscal=dy/Math.sqrt(dx*dx+dy*dy);
+		double cost=0;
+		if((source.trunk) && (!target.trunk)) {
+			cost+=(1-VitimageUtils.similarity(source.nPixels,target.nPixels)) + (nDays-1) + 1 + VitimageUtils.EPSILON;
+		}
+		else{			
+			cost+=(1-VitimageUtils.similarity(source.nPixels,target.nPixels)) + (dday<2 ? 0 : dday-1)  -0.5-prodscal*0.5  ; 
+		}
+		return cost;//TODO : on peut laisser dday-1, le cas ne sert pas, à tester
+	}
 
 
 	public static SimpleDirectedWeightedGraph<CC,ConnectionEdge>readGraphFromFile(String path){

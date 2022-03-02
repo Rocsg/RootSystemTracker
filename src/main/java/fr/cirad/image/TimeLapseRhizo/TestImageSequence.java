@@ -1,6 +1,11 @@
 package fr.cirad.image.TimeLapseRhizo;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import fr.cirad.image.common.Timer;
@@ -51,8 +56,9 @@ public class TestImageSequence extends PlugInFrame{
 
 		
 		for(int mli=1;mli<=1;mli++) {
-			for(int boi=1;boi<=6;boi++) {
+			for(int boi=2;boi<=2;boi++) {
 				if(mli==5)setRootnavParams();
+				//if(boi==2 || boi==23 || boi==24)continue;
 				
 				String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
 				String ml=""+(mli==5 ? "RootNav" : mli);
@@ -63,10 +69,11 @@ public class TestImageSequence extends PlugInFrame{
 				//runImportSequences(ml,boite);
 				//runRegisterSequences(ml,boite);
 				//runComputeMaskAndRemoveLeaves(ml,boite);//9 secondes
-				computeML(ml, boite);
+				//computeML(ml, boite);
 				//runDateEstimation(ml,boite);//2.61 secondes
 				//buildAndProcessGraph(ml,boite);
-				//computeTimes(ml, boite);
+//				computeTimes(ml, boite);
+				exportToExpertize(ml, boite);
 				t.print("Stop"+mli+"-"+boi);
 			}
 		}
@@ -365,8 +372,8 @@ public class TestImageSequence extends PlugInFrame{
 		ImagePlus mire=computeMire(imgIn);
 		imgIn=VitimageUtils.addSliceToImage(mire, imgIn);
 		if(imgIn==null)return;
-		int threshRupt=20;
-		int threshSlope=1;
+		int threshRupt=25;
+		int threshSlope=10;
 		ImagePlus imgOut=projectTimeLapseSequenceInColorspaceCombined(imgIn, imgMask1,imgMaskN,imgMaskOfLeaves,threshRupt,threshSlope);
 		imgOut=VitimageUtils.makeOperationBetweenTwoImages(imgOut, imgMaskN, 2, true);
 		ImagePlus img2=VitimageUtils.thresholdImage(imgOut, 0.5, 100000);
@@ -489,6 +496,24 @@ public class TestImageSequence extends PlugInFrame{
 		return new ImagePlus [] {img1,img2};
 	}
 			
+	
+	public  void exportToExpertize(String ml, String boite) {
+		String exportDir=mainDataDir+"/Processing_by_box";
+		new File(exportDir).mkdir();
+		String mlDir=exportDir+"/ML"+ml+"_Boite_"+boite;
+		new File(mlDir).mkdir();
+
+		//Copy rsml image
+		Path source=FileSystems.getDefault().getPath(new File(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml").getAbsolutePath());
+		Path target=FileSystems.getDefault().getPath(new File(mlDir,"4_2_Model.rsml").getAbsolutePath());
+		try {Files.copy(source,target,StandardCopyOption.REPLACE_EXISTING);} catch (IOException e) {e.printStackTrace();}
+		
+		//Copy rsml image
+		source=FileSystems.getDefault().getPath(new File(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif").getAbsolutePath());
+		target=FileSystems.getDefault().getPath(new File(mlDir,"1_5_RegisteredSequence.tif").getAbsolutePath());
+		try {Files.copy(source,target,StandardCopyOption.REPLACE_EXISTING);} catch (IOException e) {e.printStackTrace();}
+	}
+	
 	public  void computeTimes(String ml, String boite) {
 		ImagePlus dates=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
 		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphUtils.readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".ser");
@@ -504,12 +529,11 @@ public class TestImageSequence extends PlugInFrame{
 		//<DEBUG
 
 		RootModel rm=RegionAdjacencyGraphUtils.refinePlongementOfCCGraph(graph,distOut,0.9);
+		rm.cleanWildRsml();
+		rm.resampleFlyingRoots();
 		rm.writeRSML3D(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml", "",true);
 		rm=RootModel.RootModelWildReadFromRsml(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml");
-
-		System.out.println("Before crash");
 		ImagePlus skeletonTime=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,3);
-		System.out.println("After crash");
 		ImagePlus skeletonDay=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,2);
 		ImagePlus allTimes=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,false,1);
 		//rm.createGrayScaleImage(skeletonTime,0,false,true,1).show(); 
@@ -938,7 +962,8 @@ public class TestImageSequence extends PlugInFrame{
     */
 	public ImagePlus projectTimeLapseSequenceInColorspaceCombined(ImagePlus imgSeq,ImagePlus interestMask1,ImagePlus interestMaskN,ImagePlus maskOfLeaves,int thresholdRupture,int thresholdSlope) {
 		//imgSeq.show();
-		IJ.run(imgSeq, "Mean...", "radius=1 stack");
+		IJ.run(imgSeq, "Gaussian Blur...", "sigma=0.8");
+		//IJ.run(imgSeq, "Mean...", "radius=1 stack");
 		ImagePlus result1=projectTimeLapseSequenceInColorspaceMaxRuptureDown(imgSeq,interestMask1,interestMaskN,maskOfLeaves,thresholdRupture);
 		ImagePlus result2=projectTimeLapseSequenceInColorspaceMaxSlope(imgSeq,interestMask1,interestMaskN,thresholdSlope);
 		result1.show();

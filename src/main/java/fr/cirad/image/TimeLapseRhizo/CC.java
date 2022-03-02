@@ -53,6 +53,7 @@ public class CC implements Serializable{
 	public ImagePlus thisSeg=null;
 	public CC incidentCC=null;
 	public int n;
+	public int count=0;
 	public Roi r;
 	double x;
 	double y;
@@ -674,6 +675,37 @@ public class CC implements Serializable{
 	public int[]getExpectedTarget(){
 		ConnectionEdge edge=bestOutgoingActivatedEdge();
 		return getPrevTargetFromFacetConnexion(edge);
+	}
+	
+	public ConnectionEdge bestCountOutgoingEdge() {
+		double maxPix=-1;
+		double minCost=1E18;
+		ConnectionEdge bestEdge=null;
+		if(graph.outgoingEdgesOf(this).size()>0) {
+			for(ConnectionEdge edge : graph.outgoingEdgesOf(this)) {
+				if(  (graph.getEdgeTarget(edge).count==maxPix && graph.getEdgeWeight(edge)<minCost)  ||
+					 (graph.getEdgeTarget(edge).count>maxPix) ) {
+					minCost=graph.getEdgeWeight(edge);
+					maxPix=graph.getEdgeTarget(edge).count;
+					bestEdge=edge;
+				}
+			}
+		}
+		return bestEdge;
+	}
+	public ConnectionEdge bestCountOutgoingEdge_v2() {
+		double maxVal=-100000000;
+		ConnectionEdge bestEdge=null;
+		if(graph.outgoingEdgesOf(this).size()>0) {
+			for(ConnectionEdge edge : graph.outgoingEdgesOf(this)) {
+				double val=graph.getEdgeTarget(edge).count*1.0/(1+VitimageUtils.EPSILON+graph.getEdgeWeight(edge));
+				if(  val>maxVal) {
+					maxVal=val;
+					bestEdge=edge;
+				}
+			}
+		}
+		return bestEdge;
 	}
 	
 	public ConnectionEdge bestOutgoingEdge() {

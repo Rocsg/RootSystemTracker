@@ -2,6 +2,7 @@ package fr.cirad.image.TimeLapseRhizo;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -17,8 +18,10 @@ import ij.ImagePlus;
 import ij.gui.Overlay;
 import ij.gui.Roi;
 import ij.gui.TextRoi;
+import ij.measure.Calibration;
 import ij.plugin.ChannelSplitter;
 import ij.plugin.Duplicator;
+import ij.plugin.filter.AVI_Writer;
 import ij.process.ImageProcessor;
 
 public class MovieBuilderAndTimeLapseInterpolation {
@@ -29,22 +32,38 @@ public class MovieBuilderAndTimeLapseInterpolation {
 	static int vMaxInUse=35;
 	static double startingBlockRatio=0.10;//time for a new root to appear, expressed as a ratio of the sequence length 
 	static boolean smartHandyStart=true;
-	static double timeStep=0.05;
+	static double timeStep=0.05;//0.05;
 	static int nTimeStepVirtualEnd=4;
 	static double deltaPixelsSpeedInterpolation=4;
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();	
-		IJ.showMessage("la partie racinaire n'est pas proportinelle à la tige");
+		
 		//testGridAndFire();
 		//		testFullBehaviourOnSingleSimpleRoot();
 		//testFullBehaviour();
 //		testRootSpeed();
-		runInterpolation_V2("1", "0005",vMaxInUse,timeStep);
+		for(int i=5;i<10;i++) {
+			runInterpolation_V2("1", "0000"+i,vMaxInUse,timeStep);
+		}
+		for(int i=10;i<21;i++) {
+			runInterpolation_V2("1", "000"+i,vMaxInUse,timeStep);
+		}
 		VitimageUtils.waitFor(200000);
 		System.exit(0);
 	}
 	
+
+	public static void testVid() {
+		String ml="1";
+		String boite="00001";
+		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/test.tif");
+		AVI_Writer av= new AVI_Writer();
+		try {
+			av.writeImage (img, "/home/rfernandez/Bureau/testJPEG.avi", AVI_Writer.JPEG_COMPRESSION, 99);
+		} catch (IOException e) {	e.printStackTrace();}
+		
+	}
 	
 	public static void testRootSpeed() {
 		String specName="ML1_Boite_00001.rsml";
@@ -119,6 +138,7 @@ public class MovieBuilderAndTimeLapseInterpolation {
 		if(highRes)stackReg=VitimageUtils.resize(stackReg, stackReg.getWidth()/2, stackReg.getHeight()/2, 1);
 		ImagePlus times=IJ.openImage(dataDir+"/4_Times/ML"+ml+"_Boite_"+boite+".tif");
 		ImagePlus maskUpLeaves=IJ.openImage(dataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
+		System.out.println(dataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
 		maskUpLeaves=MorphoUtils.erosionCircle2D(maskUpLeaves, 65);
 		//Algorithm parameters
 		double t0Fg=0.01;
@@ -160,11 +180,23 @@ public class MovieBuilderAndTimeLapseInterpolation {
 			tim.print("\nStarting final assembling");
 			mixFgBg=assembleRootGridAndFire_V3(mixFgBg, maskFgBgGauss, gridAndFire[0],gridAndFire[1],gridAndFire[2],gridAndFire[3],true,t);
 			tim.print("\nEnd. Now saving");
+			gridAndFire=null;
 		}
-		if(highRes)   IJ.saveAsTiff(mixFgBg,dataDir+"/5_Timelapse_Highres/ML"+ml+"_Boite_"+boite+".tif");
-		else          IJ.saveAsTiff(mixFgBg,dataDir+"/5_Timelapse/ML"+ml+"_Boite_"+boite+"_V3.tif");		
+		maskFgBgGauss=null;
+		System.gc();
+		//if(highRes)   IJ.saveAsTiff(mixFgBg,dataDir+"/5_Timelapse_Highres/ML"+ml+"_Boite_"+boite+".tif");
+		//else          IJ.saveAsTiff(mixFgBg,dataDir+"/5_Timelapse/ML"+ml+"_Boite_"+boite+"_V3.tif");		
+		//IJ.run(mixFgBg, "AVI... ", "compression=JPEG frame=25 dataDir+/5_Timelapse/ML"+ml+"_Boite_"+boite+".avi");
+		Calibration cal=mixFgBg.getCalibration();
+		cal.fps=25;
+		mixFgBg.setCalibration(cal);
+		AVI_Writer av= new AVI_Writer();
+		try {
+			av.writeImage (mixFgBg, dataDir+"/5_Timelapse/ML"+ml+"_Boite_"+boite+".avi", AVI_Writer.JPEG_COMPRESSION, 99);
+		} catch (IOException e) {	e.printStackTrace();}
+
+
 		tim.print("Saved");
-		mixFgBg.show();
 	}
 
 	

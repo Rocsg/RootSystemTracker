@@ -11,7 +11,7 @@ import ij.ImagePlus;
 import ij.plugin.Duplicator;
 import net.imglib2.img.Img;
 
-public class DatasetRootnavBreaker {
+public class DatasetUnmixer {
 
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();
