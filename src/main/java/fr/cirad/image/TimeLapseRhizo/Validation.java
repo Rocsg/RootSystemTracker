@@ -1,8 +1,8 @@
 package fr.cirad.image.TimeLapseRhizo;
 
 import fr.cirad.image.common.VitimageUtils;
-import fr.cirad.image.rsmlviewer.FSR;
-import fr.cirad.image.rsmlviewer.RootModel;
+import fr.cirad.image.rsml.FSR;
+import fr.cirad.image.rsml.RootModel;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
@@ -37,8 +37,7 @@ public class Validation extends PlugInFrame{
 	
 	//1
 	
-	public void fuck() {
-		
+	public void fuck() {		
 		String rep="/Donnees/DD_CIRS626_DATA/Racines/Data_Rootnav";
 		int N=270;
 		ImagePlus[]tab=new ImagePlus[N];
@@ -55,6 +54,9 @@ public class Validation extends PlugInFrame{
 		IJ.saveAsTiff(img, "/home/rfernandez/Bureau/testRoot.tif");
 	}
 	
+	
+	
+	/** Comments to set*/
 	public void visualValidationOfAnnotationFacingTimeDate() {
 		String boite="00010";
 		String ML="ML1";

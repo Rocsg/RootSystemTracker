@@ -13,6 +13,8 @@ import org.jgrapht.graph.SimpleWeightedGraph;
 
 import com.goebl.simplify.Simplify;
 
+import fr.cirad.image.common.Bord;
+import fr.cirad.image.common.Pix;
 import fr.cirad.image.common.TransformUtils;
 import fr.cirad.image.common.VitimageUtils;
 import ij.IJ;
@@ -212,7 +214,7 @@ public class CC implements Serializable{
 	}
 	
 	public String toString() {
-		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[0])+" - "+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[1])+") "+(trunk ? " is trunk" : " ")+" stamp="+stamp;
+		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[0])+" - "+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[1])+") "+(this.trunk ? " is trunk" : " ")+" stamp="+stamp;
 	}
 	
 	public void setRoi(Roi r) {
@@ -518,6 +520,10 @@ public class CC implements Serializable{
 		}			
 	}
 
+	
+	
+	
+	
 	
 	
 	public SimpleWeightedGraph<Pix,Bord>buildConnectionGraphOfComponent(ImagePlus imgSeg,ImagePlus distToExt,int connexity){

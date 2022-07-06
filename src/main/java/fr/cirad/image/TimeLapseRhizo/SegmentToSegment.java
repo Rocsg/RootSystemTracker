@@ -5,10 +5,14 @@ import java.util.ArrayList;
 import fr.cirad.image.common.Timer;
 import fr.cirad.image.common.TransformUtils;
 import fr.cirad.image.common.VitimageUtils;
-import fr.cirad.image.rsmlviewer.FSR;
+import fr.cirad.image.rsml.FSR;
+import fr.cirad.image.rsml.Node;
+import fr.cirad.image.rsml.Root;
+import fr.cirad.image.rsml.RootModel;
+/*import fr.cirad.image.rsmlviewer.FSR;
 import fr.cirad.image.rsmlviewer.Node;
 import fr.cirad.image.rsmlviewer.Root;
-import fr.cirad.image.rsmlviewer.RootModel;
+import fr.cirad.image.rsmlviewer.RootModel;*/
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;

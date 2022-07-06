@@ -3,7 +3,9 @@ package fr.cirad.image.rootPheno;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -21,28 +23,26 @@ import com.google.zxing.common.HybridBinarizer;
 import fr.cirad.image.TimeLapseRhizo.MorphoUtils;
 import fr.cirad.image.common.VitiDialogs;
 import fr.cirad.image.common.VitimageUtils;
-import fr.cirad.image.rsmlviewer.Root;
-import fr.cirad.image.rsmlviewer.RootModel;
+import fr.cirad.image.rsml.Root;
+import fr.cirad.image.rsml.RootModel;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.process.ImageProcessor;
 
 public class ProcessTifAndRSML {
-	public static String dirData="/home/rfernandez/Bureau/A_Test/Perin_root_2/Source_data/Root";
+	public static String dirData;
 
 	public static double pixSize=0.0057471056;
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();
-		doStuff2();
-		
-		
-		
+		exp_03();
 	}
 	
 	
-	public static void doStuff1() {
+	public static void exp_02_1_ReadBarcodes() {
+		dirData="/home/rfernandez/Bureau/A_Test/Perin_root_2/Source_data/Root";
 		String[]listTif=new File(dirData).list();
 		String globChain="";
 		int count=0;
@@ -84,15 +84,120 @@ public class ProcessTifAndRSML {
 		VitimageUtils.writeStringTabInCsv(tabCsv, csvOut);
 	}
 	
+
+	
+	public static void exp_03() {
+		dirData="/home/rfernandez/Bureau/A_Test/Perin_root_3/";
+		String dirInput=dirData+"Source/UNZIP/";
+		String dirOutput=dirData+"Processing/";
+		
+		FilenameFilter textFilter = new FilenameFilter() {			public boolean accept(File dir, String name) { return (name.endsWith(".rsml"));}		};
+		fr.cirad.image.rsml.FSR sr= new fr.cirad.image.rsml.FSR();
+		sr.initialize();
+		double fivemm=0.5/pixSize;	
+		File f=new File(dirInput);
+		String[]dirsLev1=f.list();
+		Arrays.sort(dirsLev1);
+		String[][]dirsLev2=new String[dirsLev1.length][];		
+		
+		int N=0;
+		for(int d1=0;d1<dirsLev1.length;d1++) {
+			dirsLev2[d1]=new File(dirInput,dirsLev1[d1]).list(textFilter);
+			Arrays.sort(dirsLev2[d1]);
+			N+=dirsLev2[d1].length;
+		}
+
+		String[][]outMedianCSV=new String[N+1][12];
+		outMedianCSV[0]=new String[] {"Codebar","CodeExp","RsmlName","#Specimen included","#Specimen excluded","Median length (cm)","Mean length","Std length","Median tip diam. (cm)","Mean tip diam.","Std tip diam."};
+		String[][]outFullCSV=new String[10*N+1][6];
+		outFullCSV[0]=new String[] {"Codebar","CodeExp","RsmlName","Specimen index","Length (cm)","Median tip diam. (cm)"};
+		String excludeList="";
+		
+		int incr=0;
+		int incrFull=0;
+		for(int d1=0;d1<dirsLev1.length;d1++) {
+			for(int d2=0;d2<dirsLev2[d1].length;d2++) {
+				incr++;
+
+				//Open the corresponding rsml 
+				String rsmlName=dirInput+dirsLev1[d1]+"/"+dirsLev2[d1][d2];
+				String codeBar= (dirsLev2[d1][d2].split("_root")[0]);
+				System.out.println("Processing RSML "+d1+" - "+d2+" code " +codeBar+" ----> "+rsmlName);
+				RootModel model = new RootModel(rsmlName);
+				pixSize=model.pixelSize;
+				int nRoots=model.getNRoot();
+				System.out.println(" processing "+nRoots+" roots");
+				ArrayList<Double>listDiameters=new ArrayList<Double>();
+				ArrayList<Double>listLength=new ArrayList<Double>();
+			
+				//Get stats (median, mu, sigma) of primaries diameters and lengths in this box
+				int nRootsReal=0;
+				for(int nr=0;nr<nRoots;nr++) {
+					Root r=model.getRoot(nr);
+					double median=r.getAVGMedianDiameterInRange( r.computeRootLength()-3*fivemm,r.computeRootLength()-1*fivemm); 
+					//System.out.println("Root length="+r.computeRootLength()+" = "+(r.computeRootLength()*pixSize));
+					//VitimageUtils.waitFor(5000);
+					if(r.getRootLength()>2/pixSize)	{
+						nRootsReal++;
+						listDiameters.add(new Double(median*pixSize));
+						listLength.add(new Double(r.computeRootLength()*pixSize));
+						incrFull++;
+						outFullCSV[0]=new String[] {"Codebar","CodeExp","RsmlName",
+													"Specimen index","Length (cm)","Median tip diam. (cm)"};
+						outFullCSV[incrFull]=new String[] {
+														""+codeBar,dirsLev1[d1],dirsLev2[d1][d2],
+														""+(nr+1),""+IJ.d2s(new Double(r.computeRootLength()*pixSize),5),""+IJ.d2s(new Double(median*pixSize),5)};
+					}
+					else {
+						excludeList+="Excluded : "+rsmlName+" - root number "+nr+" with length="+(r.computeRootLength()*pixSize)+",\n";
+					}
+				}
+				double[]madEDiam=VitimageUtils.MADeStatsDoubleSided(listDiameters);
+				double[]muSigDiam=VitimageUtils.statistics1D(listDiameters);
+				double[]madELen=VitimageUtils.MADeStatsDoubleSided(listLength);
+				double[]muSigLen=VitimageUtils.statistics1D(listLength);
+				if(madEDiam==null) {
+					System.out.println("1 null cause");
+					for(double diam:listDiameters)System.out.println(diam);
+				}
+				if(madELen==null) {
+					System.out.println("2 null cause");
+					for(double len:listLength)System.out.println(len);
+				}
+				if(muSigDiam==null)System.out.println("3 null");
+				if(muSigLen==null)System.out.println("4 null");
+				outMedianCSV[0]=new String[] {"Codebar","CodeExp","RsmlName","#Specimen included","#Specimen excluded",
+												"Median length (cm)","Mean length","Std length",
+												"Median tip diam. (cm)","Mean tip diam.","Std tip diam."};
+				outMedianCSV[incr]=new String[] {
+												""+codeBar,dirsLev1[d1],dirsLev2[d1][d2],""+nRootsReal,""+(nRoots-nRootsReal),
+												nRootsReal<2 ? "NA" : (""+IJ.d2s(madELen[0],5)),nRootsReal<2 ? "NA" : (""+IJ.d2s(muSigLen[0],5)),nRootsReal<2 ? "NA" : (""+IJ.d2s(muSigLen[1],5)),
+												nRootsReal<2 ? "NA" : (""+IJ.d2s(madEDiam[0],5)),nRootsReal<2 ? "NA" : (""+IJ.d2s(muSigDiam[0],5)),nRootsReal<2 ? "NA" : (""+IJ.d2s(muSigDiam[1],5)),
+				};
+			}
+		}
+		String[][]outFullCSV2=new String[incrFull+1][outFullCSV[0].length];
+		for(int i=0;i<incrFull+1;i++)for(int j=0;j<outFullCSV[0].length;j++)outFullCSV2[i][j]=outFullCSV[i][j];
+		VitimageUtils.writeStringInFile(excludeList,  dirOutput+"excludeList.csv");
+		VitimageUtils.writeStringTabInCsv(outMedianCSV, dirOutput+"resultsStatsOverBoxes.csv");		
+		VitimageUtils.writeStringTabInCsv(outFullCSV, dirOutput+"resultsDataOfAllSpecimen.csv");		
+	}
+
 	
 	
-	public static void doStuff2() {
+	
+	
+	
+	
+	
+	public static void exp_02_2_ReadBarcodes() {
+		dirData="/home/rfernandez/Bureau/A_Test/Perin_root_2/Source_data/Root";
 		//Open CSV1
 		String barCodeRead="/home/rfernandez/Bureau/A_Test/Perin_root_2/Source_data/RRES_CIRAD_BARCODE-1.csv";
 		String[][]tabCorrBarCode=VitimageUtils.readStringTabFromCsv(barCodeRead);
 	  //Take the final part, from -1.5 to -0.5 cm from the tip
 	  double fivemm=0.5/pixSize;	
-	  fr.cirad.image.rsmlviewer.FSR sr= new fr.cirad.image.rsmlviewer.FSR();
+	  fr.cirad.image.rsml.FSR sr= new fr.cirad.image.rsml.FSR();
 	  sr.initialize();
 	 String csvOut="/home/rfernandez/Bureau/A_Test/Perin_root_2/Processing/barCodeExport.csv";
 		String[][]csvTab=VitimageUtils.readStringTabFromCsv(csvOut);

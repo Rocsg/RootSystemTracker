@@ -72,6 +72,12 @@
   	
   		
 	<dependencies>
+		<!-- https://mvnrepository.com/artifact/de.lmu.ifi.dbs.elki/elki -->
+		<dependency>
+		    <groupId>de.lmu.ifi.dbs.elki</groupId>
+		    <artifactId>elki</artifactId>
+		    <version>0.7.5</version>
+		</dependency>
 		<dependency>
 		    <groupId>com.vitimage</groupId>
 		    <artifactId>Fijiyama_GUI</artifactId>

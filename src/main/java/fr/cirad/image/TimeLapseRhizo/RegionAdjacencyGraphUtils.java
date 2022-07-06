@@ -10,20 +10,28 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.jgrapht.GraphPath;
 import org.jgrapht.alg.cycle.CycleDetector;
 import org.jgrapht.alg.interfaces.SpanningTreeAlgorithm.SpanningTree;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.alg.spanning.KruskalMinimumSpanningTree;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import org.jgrapht.graph.SimpleWeightedGraph;
 
 import distance.Euclidean;
+import fr.cirad.image.common.DouglasPeuckerSimplify;
 import fr.cirad.image.common.MostRepresentedFilter;
+import fr.cirad.image.common.Pix;
 import fr.cirad.image.common.Timer;
 import fr.cirad.image.common.TransformUtils;
 import fr.cirad.image.common.VitimageUtils;
+import fr.cirad.image.rsml.FSR;
+import fr.cirad.image.rsml.Root;
+import fr.cirad.image.rsml.RootModel;
 import fr.cirad.image.common.TransformUtils.VolumeComparator;
-import fr.cirad.image.rsmlviewer.FSR;
+/*import fr.cirad.image.rsmlviewer.FSR;
 import fr.cirad.image.rsmlviewer.Root;
-import fr.cirad.image.rsmlviewer.RootModel;
+import fr.cirad.image.rsmlviewer.RootModel;*/
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -42,6 +50,7 @@ public class RegionAdjacencyGraphUtils {
 	static double IDENTITY_PENALTY=PENALTY_COST;
 	static int MAX_TIMESTEP=100;
 	static int MEAN_SPEED_LAT=10;
+	static int N_PLANTS_IN_BOX=5;
 	public static final boolean DO_DISTANCE=true;
 	public static final boolean DO_TIME=false;
 
@@ -66,20 +75,15 @@ public class RegionAdjacencyGraphUtils {
 	}
 	
 	public static void establishDataFromStartForEachNodeAndExcludeBasedOnStatistics(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims) {
-		int Xmax=sampleImgForDims.getWidth()-1;
-		int Ymax=sampleImgForDims.getHeight()-1;
 		//Identify forgotten axes
 		System.out.println("\n\n\n\n\n\n\n\n\n\nStarting outlier detection, rebranching and that folks in RAG");
-		CC debugCC=null;
-		System.out.println(debugCC);
-		for(int i=0;i<20;i++)System.out.println();
 		System.out.println("REBRANCHING FORGOTTEN ONES");
+		int Xmax=sampleImgForDims.getWidth()-1;
+		int Ymax=sampleImgForDims.getHeight()-1;
+		for(int i=0;i<20;i++)System.out.println();
 		for (CC cc:graph.vertexSet()) {
-			boolean debug=(cc==debugCC);
-			if(debug)System.out.println("Going for debug");
 			if(!cc.trunk && cc.bestIncomingActivatedCC()==null) {
-				if(debug)System.out.println("Normally we go there");
-				//Count successors
+				//Count total number of vertices among successors and reject if less than four
 				int succ=1;
 				CC ct=cc;
 				while(ct.bestOutgoingActivatedCC()!=null) {
@@ -87,19 +91,23 @@ public class RegionAdjacencyGraphUtils {
 					succ++;
 				}
 				if(succ<4)continue;
+				
+				
+				
 				//Look for a connexion to trunk
-				System.out.println("Testing a potential root to attach back. It is a lat going from : "+cc+" to "+ct);
 				ConnectionEdge edge=null;
+				double minCost=1E8;
 				for(ConnectionEdge ed : graph.incomingEdgesOf(cc)) {
-					if(ed.source.trunk)edge=ed;
+					if(ed.source.trunk && ed.source.day<=cc.day)edge=ed;
 				}
 				if(edge!=null) {
-					System.out.println("Rebranching on trunk 1");
 					edge.activated=true;
 					continue;
 				}
-				if(ct.euclidianDistanceToCC(cc)>MEAN_SPEED_LAT*10 && (cc.bestIncomingEdge()==null || (succ>9) ) ) {
-					System.out.println("Rebranching on trunk 2");
+
+				
+				//Look for a lat to reattach, that is really detached from anything
+				if(ct.euclidianDistanceToCC(cc)>MEAN_SPEED_LAT*10 && (cc.bestIncomingEdge()==null || (succ>9) ) ) { // TODO : The second condition is really questionable. There should be specific tests here to improve performances
 					//This is a forgotten big root
 
 					//Identify the nearer trunk
@@ -107,23 +115,38 @@ public class RegionAdjacencyGraphUtils {
 					CC no=null;
 					for (CC cctr:graph.vertexSet()) {
 						if (!cctr.trunk || cctr.day==0)continue;
+						if (cctr.day>cc.day)continue;
 						double dist=cctr.euclidianDistanceToCC(cc);
 						if(dist<distMin) {distMin=dist;no=cctr;}
 					}
 					if(no==null)continue;
-					System.out.println("  selected branching point = "+no);
 					ConnectionEdge edd=new ConnectionEdge( no.x*0.5 + cc.x*0.5, no.y*0.5 + cc.y*0.5, 0, no,cc,no.x>cc.x ? -1 : 1 ,no.y>cc.y ? -1 : 1); 
 					edd.activated=true;
 					edd.hidden=true;
 					edd.trunk=false;
 					graph.addEdge(no,cc,edd); 
-					System.out.println("   branching edd="+edd);
 				}
 			}
 		}
 		
 		
-		//Identify laterals
+		
+		
+		/*
+		CC ccOl=getCC(graph, 3, 6294);
+		CC ccTm=getCC(graph, 141, 6321);
+		ConnectionEdge edg=graph.getEdge(ccOl, ccTm);
+		if(edg==null)System.out.println("\n///////////\nDEBEDG RAG 101 tout ok");
+		else System.out.println("\n///////////\nDEBEDG RAG 101 conn is "+edg.activated);
+		*/
+
+		
+
+		
+		
+		
+		
+		
 		int nLateral=0;
 		int nMaxSigma=25;
 		int dMax=getDayMax(graph);
@@ -134,21 +157,24 @@ public class RegionAdjacencyGraphUtils {
 		int nRejected=1;
 		double ratioMinVisible=0.4;
 		
-		//Build list of lateral 
-		//ArrayList<CC>tabDel=new ArrayList<CC>();
+	
+		//Exclude some laterals
 		for (CC cc:graph.vertexSet()) {
 			if(cc.trunk) {
 				for(ConnectionEdge edge:graph.outgoingEdgesOf(cc)) {
 					if(edge.activated) {
 						CC ccStart=edge.target;
 						if(!ccStart.trunk) {//On a un début de laterale
+							if(ccStart.trunk)System.out.println("TRUNNNNNNNNNNNNNk !");
 							double lenHid=0;
 							double lenVis=0;
 							ccStart.isLatStart=true;
 							ccStart.ccLateralStart=ccStart;
 							ccStart.pathFromStart=new ArrayList<CC>();
 							ccStart.pathFromStart.add(ccStart);
-							if(ccStart.isLateral)IJ.showMessage("WARNING : setting lateral an already lateral : "+ccStart);
+							System.out.println("Processing 1"+ccStart);
+							if(ccStart.trunk)IJ.log("WARNING 1 : setting lateral a trunk : "+ccStart);
+							if(ccStart.isLateral)IJ.log("WARNING 1 : setting lateral an already lateral : "+ccStart);
 							ccStart.isLateral=true;nLateral++;
 							CC ccTmp=ccStart;
 							CC ccOld;
@@ -162,14 +188,21 @@ public class RegionAdjacencyGraphUtils {
 							ccTmp.lengthBefore=0;
 							ccTmp.lengthFromStart=0;
 							ccTmp.lateralStamp=nLateral;
+							
+						
+						
+							
 							while(ccTmp.bestOutgoingActivatedCC()!=null) {
 								ConnectionEdge curEdge=ccTmp.bestOutgoingActivatedEdge();
 								if(curEdge.hidden)lenHid+=ccTmp.euclidianDistanceToCC(ccTmp.bestOutgoingActivatedCC());
 								else lenVis+=ccTmp.euclidianDistanceToCC(ccTmp.bestOutgoingActivatedCC());
 								ccOld=ccTmp;
 								ccTmp=ccTmp.bestOutgoingActivatedCC();
+								if(!ccOld.trunk && ccTmp.trunk) {IJ.showMessage("WARNING : lateral "+ccOld+" incoming to trunk "+ccTmp);}
 								ccStart.pathFromStart.add(ccTmp);
-								if(ccTmp.isLateral)IJ.showMessage("WARNING : setting lateral an already lateral : "+ccTmp);
+								System.out.println("Processing 2"+ccStart);
+								if(ccTmp.trunk)IJ.log("WARNING 2 : setting lateral a trunk : "+ccTmp);
+								if(ccTmp.isLateral)IJ.log("WARNING 2 : setting lateral an already lateral : "+ccTmp);
 								ccTmp.isLateral=true;
 								ccTmp.ccLateralStart=ccStart;
 								ccTmp.lateralStamp=nLateral;
@@ -193,6 +226,12 @@ public class RegionAdjacencyGraphUtils {
 			}
 		}
 		for (CC cc:graph.vertexSet()) if(!cc.trunk && !cc.isLateral)cc.setOut();
+		
+		
+		
+		
+		
+		
 		
 		for(int i=0;i<deltaTimeMax;i++) {
 			System.out.println("CUREACH["+i+"]="+nEach[i]);
@@ -361,7 +400,7 @@ public class RegionAdjacencyGraphUtils {
 									bestIncidenceCC=incidencialCC.get(i);
 									lowerCost=incidencialCost.get(i);
 								}
-							} 
+							}
 							System.out.println("Found best cost = "+lowerCost+" at incidence on "+bestIncidenceCC);
 						
 							//Locate if at left or right side of growing incidence
@@ -541,31 +580,33 @@ public class RegionAdjacencyGraphUtils {
 	}
 					
 
+	
+	
+	
+	
 	public static ArrayList<CC>sortCC(ArrayList<CC>arIn){
-//		System.out.println("\n\n\n\n\nTab at input :");
-//		for(int i=0;i<arIn.size();i++)System.out.println(arIn.get(i));
 		Object[]tabIn=new Object[arIn.size()];
 		for(int i=0;i<arIn.size();i++)tabIn[i]=arIn.get(i);
 		Arrays.sort(tabIn,new CCComparator());
 		ArrayList<CC>arOut=new ArrayList<CC>();
 		for(int i=0;i<arIn.size();i++)arOut.add((CC) tabIn[i]);
-//		System.out.println("\n\n\n\n\nTab at output :");
-//		for(int i=0;i<arIn.size();i++)System.out.println(arOut.get(i));
 		return arOut;
 	}
 	
 	static class CCComparator implements java.util.Comparator {
-		   public int compare(Object o1, Object o2) {
-		      return ((Double) ((CC) o1).x).compareTo((Double)((CC) o2).x);
-		   }
-		}
+	   public int compare(Object o1, Object o2) {
+	      return ((Double) ((CC) o1).x).compareTo((Double)((CC) o2).x);
+	   }
+	}
+	
+	
 	public static void postProcessOutliers(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus img) {
 		establishDataFromStartForEachNodeAndExcludeBasedOnStatistics(graph,img);
 	}
 	
 	
 	/** Methods for building and improving the graph ------------------------------------------------------------------------------------------------------*/	
-	public static SimpleDirectedWeightedGraph<CC,ConnectionEdge>  buildAndProcessGraphStraight(ImagePlus imgDatesTmp,String mainDataDir,String ml,String boite,boolean doImages,boolean compute,boolean doDebugImages) {
+	public static SimpleDirectedWeightedGraph<CC,ConnectionEdge>  buildAndProcessGraphStraight(ImagePlus imgDatesTmp,String mainDataDir,String imgName,boolean doImages,boolean compute,boolean doDebugImages) {
 		double ray=5;
 		int thickness=5;
 		int sizeFactor=SIZE_FACTOR;
@@ -577,35 +618,47 @@ public class RegionAdjacencyGraphUtils {
 		if(compute) {		
 			
 			graph=buildGraphFromDateMap(imgDatesTmp,connexity);
+
 			pruneGraph(graph, nbTrees,true);
+
 			setFirstOrderCosts_phase1(graph);
 //			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step1.ser");
 			identifyTrunks(graph);
 //			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step2.ser");
+			CC cc1=getCC(graph,57,2085);
+			CC cc2=getCC(graph,55,4577);
+			if(graph.containsEdge(cc1, cc2))IJ.showMessage("HERE 18, lat "+cc1+" to trunk "+cc2);
 			setFirstOrderCosts_phase2(graph);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step3.ser");
+			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+"_step3.ser");
 			CC cctest=getCC(graph,5767,1735);
-			System.out.println("DEB HHH");
 			for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
 				System.out.println(edge);
 			}
+	
+			cc1=getCC(graph,57,2085);
+			cc2=getCC(graph,55,4577);
+			if(graph.containsEdge(cc1, cc2))IJ.showMessage("HERE 20, lat "+cc1+" to trunk "+cc2);
+	
 			computeMinimumDirectedConnectedSpanningTree(graph);//TODO : les deux étapes là sont redondantes. Le disconnect suffit
-
 			CC ccTest=getCC(graph,5767,1735);
-			System.out.println("DEB HHHHHHH");
 			for(ConnectionEdge edge : graph.outgoingEdgesOf(ccTest)) {
 				System.out.println(edge);
 			}
 
 			//VitimageUtils.waitFor(50000);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step4.ser");
+			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+"_step4.ser");
+			cc1=getCC(graph,57,2085);
+			cc2=getCC(graph,55,4577);
+			if(graph.containsEdge(cc1, cc2))IJ.showMessage("HERE 21, lat "+cc1+" to trunk "+cc2);
 			reconnectDisconnectedBranches_v2(imgDatesTmp,graph,1,true,false);		//reconnectSingleBranches(graph4);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step5.ser");
+			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+"_step5.ser");
 			postProcessOutliers(graph,imgDatesTmp);		//reconnectSingleBranches(graph4);
-			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step6.ser");
-			writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".ser");
+			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+"_step6.ser");
+//			upstreamProlongation(graph,imgDatesTmp);		//reconnectSingleBranches(graph4);
+//			if(doDebugImages) writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+"_step6.ser");
+			writeGraphToFile(graph,mainDataDir+"/3_Graphs_Ser/"+imgName+".ser");
 		}
-		else graph=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".ser");
+		else graph=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+imgName+".ser");
 	
 		if(doImages) {
 			int nDays=1+(int)Math.round(VitimageUtils.maxOfImage(imgDatesTmp));
@@ -621,13 +674,13 @@ public class RegionAdjacencyGraphUtils {
 				if(goStraightPlease) {
 					graphsImgs=new ImagePlus[3];
 					backImgs=new ImagePlus[3];
-					SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(1)+".ser");
+					SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+imgName+"_step"+(1)+".ser");
 					graphsImgs[0]=drawGraph(imgDatesTmp, gg, ray, thickness,sizeFactor);		
 
-					gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(5)+".ser");
+					gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+imgName+"_step"+(5)+".ser");
 					graphsImgs[1]=drawGraph(imgDatesTmp, gg, ray, thickness,sizeFactor);		
 					
-					gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(6)+".ser");
+					gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+imgName+"_step"+(6)+".ser");
 					graphsImgs[2]=drawGraph(imgDatesTmp, gg, ray, thickness,sizeFactor);		
 					backImgs[0]=imgDatesHigh.duplicate();
 					backImgs[1]=imgDatesHigh.duplicate();
@@ -635,7 +688,7 @@ public class RegionAdjacencyGraphUtils {
 				}
 				else {
 					for(int i=0;i<nSteps;i++) {
-						SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+"_step"+(i+3)+".ser");
+						SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+imgName+"_step"+(i+3)+".ser");
 						graphsImgs[i]=drawGraph(imgDatesTmp, gg, ray, thickness,sizeFactor);		
 						backImgs[i]=imgDatesHigh.duplicate();
 					}
@@ -657,9 +710,39 @@ public class RegionAdjacencyGraphUtils {
 			glob.setDisplayRange(0, nDays);
 			IJ.run(graphs,"Fire","");
 			//glob.show();
-			IJ.saveAsTiff(glob, mainDataDir+"/3_Graphs_Tif/ML"+ml+"_Boite_"+boite+".tif");
+			IJ.saveAsTiff(glob, mainDataDir+"/3_Graphs_Tif/"+imgName+".tif");
 		}
 		return graph;
+	}
+	
+	
+	/**
+	 * Backtracing algorithm. Compute the best prolongation of the primary and the laterals
+	 */
+	public static void upstreamProlongation(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,ImagePlus imgTimeSeries) {
+		//process primaries
+			//For each primary
+			int p=-1;//primary index
+			for(CC cc:graph.vertexSet())
+				if(!cc.trunk || cc.day!=1) continue;
+				p++;
+
+				//look for the surface target height
+
+				//look for the shortest path from upper lateral to the surface
+				double lPath=0;
+				
+				
+				//Inform about what was done
+				
+				System.out.println("Plant "+p+" was extended of "+lPath+" pixels to the surface");
+				
+		
+		
+		
+		
+		//process laterals
+		
 	}
 	
 	public static int maxCCIndexOfDay(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,int d) {
@@ -756,6 +839,7 @@ public class RegionAdjacencyGraphUtils {
 			}
 		}
 		System.out.println();
+
 		return graph;
 	}
 				
@@ -866,7 +950,6 @@ public class RegionAdjacencyGraphUtils {
 		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
 			System.out.println(edge);
 		}
-		System.out.println("DEB 2");
 		
 		//Initialize connexe traversal from the virtual start (day=0)
 		int maxDay=0;int currentCC=1;
@@ -881,6 +964,7 @@ public class RegionAdjacencyGraphUtils {
 		for(int i=1;i<=maxDay;i++) {
 			for(CC cc:graph.vertexSet()) {
 				if(cc.day!=i)continue;
+				if(cc.trunk)continue;
 				boolean debug=(cc==getCC(graph, 18, 5719, 1874));
 				ConnectionEdge edgeMin=null;
 				double minCost=1E16;
@@ -904,28 +988,22 @@ public class RegionAdjacencyGraphUtils {
 				//	if(debug)System.out.println("H11, with edgeMinCon="+edgeMinConnected);
 				//}
 				if(edgeMin!=null) {
-					if(debug)System.out.println("H2");
 					for(ConnectionEdge edge:graph.incomingEdgesOf(cc))edge.activated=(edge==edgeMin);
 					cc.stamp=graph.getEdgeSource(edgeMin).stamp;
 				}
 				else {
-					if(debug)System.out.println("H3");
 					for(ConnectionEdge edge:graph.incomingEdgesOf(cc))edge.activated=false;
 					cc.stamp=(++currentCC);
 				}
 			}
 		}				
-		System.out.println("DEB 2");
 		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
 			System.out.println(edge);
 		}
-		System.out.println("DEB 2");
 		updateCostAndDisconnectNonOptimalLateralBranches_V2(graph);
-		System.out.println("DEB 3");
 		for(ConnectionEdge edge : graph.outgoingEdgesOf(cctest)) {
 			System.out.println(edge);
 		}
-		System.out.println("DEB 3");
 		System.out.println("\n -> End of minimum directed connected spanning tree. Total number of components = "+currentCC+" (higher than expected nTrees means probably disconnected laterals emerged)");
 		//VitimageUtils.waitFor(40000000);
 	}
@@ -1255,7 +1333,7 @@ public class RegionAdjacencyGraphUtils {
 		boolean debugLat=false;
 		
 		//Processing primary roots
-		//dessiner la somme de pathlines des racines et l'associer aux CC. 		
+		//dessiner la somme des pathlines des racines et l'associer aux CC. 		
 		for(CC cc : graph.vertexSet()) {
 			if((cc.day!=1) || (!cc.trunk)) continue;
 			if(debugPrim)System.out.println("\nPROCESSING PLANT primary, starting with CC "+cc);
@@ -1281,6 +1359,7 @@ public class RegionAdjacencyGraphUtils {
 				listRprim.add(rPrim);
 				listNprim.add(ccNext.n);
 				listDprim.add(ccNext.day);
+				IJ.log("Et pourtant, adding"+ccNext);
 				llcc.get(ind).add(ccNext);
 				if(debugPrim)System.out.println("Adding "+ccNext+" to array number "+ind);
 			}
@@ -1310,10 +1389,10 @@ public class RegionAdjacencyGraphUtils {
 					currentSource=nextSource;
 					cumulatedDistance+=VitimageUtils.distance(previousTarget[0], previousTarget[1], currentSource[0]+ccFirst.xB, currentSource[1]+ccFirst.yB);
 				}
-				else 	{
+				else{
 					currentSource=ccFirst.getExpectedSource();
+					
 				}
-				
 				//Identify target point
 				if(ccLast.getPrimChild()==null) {
 					//End of primary : Identify target in ccLast
@@ -1424,8 +1503,38 @@ public class RegionAdjacencyGraphUtils {
 				}
 
 				//Subsample respective dijkstra path with beucker algorithm, and collect RSML points with speed and 
-				List<Pix> list= simplerSimplify ? DouglasPeuckerSimplify.simplifySimpler(ccF.mainDjikstraPath,toKeep.get(li) ,3) :
+				
+				List<Pix> list=null;
+/*				if(li==0) {
+					//BACKTRACKING
+					List<Pix>listEnd=ccF.mainDjikstraPath;
+					
+					//Identify the first coordinates
+					int x0=listEnd.get(0).x+ccF.xB;
+					int y0=listEnd.get(0).x+ccF.yB;
+					
+					//Identify the mean height of region to attain in this area
+					int upperPix=0;
+					for(int i=y0;i>=0;i--) {
+						if(imgMask.getPixel(i, x0)[0]>0)upperPix=i;
+					}
+					System.out.println("upper Pix= ( "+x0+" , "+upperPix+" )");
+
+					//Extract a rectangle around the first coordinate at time 0
+					
+					
+					//Extract a min djikstra path to this region
+					
+					//Insert the corresponding coordinates in reverse order, and set time value
+					a
+					
+					
+				}
+				else{
+	*/
+				list= simplerSimplify ? DouglasPeuckerSimplify.simplifySimpler(ccF.mainDjikstraPath,toKeep.get(li) ,3) :
 					DouglasPeuckerSimplify.simplify(ccF.mainDjikstraPath,toKeep.get(li) ,toleranceDistToCentralLine);
+				//}
 				for(int i=0;i<list.size()-1;i++) {
 					Pix p=list.get(i);
 					rPrim.addNode(p.x+ccF.xB,p.y+ccF.yB,p.time,(i==0)&&(li==0));
@@ -1450,12 +1559,14 @@ public class RegionAdjacencyGraphUtils {
 		int incrLat=1;
 		for(CC cc : graph.vertexSet()) {
 			if(!cc.isLatStart)continue;
-			if(debugLat)	System.out.println("\nProcessing lateral root #"+(incrLat++)+" : "+cc);
+			debugLat=false;
+			if(debugLat)	System.out.println("\n\n\nProcessing lateral root #"+(incrLat++)+" : "+cc+" whose source.n="+cc.bestIncomingActivatedEdge().source.n);
 			
 			//Identification of correspondant primary root
 			Root myRprim=null;
 			for(int i=0;i<listRprim.size();i++) {
-				if(listNprim.get(i)==cc.bestIncomingActivatedEdge().source.n)myRprim=listRprim.get(i);
+				if(debugLat)System.out.println("Looking for "+cc.bestIncomingActivatedEdge().source+"    testing a Dprim-Nprim"+listDprim.get(i)+"-"+listNprim.get(i));				
+				if(listNprim.get(i)==cc.bestIncomingActivatedEdge().source.n && listDprim.get(i)==cc.bestIncomingActivatedEdge().source.day) {myRprim=listRprim.get(i);if(debugLat)System.out.println(" \n\nTHIS ONE ! ");}
 			}
 			if(myRprim==null) {
 				System.out.println("Here in RAG L1373");
@@ -1466,7 +1577,6 @@ public class RegionAdjacencyGraphUtils {
 				
 			}
 
-			
 			
 			//Identification of connected part of the root
 			CC ccNext=cc;
@@ -1655,6 +1765,8 @@ public class RegionAdjacencyGraphUtils {
 			}
 			rLat.computeDistances();
 			rLat.computeDistances();
+
+			System.out.println("Will attach "+rLat+" to "+myRprim);
 			myRprim.attachChild(rLat);
 			rLat.attachParent(myRprim);
 			rm.rootList.add(rLat);
@@ -1664,7 +1776,6 @@ public class RegionAdjacencyGraphUtils {
 
 
 
-	
 	
 
 	
@@ -2278,6 +2389,15 @@ public class RegionAdjacencyGraphUtils {
 			nextCC=new ArrayList<CC>();
 		}
 		System.out.println();
+		ArrayList<ConnectionEdge>edges=new ArrayList<ConnectionEdge>();
+		for(CC cc : graph.vertexSet()) {
+			if(!cc.trunk)continue;
+			for (ConnectionEdge edge: graph.incomingEdgesOf(cc)) {
+				if(!edge.source.trunk)edges.add(edge);
+			}
+		}
+		for(ConnectionEdge edge:edges)graph.removeEdge(edge);
+		System.out.print("\nCalcul des troncs.");
 	}
 
 	

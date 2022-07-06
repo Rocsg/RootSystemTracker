@@ -1,42 +1,74 @@
 package fr.cirad.image.TimeLapseRhizo;
 
+//Import from std libs
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import org.jgrapht.graph.SimpleDirectedWeightedGraph;
-import fr.cirad.image.common.Timer;
-import fr.cirad.image.common.VitimageUtils;
-import fr.cirad.image.fijiyama.RegistrationAction;
-import fr.cirad.image.registration.BlockMatchingRegistration;
-import fr.cirad.image.registration.ItkTransform;
-import fr.cirad.image.registration.Transform3DType;
-import fr.cirad.image.rsmlviewer.Node;
-import fr.cirad.image.rsmlviewer.Root;
-import fr.cirad.image.rsmlviewer.RootModel;
+import java.nio.file.spi.FileSystemProvider;
+
+//Import from ImageJ libs
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.frame.PlugInFrame;
-import trainableSegmentation.WekaSegmentation;
 
-//TODO : when registering, do the crop partly before, then registration, then partly after. In order to avoid to have bogus reconstructed BG at the extremities, what can have an impact
+import org.jgrapht.GraphPath;
+//Import from Jgrapht libs
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+
+import fr.cirad.image.common.Bord;
+import fr.cirad.image.common.DouglasPeuckerSimplify;
+import fr.cirad.image.common.Pix;
+//Import from Fijiyama libs
+import fr.cirad.image.common.Timer;
+import fr.cirad.image.common.VitiDialogs;
+import fr.cirad.image.common.VitimageUtils;
+import fr.cirad.image.fijiyama.RegistrationAction;
+import fr.cirad.image.registration.BlockMatchingRegistration;
+import fr.cirad.image.registration.ItkTransform;
+import fr.cirad.image.registration.Transform3DType;
+import fr.cirad.image.rsml.Node;
+import fr.cirad.image.rsml.Root;
+import fr.cirad.image.rsml.RootModel;
+//import fr.cirad.image.rsmlviewer.RootModel;
+
+//Work in progress : parameters list of the pipeline
+//XMINCROP, YMINCROP, DXCROP, DYCROP : define the area of interest in the image, excluding the petri box, and including all root parts    
+//MAXLINEAR                          : a scale factor for the registration. Registration starts with a subsampling factor of 2^4=16     
+//isRootnavData                      : when set to true, pipeline parameters are adapted to process such data    
+//:    
+//:    
+//:    
+
+//TODO : when registering, do the crop partly before, then registration, then partly after.
+//			In order to avoid to have bogus reconstructed BG at the extremities, what can have an impact
 //TODO : times all is an image name where distance is displayed in pixel. It should be avoided
 //TODO : list the steps and the step parameters settings in order to identify parameterizable operations, in order to adapt to new datasets
 
 
-public class TestImageSequence extends PlugInFrame{	
+
+
+
+public class RhizoTrackPipeline extends PlugInFrame{	
+	private static final long serialVersionUID = 1L;
 	static int XMINCROP=122;
 	static int YMINCROP=152;
 	static int DXCROP=1348;
 	static int DYCROP=1226;
 	static int MAXLINEAR=4;
 	static boolean isRootnavData=false;
+	public boolean testing=false;
+	public String inputDataDir="/home/rfernandez/Bureau/A_Test/RSML";
+	public String processingDataDir="/home/rfernandez/Bureau/A_Test/RSML";
+	private static double TOLERANCE_DISTANCE_TO_CENTRAL_LINE_FOR_DOUGLAS_SIMPLIFICATION=0.9;
 	public static void setRootnavParams() {
 		isRootnavData=true;
 		XMINCROP=0;
@@ -46,305 +78,173 @@ public class TestImageSequence extends PlugInFrame{
 		MAXLINEAR=4;
 		
 	}
-	static boolean testing=true;
-	static final String mainDataDir=testing ? "/home/rfernandez/Bureau/A_Test/RSML"
-			: "/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Second_dataset_2021_07/Processing";
-	static boolean debugGraphConstruction=true;
+	static boolean debugGraphConstruction=false;
+	public static String mainDataDir="/home/rfernandez/Bureau/A_Test/RSML";
+
+	public static void thatStuff() {
+		int ml=1;
+		ArrayList<Double>li=new ArrayList<Double>();
+		for(int boi=1;boi<=18;boi++) {
+			String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
+			System.out.println("Processing ML"+ml+"_Boite_"+boite);
+			IJ.log("Processing ML"+ml+"_Boite_"+boite);
+			String imgName="ML"+ml+"_Boite_"+boite;
+			RootModel rmGot=RootModel.RootModelWildReadFromRsml(mainDataDir+"/4_RSML_BACKTRACK/"+imgName+".rsml");
+			String []files=new File( mainDataDir+"/Retour Amandine/"+imgName+"/Expertized_models/").list();
+			Arrays.sort(files);
+			RootModel rmExpert=RootModel.RootModelWildReadFromRsml(mainDataDir+"/Retour Amandine/"+imgName+"/Expertized_models/"+files[files.length-1]);
+			Root[]rPred=rmGot.getPrimaryRoots();
+			Root[]rExp=rmExpert.getPrimaryRoots();
+			for(int i=0;i<5;i++){
+				System.out.println(rPred[i].firstNode.x+","+rPred[i].firstNode.y+" and "+rExp[i].firstNode.x+","+rExp[i].firstNode.y);
+				li.add(1.0*rExp[i].firstNode.y-rPred[i].firstNode.y);
+			}
+		}
+		double[]tab=VitimageUtils.statistics1D(li);
+		System.out.println(tab[0]+","+tab[1]);
+	}
+	
+	
+	public static void main(String[]args) {
+		ImageJ ij=new ImageJ();
+		String imgName2="ML1_Boite_00021";
+		RhizoTrackPipeline test2= new RhizoTrackPipeline("");
+		//test2.runDateEstimation(imgName2);
+		//test2.buildAndProcessGraph(imgName2);//60s
+		//test2.computeTimes(imgName2); //9s
+		backTrackPrimaries(imgName2);
+		System.exit(0);
+		int ml=1;
+		for(int boi=21;boi<=36;boi++) {
+			String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
+			String imgName="ML"+ml+"_Boite_"+boite;
+			backTrackPrimaries(imgName);
+		}
+		System.exit(0);
+		thatStuff();
+		RhizoTrackPipeline test= new RhizoTrackPipeline("");
+		test.run("TEST_ON_RFERNAND");
+	}
 
 	public void run(String arg) {
 		IJ.log("RUN");
 
-		
-		for(int mli=1;mli<=1;mli++) {
-			for(int boi=2;boi<=2;boi++) {
-				if(mli==5)setRootnavParams();
-				//if(boi==2 || boi==23 || boi==24)continue;
-				
-				String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
-				String ml=""+(mli==5 ? "RootNav" : mli);
-				Timer t=new Timer();
-				t.print("Start"+mli+"-"+boi);
-				System.out.println("Processing ML"+ml+"_Boite_"+boite);
-				IJ.log("Processing ML"+ml+"_Boite_"+boite);
-				//runImportSequences(ml,boite);
-				//runRegisterSequences(ml,boite);
-				//runComputeMaskAndRemoveLeaves(ml,boite);//9 secondes
-				//computeML(ml, boite);
-				//runDateEstimation(ml,boite);//2.61 secondes
-				//buildAndProcessGraph(ml,boite);
-//				computeTimes(ml, boite);
-				exportToExpertize(ml, boite);
-				t.print("Stop"+mli+"-"+boi);
+		if(arg.equals("TEST_ON_RFERNAND")) {
+			testing=false;
+			for(int mli=1;mli<=1;mli++) {
+				for(int boi=37;boi<=54;boi++) {
+					debugGraphConstruction=false;
+					if(mli==5)setRootnavParams();				
+					String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
+					String ml=""+(mli==5 ? "RootNav" : mli);
+					System.out.println("Processing ML"+ml+"_Boite_"+boite);
+					IJ.log("Processing ML"+ml+"_Boite_"+boite);
+
+					
+					Timer t=new Timer();
+					t.print("Start"+mli+"-"+boi);
+					//runImportSequences(ml,boite);
+					String imgName="ML"+ml+"_Boite_"+boite;
+					//runRegisterSequences(imgName);
+					//runComputeMaskAndRemoveLeaves(imgName);//9 secondes
+					//computeML(imgName);
+					runDateEstimation(imgName);//2.61 secondes
+					//buildAndProcessGraph(imgName);//60s
+					//computeTimes(imgName); //9s
+					backTrackPrimaries(imgName);
+//					exportToExpertize(imgName);
+					t.print("Stop"+mli+"-"+boi);
+				}
 			}
+			IJ.showMessage("Done");
+			System.exit(0);
 		}
-		IJ.showMessage("Done");
-		VitimageUtils.waitFor(600000000);
-		System.exit(0);
-	}
-
-	
-	public TestImageSequence() {		super("");	IJ.log("Constructor without");}
-	public TestImageSequence(String title) {		super(title);IJ.log("Constructor with");	}
-	public static void main(String[]args) {
-		ImageJ ij=new ImageJ();
-		TestImageSequence test= new TestImageSequence("");
-		test.run("");
-		//test.test2();
-	}
-
-	
-	public void test2() {
-		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/test.tif");
-		img.show();
-//		double[]tab1=getRootnavBoxCenter(img);
-		double[]tab1=getRootnavBoxCenter(img);
-		System.out.println(tab1[0]+","+tab1[1]);
-	}
-	
-	public	double[]getRootnavBoxCenter(ImagePlus img){
-		ImagePlus im=VitimageUtils.convertByteToFloatWithoutDynamicChanges(img);
-		float[]data=(float[]) im.getStack().getPixels(1);
-		double nInt=0;
-		int X=im.getWidth();
-		int Y=im.getHeight();
-		double[]agr=new double[] {0,0};
-		for(int x=0;x<X;x++)		for(int y=0;y<Y;y++) {
-			if(data[X*y+x]<60) {
-				nInt+=(60-data[X*y+x]);
-				agr[0]+=x*(60-data[X*y+x]);
-				agr[1]+=y*(60-data[X*y+x]);
-			}
+		else {
+			inputDataDir=VitiDialogs.chooseDirectoryUI("Choose an input directory. Inside, one dir per box, each dir contains a sequence of images which is a temporal series)","OK");
+			processingDataDir=VitiDialogs.chooseDirectoryUI("Choose a directory where to process data and to store results.","OK");
+			if(!verifyDirs())return;
+			
+			
 		}
-	
-		return new double[] {agr[0]/nInt,agr[1]/nInt};
 	}
 	
-	public	double[]getRootnavBoxCenter2(ImagePlus img){
-		ImagePlus im=img.duplicate();
-		IJ.run(im,"Invert","");
-		im=VitimageUtils.convertByteToFloatWithoutDynamicChanges(im);
-		
-		double i=VitimageUtils.getOtsuThreshold(im);
-		System.out.println(i);
-		ImagePlus im2=VitimageUtils.thresholdFloatImage(im, 80, 500);
-		im2.setDisplayRange(0, 1);
-		ImagePlus con=VitimageUtils.connexe2dNoFuckWithVolume(im2, 0, 0.5, 0.5, 1000000000, 4, 1, true);
-		con.show();
-		con=VitimageUtils.convertShortToFloatWithoutDynamicChanges(con);
-		float[]data=(float[]) con.getStack().getPixels(1);
-		double nInt=0;
-		int X=im.getWidth();
-		int Y=im.getHeight();
-		double[]agr=new double[] {0,0};
-		for(int x=0;x<X;x++)		for(int y=0;y<Y;y++) {
-			nInt+=(data[X*y+x]);
-			agr[0]+=x*(data[X*y+x]);
-			agr[1]+=y*(data[X*y+x]);
-		}
-	
-		return new double[] {agr[0]/nInt,agr[1]/nInt};
-	}
-	
-	public static int[] detectBoxCenterInRootnavSlice(ImagePlus img) {
-		//Enhance horizontal and vertical lines
-		ImagePlus img2=MorphoUtils.dilationLine2D(img, 2, true);img2=MorphoUtils.erosionLine2D(img2, 15, true);
-		img2=MorphoUtils.dilationLine2D(img2, 2, false);img2=MorphoUtils.erosionLine2D(img2, 15, false);img2=MorphoUtils.erosionCircle2D(img2, 3);
-		//Remove white borders and get biggest component
-		img2=VitimageUtils.drawRectangleInImage(img2, 0, 0, 30, 1023, 0);
-		img2=VitimageUtils.drawRectangleInImage(img2, 0, 0, 1023, 30, 0);
-		img2=VitimageUtils.drawRectangleInImage(img2, 994, 0, 1023, 1023, 0);
-		img2=VitimageUtils.drawRectangleInImage(img2, 0, 994, 1023, 1023, 0);
-		ImagePlus con=VitimageUtils.connexe2dNoFuckWithVolume(img2, 150, 300, 10000, 1000000000, 4, 1, false);
-
-		//Compute mass center
-		con=VitimageUtils.convertShortToFloatWithoutDynamicChanges(con);
-		float[]data=(float[]) con.getStack().getPixels(1);
-		double nInt=0;
-		int X=con.getWidth();
-		int Y=con.getHeight();
-		double[]agr=new double[] {0,0};
-		for(int x=0;x<X;x++)		for(int y=0;y<Y;y++) {
-			nInt+=(data[X*y+x]);
-			agr[0]+=x*(data[X*y+x]);
-			agr[1]+=y*(data[X*y+x]);
-		}
-
-		int x0=(int) (agr[0]/nInt);
-		int y0=(int) (agr[1]/nInt);
-		return new int[] {x0,y0};
-	}
+	public RhizoTrackPipeline() {		super("");}
+	public RhizoTrackPipeline(String title) {		super(title);}
 
 	
 	
 	
 	
 	/**Test sequences ***********************************************************************************************************************/	
-	public void testDateEstimation() {
-		int ml=1;
-		String boite="00002";
-		System.out.println("Processing ML"+ml+"_Boite_"+boite);
-		ImagePlus imgIn=IJ.openImage(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgMask=IJ.openImage(mainDataDir+"/1_Mask/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus mire=computeMire(imgIn);
-		imgIn=VitimageUtils.addSliceToImage(mire, imgIn);
-		imgIn.show();
-		ImagePlus[]tabImg=VitimageUtils.stackToSlices(imgIn);
-		ImagePlus[]tabImg2=VitimageUtils.stackToSlices(imgIn);
-		for(int i=1;i<tabImg.length;i++)tabImg[i]=VitimageUtils.makeOperationBetweenTwoImages(tabImg2[i-1],tabImg2[i],4,true);
-		ImagePlus out=VitimageUtils.slicesToStack(tabImg);
-		out.show();
-		
-
-	}
 	
-	public void testRegistration() {
-		ImagePlus imgMov=IJ.openImage("/home/rfernandez/Bureau/t0.tif");
-		ImagePlus imgRef=IJ.openImage("/home/rfernandez/Bureau/t1.tif");
-		imgMov=VitimageUtils.resize(imgMov, imgMov.getWidth()/4, imgMov.getHeight()/4, 1);
-		imgRef=VitimageUtils.resize(imgRef, imgRef.getWidth()/4, imgRef.getHeight()/4, 1);
-		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/Temp/gg3/step_2_after_rig.tif");
-		ImagePlus mask=null;
-
-		if(true) {
-		boolean viewRegistrations=true;
-			RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(imgRef,imgMov,null,false);				
-			regAct.setLevelMaxLinear(3);
-			regAct.setLevelMinLinear(1);
-			regAct.setIterationsBMLinear(6);
-			regAct.typeTrans=Transform3DType.RIGID;
-			regAct.strideX=4;
-			regAct.strideY=4;
-			regAct.neighX=1;
-			regAct.neighY=1;
-			regAct.sigmaDense/=6;
-			regAct.selectLTS=99;
-			BlockMatchingRegistration bm= BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
-			bm.mask=mask;
-			viewRegistrations=false;
-		    bm.defaultCoreNumber=VitimageUtils.getNbCores();
-		    bm.minBlockVariance=0.5;
-		    bm.minBlockScore=0.001;
-		    bm.percentageBlocksSelectedByScore=99;
-		    bm.percentageBlocksSelectedByVariance=99;
-		    if(viewRegistrations) {
-				bm.displayRegistration=2; 
-				bm.adjustZoomFactor(512.0/imgRef.getWidth());
-			}
-			ItkTransform tr=bm.runBlockMatching(null, false);			
-			IJ.showMessage("\n\n\n\nDONE\n");
- 			if(viewRegistrations) {
-			    bm.closeLastImages();
-			    bm.freeMemory();
-			}
- 			tr.writeMatrixTransformToFile("/home/rfernandez/temp.txt");
-		}
-		ItkTransform tr=ItkTransform.readTransformFromFile("/home/rfernandez/temp.txt");
-		
-		int N=img.getStackSize();
-		int x=10;
-		ImagePlus[]tabImg=VitimageUtils.stackToSlices(img);
-		ItkTransform[]trComposed=new ItkTransform[N];
-		boolean viewRegistrations=true;
-		for(int n1=x;n1<x+1;n1++) {
-			RegistrationAction regAct2=new RegistrationAction().defineSettingsFromTwoImages(imgRef, imgMov,null,false);				
-			regAct2.setLevelMaxNonLinear(0);
-			regAct2.setLevelMinNonLinear(-2);
-			regAct2.setIterationsBMNonLinear(6);
-			regAct2.typeTrans=Transform3DType.DENSE;
-			regAct2.strideX=4;
-			regAct2.strideY=4;
-			regAct2.neighX=2;
-			regAct2.neighY=2;
-			regAct2.sigmaDense/=12;
-			regAct2.selectLTS=99;
-			BlockMatchingRegistration bm2= BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct2);
-			bm2.mask=mask;
-		    bm2.defaultCoreNumber=VitimageUtils.getNbCores();
-		    bm2.minBlockVariance=0.5;
-		    bm2.minBlockScore=0.001;
-		    bm2.percentageBlocksSelectedByScore=99;
-		    bm2.percentageBlocksSelectedByVariance=99;
-		    if(viewRegistrations) {
-				bm2.displayRegistration=2;
-				bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());
-			}
-			trComposed[n1]=bm2.runBlockMatching(tr, false);			
-			IJ.showMessage("\n\n\n\nDONE\n");
-			VitimageUtils.waitFor(600000000);
-			if(viewRegistrations) {
-			    bm2.closeLastImages();
-			    bm2.freeMemory();
-			}
-
-		}
-	}
-
-	public void test() {
-		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/test.tif");
-		img=VitimageUtils.resizeNearest(img,200, 200, 1);
-		img=VitimageUtils.nullImage(img);
-		IJ.run(img,"8-bit","");
-		int thick=1;
-		double angle=5;
-		VitimageUtils.drawCircleIntoImage(img, 10, 100, 100, 1,255);
-		img.show();
-		VitimageUtils.waitFor(10000000);
-	}
-
+	
+	
+	
 	
 	
 	/** Main entry points --------------------------------------------------------------------------------------------------------------------------------------------------------*/
-	public  void runImportSequences(String ml, String boite) {
-		ImagePlus img=importTimeLapseSerie(""+ml, boite,".jpg",null,false);
+	public boolean verifyDirs() {
+		if (!new File(inputDataDir).exists()) {IJ.showMessage("Wrong inputDataDir, does not exist : "+inputDataDir);return false;}
+		if (!new File(processingDataDir).exists()) {IJ.showMessage("Wrong processingDataDir, does not exist : "+inputDataDir);return false;}
 		
+		
+		
+		
+		return true;
+	}
+	
+	
+	public void runImportSequences(String ml, String boite) {
+		ImagePlus img=importTimeLapseSerie(""+ml, boite,".jpg",null,false);
+		String imgName="ML"+ml+"_Boite_"+boite;
 		if(img!=null) {
 			int X=img.getWidth();
 			int Y=img.getHeight();
 			int Z=img.getStackSize();
 			System.out.print(" resize...");
 			//VitimageUtils.adjustImageCalibration(img, new double[] {19,19,19}, "µm");
-			//IJ.saveAsTiff(img, mainDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite);
+			//IJ.saveAsTiff(img, processingDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite);
 			img=VitimageUtils.resize(img, X/4, X/4, Z);
 			VitimageUtils.adjustImageCalibration(img, new double[] {19*4,19*4,19*4}, "µm");
-			IJ.saveAsTiff(img, mainDataDir+"/0_Stacked/ML"+ml+"_Boite_"+boite);
+			IJ.saveAsTiff(img, processingDataDir+"/0_Stacked/"+imgName+".tif");
 			}				
 	}
 			
-	public  void runRegisterSequences(String ml, String boite) {
+	public void runRegisterSequences(String imgName) {
 		ImagePlus []imgs=null;
-		if(isRootnavData)imgs=registerImageSequenceRootnav(""+ml,boite,4,false);
-		else imgs=registerImageSequence(""+ml,boite,4,false);
+		imgs=registerImageSequence(imgName,4,false);
 		System.out.println("Did !");
-		System.out.println("Saving as "+mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
-		IJ.saveAsTiff(imgs[1], mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");				
-		if(imgs[0]!=null)	IJ.saveAsTiff(imgs[0], mainDataDir+"/1_Registered_High/ML"+ml+"_Boite_"+boite+".tif");				
+		System.out.println("Saving as "+processingDataDir+"/1_Registered/"+imgName+".tif");
+		IJ.saveAsTiff(imgs[1], processingDataDir+"/1_Registered/"+imgName+".tif");				
+		if(imgs[0]!=null)	IJ.saveAsTiff(imgs[0], processingDataDir+"/1_Registered_High/"+imgName+".tif");				
 	}
 
-	public void runComputeMaskAndRemoveLeaves(String ml, String boite) {
+	public void runComputeMaskAndRemoveLeaves(String imgName) {
 		boolean highRes=false;
-		ImagePlus imgReg=IJ.openImage(mainDataDir+"/1_Registered"+(highRes ? "_High":"")+"/ML"+ml+"_Boite_"+boite+".tif");
+		ImagePlus imgReg=IJ.openImage(processingDataDir+"/1_Registered"+(highRes ? "_High":"")+"/"+imgName+".tif");
 		ImagePlus imgMask1=VitimageUtils.getBinaryMaskUnary(getInterestAreaMask(new Duplicator().run(imgReg,1,1,1,1,1,1),highRes),0.5);
 		imgMask1.setDisplayRange(0, 1);
-		IJ.saveAsTiff(imgMask1, mainDataDir+"/1_Mask_1/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(imgMask1, processingDataDir+"/1_Mask_1/"+imgName+".tif");
 
 		ImagePlus imgMaskN=VitimageUtils.getBinaryMaskUnary(getInterestAreaMask(new Duplicator().run(imgReg,1,1,imgReg.getStackSize(),imgReg.getStackSize(),1,1),highRes),0.5);
 		imgMaskN.setDisplayRange(0, 1);
-		IJ.saveAsTiff(imgMaskN, mainDataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(imgMaskN, processingDataDir+"/1_Mask_N/"+imgName+".tif");
 
 		ImagePlus imgMask2=	MorphoUtils.erosionCircle2D(imgMask1, 250*(highRes ? 4 : 1));
 		imgMask2.setDisplayRange(0, 1);
-		IJ.saveAsTiff(imgMask2, mainDataDir+"/1_Mask_Feuilles/ML"+ml+"_Boite_"+boite+".tif");		
+		IJ.saveAsTiff(imgMask2, processingDataDir+"/1_Mask_Feuilles/"+imgName+".tif");		
 
 		ImagePlus []imgsOut=removeLeavesFromSequence_v2(imgReg, imgMask1, imgMask2,highRes);
 		imgsOut[0].setDisplayRange(0, 255);
 
-		IJ.saveAsTiff(imgsOut[0],mainDataDir+"/1_Remove_Leaves/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(imgsOut[0],processingDataDir+"/1_Remove_Leaves/"+imgName+".tif");
 		imgsOut[1].setDisplayRange(0, 1);
-		IJ.saveAsTiff(imgsOut[1],mainDataDir+"/1_Mask_Of_Leaves/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(imgsOut[1],processingDataDir+"/1_Mask_Of_Leaves/"+imgName+".tif");
 	}	
 	
+/*
 	public void computeML(String ml, String boite) {
-		ImagePlus imgIn=IJ.openImage(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
+		ImagePlus imgIn=IJ.openImage(processingDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
 		String clasifierPath="/home/rfernandez/Bureau/A_Test/RSML/N_Others/ML/classifier_v5.model";
 		ImagePlus[]mlResult=new ImagePlus[imgIn.getStackSize()];
 		int N=imgIn.getStackSize();
@@ -358,16 +258,17 @@ public class TestImageSequence extends PlugInFrame{
 			System.out.println(" Ok."+t);			
 		}
 		ImagePlus mlRes=VitimageUtils.slicesToStack(mlResult);
-		IJ.saveAsTiff(mlRes,mainDataDir+"/2_ML/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(mlRes,processingDataDir+"/2_ML/ML"+ml+"_Boite_"+boite+".tif");
 	}
+	*/
 	
 	
-	
-	public void runDateEstimation(String ml, String boite) {
-		ImagePlus imgIn=IJ.openImage(mainDataDir+"/1_Remove_Leaves/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgMask1=IJ.openImage(mainDataDir+"/1_Mask_1/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgMaskN=IJ.openImage(mainDataDir+"/1_Mask_N/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgMaskOfLeaves=IJ.openImage(mainDataDir+"/1_Mask_Of_Leaves/ML"+ml+"_Boite_"+boite+".tif");
+	public void runDateEstimation(String imgName) {
+		System.out.println(processingDataDir+"/1_Remove_Leaves/"+imgName+".tif");
+		ImagePlus imgIn=IJ.openImage(processingDataDir+"/1_Remove_Leaves/"+imgName+".tif");
+		ImagePlus imgMask1=IJ.openImage(processingDataDir+"/1_Mask_1/"+imgName+".tif");
+		ImagePlus imgMaskN=IJ.openImage(processingDataDir+"/1_Mask_N/"+imgName+".tif");
+		ImagePlus imgMaskOfLeaves=IJ.openImage(processingDataDir+"/1_Mask_Of_Leaves/"+imgName+".tif");
 
 		ImagePlus mire=computeMire(imgIn);
 		imgIn=VitimageUtils.addSliceToImage(mire, imgIn);
@@ -383,19 +284,19 @@ public class TestImageSequence extends PlugInFrame{
 /*		img2.show();
 		img3.show();
 		VitimageUtils.waitFor(500000);*/
-		img2=VitimageUtils.connexeNoFuckWithVolume(img2, 1, 10000, 3000, 1E10, 4, 0, true);
+		img2=VitimageUtils.connexeNoFuckWithVolume(img2, 1, 10000, 2000, 1E10, 4, 0, true);
 		img2=VitimageUtils.thresholdImage(img2, 0.5, 1E8);
 		img2=VitimageUtils.getBinaryMaskUnary(img2, 0.5);
 		IJ.run(img2,"8-bit","");
 		imgOut=VitimageUtils.makeOperationBetweenTwoImages(imgOut, img2, 2, true);
 		IJ.run(imgOut,"Fire","");
 		imgOut.setDisplayRange(-1, 22);
-		IJ.saveAsTiff(imgOut, mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(imgOut, processingDataDir+"/2_Date_maps/"+imgName+".tif");
 	}
 
-	public void runBuildGraphs(String ml,String boite) {
+	public void runBuildGraphs(String imgName) {
 		//ImagePlus imgOut=buildAndProcessGraph(""+ml,boite);
-		//IJ.saveAsTiff(imgOut, mainDataDir+"/3_Graphs/ML"+ml+"_Boite_"+boite);
+		//IJ.saveAsTiff(imgOut, processingDataDir+"/3_Graphs/ML"+ml+"_Boite_"+boite);
 	}
 	
 	
@@ -497,65 +398,64 @@ public class TestImageSequence extends PlugInFrame{
 	}
 			
 	
-	public  void exportToExpertize(String ml, String boite) {
-		String exportDir=mainDataDir+"/Processing_by_box";
+	public  void exportToExpertize(String imgName) {
+		String exportDir=processingDataDir+"/Processing_by_box";
 		new File(exportDir).mkdir();
-		String mlDir=exportDir+"/ML"+ml+"_Boite_"+boite;
+		String mlDir=exportDir+"/"+imgName;
 		new File(mlDir).mkdir();
 
 		//Copy rsml image
-		Path source=FileSystems.getDefault().getPath(new File(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml").getAbsolutePath());
+		Path source=FileSystems.getDefault().getPath(new File(processingDataDir+"/4_RSML/"+imgName+".rsml").getAbsolutePath());
 		Path target=FileSystems.getDefault().getPath(new File(mlDir,"4_2_Model.rsml").getAbsolutePath());
 		try {Files.copy(source,target,StandardCopyOption.REPLACE_EXISTING);} catch (IOException e) {e.printStackTrace();}
 		
 		//Copy rsml image
-		source=FileSystems.getDefault().getPath(new File(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif").getAbsolutePath());
+		source=FileSystems.getDefault().getPath(new File(processingDataDir+"/1_Registered/"+imgName+".tif").getAbsolutePath());
 		target=FileSystems.getDefault().getPath(new File(mlDir,"1_5_RegisteredSequence.tif").getAbsolutePath());
 		try {Files.copy(source,target,StandardCopyOption.REPLACE_EXISTING);} catch (IOException e) {e.printStackTrace();}
 	}
 	
-	public  void computeTimes(String ml, String boite) {
-		ImagePlus dates=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
-		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphUtils.readGraphFromFile(mainDataDir+"/3_Graphs_Ser/"+"ML"+ml+"_Boite_"+boite+".ser");
+	public  void computeTimes(String imgName) {
+		ImagePlus mask=IJ.openImage(processingDataDir+"/1_Mask_1/"+imgName+".tif");
+		ImagePlus reg=IJ.openImage(mainDataDir+"/1_Registered/"+imgName+".tif");
+		reg=new Duplicator().run(reg,1,1,1,1,1,1);
+		ImagePlus dates=IJ.openImage(processingDataDir+"/2_Date_maps/"+imgName+".tif");
+		mask=MorphoUtils.dilationCircle2D(mask, 9);
+		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphUtils.readGraphFromFile(processingDataDir+"/3_Graphs_Ser/"+imgName+".ser");
 		ImagePlus distOut=MorphoUtils.getDistOut(dates,false);
 
-		//DEBUG>
-		//IJ.showMessage("Debug truc in COMP");
-		CC cctest=RegionAdjacencyGraphUtils.getCC(graph, 394*RegionAdjacencyGraphUtils.SIZE_FACTOR, 394*RegionAdjacencyGraphUtils.SIZE_FACTOR);
-		//	IJ.showMessage(""+cctest+" isout ? "+cctest.isOut);
-		for(ConnectionEdge edge :graph.edgesOf(cctest)) {
-			//	IJ.showMessage("Edge : "+edge+" act ? "+edge.activated+" out ? "+edge.isOut);
-		}
-		//<DEBUG
-
-		RootModel rm=RegionAdjacencyGraphUtils.refinePlongementOfCCGraph(graph,distOut,0.9);
+		RootModel rm=RegionAdjacencyGraphUtils.refinePlongementOfCCGraph(graph,distOut,TOLERANCE_DISTANCE_TO_CENTRAL_LINE_FOR_DOUGLAS_SIMPLIFICATION);
 		rm.cleanWildRsml();
 		rm.resampleFlyingRoots();
-		rm.writeRSML3D(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml", "",true);
-		rm=RootModel.RootModelWildReadFromRsml(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml");
+		rm.writeRSML3D(processingDataDir+"/4_RSML/"+imgName+".rsml", "",true,false);
+		backTrackPrimaries(processingDataDir+"/4_RSML/"+imgName+".rsml",processingDataDir+"/4_RSML_BACKTRACK/"+imgName+".rsml",mask,reg,TOLERANCE_DISTANCE_TO_CENTRAL_LINE_FOR_DOUGLAS_SIMPLIFICATION);
+		rm=RootModel.RootModelWildReadFromRsml(processingDataDir+"/4_RSML_BACKTRACK/"+imgName+".rsml");
 		ImagePlus skeletonTime=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,3);
 		ImagePlus skeletonDay=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,true,2);
 		ImagePlus allTimes=RegionAdjacencyGraphUtils.drawDistanceOrTime(dates,graph,false,false,1);
 		//rm.createGrayScaleImage(skeletonTime,0,false,true,1).show(); 
 
+		
 
-	//	rm.writeRSML3D(mainDataDir+"/4_RSML/ML"+ml+"_Boite_"+boite+".rsml","TEST",true);
+	//	rm.writeRSML3D(processingDataDir+"/4_RSML/"+imgName+".rsml","TEST",true);
 		System.out.println("H3");
 
-		ImagePlus timeRSMLimg=createTimeSequenceSuperposition(ml,boite,rm,skeletonTime,false);
-		IJ.saveAsTiff(timeRSMLimg, mainDataDir+"/4_RSML_img/ML"+ml+"_Boite_"+boite+".tif");
+		if(debugGraphConstruction) {
+			ImagePlus timeRSMLimg=createTimeSequenceSuperposition(imgName,rm,skeletonTime,false);
+			IJ.saveAsTiff(timeRSMLimg, processingDataDir+"/4_RSML_img/"+imgName+".tif");
+		}
 		skeletonDay.setDisplayRange(0, 23);
 		skeletonTime.setDisplayRange(0, 23);
 		allTimes.setDisplayRange(0, 23);
-		IJ.saveAsTiff(skeletonTime, mainDataDir+"/4_Times_skeleton/ML"+ml+"_Boite_"+boite+".tif");
-		IJ.saveAsTiff(skeletonTime, mainDataDir+"/4_Times_skeleton/ML"+ml+"_Boite_"+boite+".tif");
-		IJ.saveAsTiff(skeletonDay, mainDataDir+"/4_Day_skeleton/ML"+ml+"_Boite_"+boite+".tif");
-		IJ.saveAsTiff(allTimes, mainDataDir+"/4_Times/ML"+ml+"_Boite_"+boite+".tif");
+		IJ.saveAsTiff(skeletonTime, processingDataDir+"/4_Times_skeleton/"+imgName+".tif");
+		IJ.saveAsTiff(skeletonTime, processingDataDir+"/4_Times_skeleton/"+imgName+".tif");
+		IJ.saveAsTiff(skeletonDay, processingDataDir+"/4_Day_skeleton/"+imgName+".tif");
+		IJ.saveAsTiff(allTimes, processingDataDir+"/4_Times/"+imgName+".tif");
 		System.out.println("H4");
 	}
 	
-	public ImagePlus createTimeSequenceSuperposition(String ml, String boite,RootModel rm,ImagePlus refSize,boolean highRes){
-		ImagePlus imgReg=(highRes) ? IJ.openImage(mainDataDir+"/1_Registered"+(highRes ? "_High" : "")+"/ML"+ml+"_Boite_"+boite+".tif") :  IJ.openImage(mainDataDir+"/1_Registered/ML"+ml+"_Boite_"+boite+".tif");
+	public ImagePlus createTimeSequenceSuperposition(String imgName,RootModel rm,ImagePlus refSize,boolean highRes){
+		ImagePlus imgReg=(highRes) ? IJ.openImage(processingDataDir+"/1_Registered"+(highRes ? "_High" : "")+"/"+imgName+".tif") :  IJ.openImage(processingDataDir+"/1_Registered/"+imgName+".tif");
 		ImagePlus[]tabRes=VitimageUtils.stackToSlices(imgReg);
 		Timer t=new Timer();
 		for(int i=0;i<tabRes.length;i++) {
@@ -570,7 +470,100 @@ public class TestImageSequence extends PlugInFrame{
 	}
 
 	
+	public static void backTrackPrimaries(String imgName) {
+		ImagePlus mask=IJ.openImage(mainDataDir+"/1_Mask_1/"+imgName+".tif");
+		ImagePlus reg=IJ.openImage(mainDataDir+"/1_Registered/"+imgName+".tif");
+		reg=new Duplicator().run(reg,1,1,1,1,1,1);
+		mask=MorphoUtils.dilationCircle2D(mask, 9);
+		backTrackPrimaries(mainDataDir+"/4_RSML/"+imgName+".rsml",mainDataDir+"/4_RSML_BACKTRACK/"+imgName+".rsml",mask,reg,TOLERANCE_DISTANCE_TO_CENTRAL_LINE_FOR_DOUGLAS_SIMPLIFICATION);
+		ImagePlus imgModelAfter=RootModel.createSuperpositionTimeLapseFromPath(mainDataDir+"/1_Registered/"+imgName+".tif",mainDataDir+"/4_RSML_BACKTRACK/"+imgName+".rsml");
+		ImagePlus imgModelInit=RootModel.createSuperpositionTimeLapseFromPath(mainDataDir+"/1_Registered/"+imgName+".tif",mainDataDir+"/4_RSML/"+imgName+".rsml");
+		String[]paths=new File(mainDataDir+"/Retour Amandine/"+imgName+"/Expertized_models/").list();
+		Arrays.sort(paths);
+		String filePath=mainDataDir+"/Retour Amandine/"+imgName+"/Expertized_models/"+paths[paths.length-1];
+		ImagePlus imgModelExpert=RootModel.createSuperpositionTimeLapseFromPath(mainDataDir+"/1_Registered/"+imgName+".tif",filePath);
+		imgModelInit.setTitle("Init");
+		imgModelAfter.setTitle("After");
+		imgModelExpert.setTitle("Expert");
+		//imgModelInit.show();
+		//imgModelAfter.show();
+		//imgModelExpert.show();
+	}	
+
 	
+	public static void backTrackPrimaries(String pathToInputRsml,String pathToOutputRsml,ImagePlus mask,ImagePlus imgRegT0,double toleranceDistToCentralLine) {
+		RootModel rmInit=RootModel.RootModelWildReadFromRsml(pathToInputRsml);
+		Root[]prRoots=rmInit.getPrimaryRoots();
+		int X=mask.getWidth();
+		int Y=mask.getHeight();
+		int xTolerance=X/20;
+
+		for(Root r : prRoots) {
+			//Identify the first coordinates
+			Node oldFirst=r.firstNode;
+			int xMid=(int) oldFirst.x;
+			int yMid=(int) oldFirst.y;
+		
+			//Identify the mean height of region to attain in this area
+			int upperPix=0;
+			for(int i=yMid;i>=0;i--) {
+				if(mask.getPixel(xMid, i)[0]>0)upperPix=i;
+			}
+			//TODO
+			upperPix-=10;
+			upperPix=0;
+			if(upperPix<0)upperPix=0;
+			
+			//Extract a rectangle around the first coordinate at time 0
+			ImagePlus imgExtractMask=VitimageUtils.cropImage(mask, xMid-xTolerance, upperPix, 0, xTolerance*2+1, yMid-upperPix+1, 1);
+			imgExtractMask.setDisplayRange(0, 1);
+			ImagePlus imgExtract=VitimageUtils.cropImage(imgRegT0, xMid-xTolerance, upperPix, 0, xTolerance*2+1, yMid-upperPix+1, 1);
+			
+			//Extract a min djikstra path to this region
+			GraphPath<Pix,Bord>graph=VitimageUtils.getShortestAndDarkestPathInImage(imgExtract,8,new Pix(xTolerance,0,0),new Pix (xTolerance,yMid-upperPix,0));
+			List<Pix>liInit=graph.getVertexList();
+			
+			
+			//Find in this path the last point that is not in the interest area
+			int indFirst=0;
+			for(int i=0;i<graph.getLength() ;i++) {
+				Pix p=liInit.get(i);
+//				System.out.println("Testing "+p+ " = "+imgExtractMask.getPixel(p.x, p.y)[0]);
+				if(imgExtractMask.getPixel(p.x, p.y)[0]<1)indFirst=i;
+			}
+			indFirst+=7;//Fit to the mean
+			if(indFirst>=graph.getLength()-1)continue;//No path to add
+			List<Pix>liSecond=new ArrayList<Pix>();
+			for(int i=indFirst;i<graph.getLength() ;i++) {
+				liSecond.add( liInit.get(i) );
+			}
+			
+			//subsample the new path
+			List<Integer>liNull=new ArrayList<Integer>();
+			List<Pix>list= DouglasPeuckerSimplify.simplify(liSecond,liNull ,toleranceDistToCentralLine);
+			list.remove(list.size()-1);
+			System.out.println("After second step");
+			int x0=xMid-xTolerance;
+			int y0=upperPix;
+			
+			//Insert the corresponding coordinates update time value along the root		
+			Pix p=list.get(0);
+			Node n=new Node(p.x+x0,p.y+y0,0,null,false);
+			r.firstNode=n;
+			for(int i=1;i<list.size()-1;i++) {				
+				p=list.get(i);
+				Node n2=new Node(p.x+x0,p.y+y0,0.01f,n,true);
+				n=n2;
+			}
+			n.child=oldFirst;
+			oldFirst.parent=n;
+			r.updateNnodes();
+			r.computeDistances();
+			r.resampleFlyingPoints();
+		}
+		rmInit.writeRSML3D(pathToOutputRsml, "", true,false);
+	}
+
 	
 	
 	/**
@@ -581,11 +574,11 @@ public class TestImageSequence extends PlugInFrame{
 		String hardDiskPath="/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Second_dataset_2021_07/Data_Tidy/";
 		if(new File(hardDiskPath).exists()) {}
 		else {
-			hardDiskPath="/media/rfernandez/BACKUP_DATA_RO_A/DATA_RO_A/Roots_systems/Data_BPMP/Second_dataset_2021_07/Data_Tidy/";
+			hardDiskPath="/Donnees/DD_CIRS626_DATA/Racines/Data_BPMP/Second_dataset_2021_07/Data_Tidy/";
 			if(new File(hardDiskPath).exists()) {}
 			else {IJ.showMessage("No hard disk found for source data. ");return null;}			
 		}
-		String dirData=( (dataDir==null) ? (mainDataDir+"/Data_Tidy/") : dataDir );
+		String dirData=( (dataDir==null) ? (processingDataDir+"/Data_Tidy/") : dataDir );
 		ArrayList<ImagePlus> listImg=new ArrayList<ImagePlus>();
 		ArrayList<String>listLabels=new ArrayList<String>();
 		for(int i=0;i<100;i++) {
@@ -617,16 +610,17 @@ public class TestImageSequence extends PlugInFrame{
 		return imgStack;
 
 	}
-	 /**
+
+	/**
     STEP 01 : Register stack comprising successive 2D images of root systems.
     If no dataDir is given, open the image into rfernandez's DATA drive
     */
-	public ImagePlus []registerImageSequence(String ml, String boite,int additionnalIterationsUsingMeanImage,boolean viewRegistrations) {
+	public ImagePlus []registerImageSequence(String imgName,int additionnalIterationsUsingMeanImage,boolean viewRegistrations) {
 		boolean makeHighRes=false;
-		ImagePlus mask=IJ.openImage(mainDataDir+"/N_Others/maskNewLargerLong.tif");
-		ImagePlus imgInit2=IJ.openImage(mainDataDir+"/0_Stacked/ML"+ml+"_Boite_"+boite+".tif");
+		ImagePlus mask=IJ.openImage(processingDataDir+"/N_Others/maskNewLargerLong.tif");
+		ImagePlus imgInit2=IJ.openImage(processingDataDir+"/0_Stacked/"+imgName+".tif");
 		ImagePlus imgInit2High=null;
-		if(makeHighRes)imgInit2High=IJ.openImage(mainDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite+".tif");
+		if(makeHighRes)imgInit2High=IJ.openImage(processingDataDir+"/0_Stacked_Highres/"+imgName+".tif");
 		ImagePlus imgInit=VitimageUtils.cropImage(imgInit2, XMINCROP,YMINCROP,0,DXCROP,DYCROP,imgInit2.getStackSize());
 		ImagePlus imgInitHigh=null;
 		if(makeHighRes)imgInitHigh=VitimageUtils.cropImage(imgInit2High, 122*4,152*4,0,1348*4,1226*4,imgInit2High.getStackSize());
@@ -656,21 +650,6 @@ public class TestImageSequence extends PlugInFrame{
 
 			
 			ItkTransform trRoot=null;
-			if(isRootnavData) {
-				//determine box centers
-				//determine box 1
-				double[]tab1=getRootnavBoxCenter(tabImg[n+1]);
-				double[]tab2=getRootnavBoxCenter(tabImg[n]);
-				//determine box 2
-				double dx=tab1[0]-tab2[0];
-				double dy=tab1[1]-tab2[1];
-				trRoot=ItkTransform.array16ElementsToItkTransform(new double[] {1,0,0, dx, 0,1,0,  dy,  0,0,1,0,  0,0,0,1});
-				IJ.showMessage(dx+","+dy);
-			}
-
-			
-			
-			
 			RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n],tabImg[n+1],null,false);
 			regAct.setLevelMaxLinear(MAXLINEAR);			regAct.setLevelMinLinear(0);
 			regAct.strideX=8;			regAct.strideY=8;			regAct.neighX=3;			regAct.neighY=3;
@@ -682,7 +661,7 @@ public class TestImageSequence extends PlugInFrame{
 			if(!isRootnavData)bm.mask=mask.duplicate();
 		    bm.defaultCoreNumber=VitimageUtils.getNbCores();
 		    bm.minBlockVariance/=4;
-		    viewRegistrations=(true || false && (n==17));
+		    viewRegistrations=false;
 			if(viewRegistrations) {
 				bm.displayRegistration=2;
 				bm.adjustZoomFactor(((512.0))/tabImg[n].getWidth());
@@ -750,7 +729,7 @@ public class TestImageSequence extends PlugInFrame{
 		    bm2.minBlockVariance=10;
 		    bm2.minBlockScore=0.10;
 		    bm2.displayR2=false;
-		    viewRegistrations=(true || false && n1==17);
+		    viewRegistrations=false;
 			if(viewRegistrations) {
 				bm2.displayRegistration=2;
 				bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());
@@ -777,186 +756,6 @@ public class TestImageSequence extends PlugInFrame{
 		return new ImagePlus[] {resultHigh,result2};
 	}
 
-	
-	
-	
-	public ImagePlus []registerImageSequenceRootnav(String ml, String boite,int additionnalIterationsUsingMeanImage,boolean viewRegistrations) {
-		boolean makeHighRes=false;
-		ImagePlus mask=IJ.openImage(mainDataDir+"/N_Others/maskNewLargerLong.tif");
-		ImagePlus imgInit2=IJ.openImage(mainDataDir+"/0_Stacked/ML"+ml+"_Boite_"+boite+".tif");
-		ImagePlus imgInit=VitimageUtils.cropImage(imgInit2, XMINCROP,YMINCROP,0,DXCROP,DYCROP,imgInit2.getStackSize());
-		ImagePlus imgOut=imgInit.duplicate();
-		IJ.run(imgOut,"32-bit","");
-
-		int N=imgInit.getStackSize();
-		ImagePlus []tabImg=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImgTest=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImg2=VitimageUtils.stackToSlices(imgInit);
-		ImagePlus []tabImgSmall=VitimageUtils.stackToSlices(imgInit);
-		ItkTransform []tr=new ItkTransform[N];
-		ItkTransform []trStart=new ItkTransform[N];
-		ItkTransform []trComposed=new ItkTransform[N];
-
-		for(int n=0;(n<N);n++) {
-			tabImg2[n]=tabImg[n].duplicate();
-			int[]tab=detectBoxCenterInRootnavSlice(tabImg[n]);
-			trStart[n]=ItkTransform.array16ElementsToItkTransform(new double[] {1,0,0, -512+tab[0], 0,1,0,  -512+tab[1],  0,0,1,0,  0,0,0,1});
-			tabImg[n]=trStart[n].transformImage(tabImg[n],tabImg[n]);
-		}
-		boolean doit=false;
-		if(doit) {
-			//First step : daisy-chain rigid registration
-			Timer t=new Timer();
-			t.log("Start");
-			
-			
-			for(int n=0;(n<N-1);n++) {
-				t.log("n="+n);
-				RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n].duplicate(),tabImg[n+1].duplicate(),null,false);
-				regAct.setLevelMaxLinear(MAXLINEAR);			regAct.setLevelMinLinear(0);
-				regAct.strideX=8;			regAct.strideY=8;			regAct.neighX=3;			regAct.neighY=3;
-				regAct.selectLTS=90;
-				regAct.typeTrans=Transform3DType.TRANSLATION;
-				BlockMatchingRegistration bm= BlockMatchingRegistration.setupBlockMatchingRegistration(tabImg[n].duplicate(), tabImg[n+1].duplicate(), regAct);
-				bm.defaultCoreNumber=VitimageUtils.getNbCores();
-			    //bm.minBlockVariance/=4;
-			    viewRegistrations=false;
-				if(viewRegistrations) {
-					bm.displayRegistration=2;
-					bm.adjustZoomFactor(((512.0))/tabImg[n].getWidth());
-					bm.flagSingleView=true;
-				}
-				bm.displayR2=false;
-				bm.nbIterations=6;
-				bm.mask=IJ.openImage(mainDataDir+"/N_Others/maskRootnavUp.tif");	
-				//Run translation
-				tr[n]=bm.runBlockMatching(null, false);		
-				tr[n]=tr[n].simplify();
-	//			IJ.showMessage("AFTER FIRST tr["+n+"]="+tr[n]);
-			    if(viewRegistrations) { bm.closeLastImages();		    bm.freeMemory();		    }
-	
-				
-				
-			    
-			    
-			    
-			    
-			    
-				regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n].duplicate(),tabImg[n+1].duplicate(),null,false);
-				regAct.setLevelMaxLinear(1);			regAct.setLevelMinLinear(0);
-				regAct.strideX=8;			regAct.strideY=8;			regAct.neighX=3;			regAct.neighY=3;
-				regAct.selectLTS=90;
-				regAct.typeTrans=Transform3DType.RIGID;
-				bm= BlockMatchingRegistration.setupBlockMatchingRegistration(tabImg[n].duplicate(), tabImg[n+1].duplicate(), regAct);
-				bm.defaultCoreNumber=VitimageUtils.getNbCores();
-			    //bm.minBlockVariance/=4;
-			    viewRegistrations=true;
-				if(viewRegistrations) {
-					bm.displayRegistration=2;
-					bm.adjustZoomFactor(((512.0))/tabImg[n].getWidth());
-					bm.flagSingleView=true;
-				}
-				bm.displayR2=false;
-				bm.nbIterations=6;
-				bm.minBlockVariance/=4;
-			    bm.mask=IJ.openImage(mainDataDir+"/N_Others/maskRootnav.tif");
-				//Run rigid
-				tr[n]=tr[n].simplify();
-	//			IJ.showMessage("BEFORE SECOND tr["+n+"]="+tr[n]);
-				tr[n].addTransform(bm.runBlockMatching(tr[n], false));		
-				tr[n]=tr[n].simplify();
-	//			IJ.showMessage("AFTER SECOND tr["+n+"]="+tr[n]);
-	
-				if(viewRegistrations) { bm.closeLastImages();		    bm.freeMemory();		    }
-			    	
-	
-			    tr[n].writeMatrixTransformToFile("/home/rfernandez/Bureau/Temp/gg4/tr_"+n+".txt");
-				if(viewRegistrations) {
-				    bm.closeLastImages();
-				    bm.freeMemory();
-				}
-				VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg/"+(n), n);
-			}
-		}
-		else {
-			for(int n=0;(n<N-1);n++) {
-				tr[n]=ItkTransform.readTransformFromFile("/home/rfernandez/Bureau/Temp/gg4/tr_"+n+".txt");
-			}
-		}
-		
-		for(int n1=0;n1<N-1;n1++) {
-			trComposed[n1]=tr[n1];
-			for(int n2=n1+1;n2<N-1;n2++) {
-				trComposed[n1].addTransform(tr[n2]);
-			}
-			tabImg[n1]=trComposed[n1].transformImage(tabImg[n1], tabImg[n1]);
-		}
-		ImagePlus result1=VitimageUtils.slicesToStack(tabImg);
-		result1.setTitle("step 1");
-		IJ.saveAsTiff(result1, "/home/rfernandez/Bureau/Temp/gg3/step_1_after_rigOt.tif");
-		
-		
-		
-		//Second step : daisy-chain dense registration  
-		ArrayList<ImagePlus>listAlreadyRegistered=new ArrayList<ImagePlus>();
-		listAlreadyRegistered.add(tabImg [N-1]);
-		for(int n1=N-2;n1>=0;n1--) {
-			ImagePlus imgRef=listAlreadyRegistered.get(listAlreadyRegistered.size()-1);//VitimageUtils.meanOfImageArray(listAlreadyRegistered.toArray(new ImagePlus[N-n1-1]));
-			RegistrationAction regAct2=new RegistrationAction().defineSettingsFromTwoImages(tabImg[0],tabImg[0],null,false);				
-			regAct2.setLevelMaxNonLinear(1);			regAct2.setLevelMinNonLinear(-1);			regAct2.setIterationsBMNonLinear(4);
-			regAct2.typeTrans=Transform3DType.DENSE;
-			regAct2.strideX=4;			regAct2.strideY=4;			regAct2.neighX=2;			regAct2.neighY=2;			regAct2.bhsX-=3;			regAct2.bhsY-=3;
-			regAct2.sigmaDense/=6;
-			regAct2.selectLTS=80;
-			BlockMatchingRegistration bm2= BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, tabImg[n1], regAct2);
-			bm2.mask=mask.duplicate();
-		    bm2.defaultCoreNumber=VitimageUtils.getNbCores();
-		    bm2.minBlockVariance=10;
-		    bm2.minBlockScore=0.10;
-		    bm2.displayR2=false;
-		    bm2.mask=IJ.openImage(mainDataDir+"/N_Others/maskRootnavDown.tif");
-		    viewRegistrations=true;
-			if(viewRegistrations) {
-				bm2.displayRegistration=2;
-				bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());
-			}
-//				bm2.minBlockVariance/=2;
-			trComposed[n1]=bm2.runBlockMatching(trComposed[n1], false);			
-			if(viewRegistrations) {
-			    bm2.closeLastImages();
-			    bm2.freeMemory();
-			}
-			tabImg[n1]=trComposed[n1].transformImage(tabImg[n1], tabImg[n1]);
-			VitimageUtils.writeIntInFile("/home/rfernandez/Bureau/Temp/gg2/den_"+n1, n1);
-			listAlreadyRegistered.add(tabImg[n1]);
-		}
-
-		for(int n1=0;n1<N;n1++) {
-			ItkTransform trTot=trStart[n1];
-			trTot.addTransform(trComposed[n1]);
-			tabImg[n1]=trTot.transformImage(tabImg2[n1],tabImg2[n1]);
-		}
-		
-		
-		ImagePlus resultHigh=null;
-		ImagePlus result2=VitimageUtils.slicesToStack(tabImg);
-		result2.setTitle("step 3");
-		IJ.saveAsTiff(result2, "/home/rfernandez/Bureau/Temp/gg3/step_3_after_rig.tif");
-		result2=VitimageUtils.slicesToStack(tabImg);
-		result2.setTitle("final result");
-
-		return new ImagePlus[] {resultHigh,result2};
-	}
-
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	/**
     STEP 02 : Identify pixel-wise the first date of presence of any root. Build a datemap
     */
@@ -978,12 +777,12 @@ public class TestImageSequence extends PlugInFrame{
 	}
 
 	/**
-	 *  STEP 03 : Compute graphs
+	STEP 03 : Compute graphs
 	 */
-	public  void buildAndProcessGraph(String ml, String boite) {
+	public  void buildAndProcessGraph(String imgName) {
 		//Import and oversample image of dates
-		ImagePlus imgDatesTmp=IJ.openImage(mainDataDir+"/2_Date_maps/ML"+ml+"_Boite_"+boite+".tif");
-		RegionAdjacencyGraphUtils.buildAndProcessGraphStraight(imgDatesTmp,mainDataDir,ml,boite,true,true,debugGraphConstruction);
+		ImagePlus imgDatesTmp=IJ.openImage(processingDataDir+"/2_Date_maps/"+imgName+".tif");
+		RegionAdjacencyGraphUtils.buildAndProcessGraphStraight(imgDatesTmp,processingDataDir,imgName,debugGraphConstruction,true,debugGraphConstruction);
 	}
 
 	
@@ -1106,8 +905,39 @@ public class TestImageSequence extends PlugInFrame{
 	public ImagePlus computeMire(ImagePlus imgIn) {
 		ImagePlus img=new Duplicator().run(imgIn,1,1,1,1,1,1);
 		IJ.run(img, "Median...", "radius=9 stack");
+		//img=concatPartsOfImages(img,imgIn,"Y",0.5); In case of, when will be the time
 		return img;
 	}
+	
+	
+	public static ImagePlus concatPartsOfImages(ImagePlus img1,ImagePlus img2,String axis,double ratio) {
+		if(img1.getType()!=ImagePlus.GRAY8 || img1.getType()!=ImagePlus.GRAY8)return null;
+		int X=img1.getWidth();
+		int Y=img2.getHeight();
+		ImagePlus imgOut=new Duplicator().run(img1);
+		byte[] valsImg1=(byte[])img1.getStack().getProcessor(1).getPixels();
+		byte[] valsImg2=(byte[])img2.getStack().getProcessor(1).getPixels();
+		byte[] valsOut=(byte[])imgOut.getStack().getProcessor(1).getPixels();
+
+		if(axis=="X") {
+			int xMax=(int) (X*ratio);
+			for(int x=0;x<X;x++) {
+				for(int y=0;y<Y;y++) {
+					valsOut[X*(y)+(x)]=(x<xMax) ? (valsImg1[X*(y)+(x)]) : (valsImg2[X*(y)+(x)]);
+				}			
+			}
+		}
+		else {
+			int yMax=(int) (Y*ratio);
+			for(int x=0;x<X;x++) {
+				for(int y=0;y<Y;y++) {
+					valsOut[X*(y)+(x)]=(y<yMax) ? (valsImg1[X*(y)+(x)]) : (valsImg2[X*(y)+(x)]);
+				}			
+			}
+		}
+		return imgOut;
+	}
+	
 	
 	public ImagePlus indRuptureDownOfImageArrayDouble(ImagePlus []imgs,ImagePlus []maskLeavesOut,int minThreshold) {
 		
