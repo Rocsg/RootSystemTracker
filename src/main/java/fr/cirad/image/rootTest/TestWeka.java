@@ -1,4 +1,4 @@
-package fr.cirad.image.root.test;
+package fr.cirad.image.rootTest;
 import java.util.ArrayList;
 import java.util.Random;
 

@@ -1,4 +1,4 @@
-package fr.cirad.image.root.test;
+package fr.cirad.image.rootTest;
 
 import java.io.File;
 import java.util.ArrayList;

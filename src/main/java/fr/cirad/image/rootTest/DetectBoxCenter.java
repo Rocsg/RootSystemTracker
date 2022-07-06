@@ -1,4 +1,4 @@
-package fr.cirad.image.root.test;
+package fr.cirad.image.rootTest;
 
 import fr.cirad.image.TimeLapseRhizo.MorphoUtils;
 import fr.cirad.image.common.VitimageUtils;
