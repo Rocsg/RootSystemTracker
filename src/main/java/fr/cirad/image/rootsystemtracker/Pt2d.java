@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 public class Pt2d implements com.goebl.simplify.Point{
 	private double x;
 	private double y;

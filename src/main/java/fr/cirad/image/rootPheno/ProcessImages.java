@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Map;
 
-import fr.cirad.image.TimeLapseRhizo.MorphoUtils;
 import fr.cirad.image.common.VitiDialogs;
 import fr.cirad.image.common.VitimageUtils;
+import fr.cirad.image.rootsystemtracker.MorphoUtils;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;

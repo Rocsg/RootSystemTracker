@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 
 //Import from std libs
 import java.io.File;

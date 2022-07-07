@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 
 import java.awt.Color;
 import java.awt.Font;

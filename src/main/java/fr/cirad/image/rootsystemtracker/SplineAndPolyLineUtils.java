@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 

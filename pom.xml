@@ -9,7 +9,7 @@
 		<connection>scm:git:git://github.com/Rocsg/RootSystemTracker</connection>
 		<developerConnection>scm:git:git@github.com:Rocsg/RootSystemTracker</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/Rocsg/RSMLViewer</url>
+		<url>https://github.com/Rocsg/RootSystemTracker</url>
 	</scm>
  	<issueManagement>
 		<system>GitHub Issues</system>
@@ -20,9 +20,9 @@
 	</ciManagement>
 
 	<properties>
-		<package-name>fr.cirad.image.TimeLapseRhizo</package-name>
+		<package-name>fr.cirad.image.rootsystemtracker</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
-		<main-class>TestImageSequence</main-class>
+		<main-class>Plugin_RootSystemTracker</main-class>
 		<license.copyrightOwners>fr.cirad</license.copyrightOwners>
   	    <maven.compiler.source>1.8</maven.compiler.source>
 	    <maven.compiler.target>1.8</maven.compiler.target>

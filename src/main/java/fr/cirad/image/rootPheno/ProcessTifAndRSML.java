@@ -20,9 +20,9 @@ import com.google.zxing.Result;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 
-import fr.cirad.image.TimeLapseRhizo.MorphoUtils;
 import fr.cirad.image.common.VitiDialogs;
 import fr.cirad.image.common.VitimageUtils;
+import fr.cirad.image.rootsystemtracker.MorphoUtils;
 import fr.cirad.image.rsml.Root;
 import fr.cirad.image.rsml.RootModel;
 import ij.IJ;

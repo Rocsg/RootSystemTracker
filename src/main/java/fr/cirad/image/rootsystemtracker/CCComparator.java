@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 
 public class CCComparator implements java.util.Comparator {
    public int compare(Object o1, Object o2) {

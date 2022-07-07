@@ -1,4 +1,4 @@
-package fr.cirad.image.TimeLapseRhizo;
+package fr.cirad.image.rootsystemtracker;
 
 import fr.cirad.image.common.VitimageUtils;
 import ij.IJ;
