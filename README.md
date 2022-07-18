@@ -29,7 +29,7 @@ The plugin **RootSystemTracker** is an automatic analysis pipeline based on regi
 
 The following video shows the movie produced by RootSystemTracker on a specimen
 
-{% include video platform='youtube' id='SWEqnnOhIOU'%}
+https://www.youtube.com/watch?v=SWEqnnOhIOU
 
 
 ## Installation
