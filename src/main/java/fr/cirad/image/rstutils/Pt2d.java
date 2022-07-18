@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstutils;
 public class Pt2d implements com.goebl.simplify.Point{
 	private double x;
 	private double y;

@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstdev;
 
 import java.awt.Rectangle;
 import java.io.FileInputStream;
@@ -28,6 +28,11 @@ import fr.cirad.image.common.VitimageUtils;
 import fr.cirad.image.rsml.FSR;
 import fr.cirad.image.rsml.Root;
 import fr.cirad.image.rsml.RootModel;
+import fr.cirad.image.rstutils.HungarianAlgorithm;
+import fr.cirad.image.rstutils.MorphoUtils;
+import fr.cirad.image.rstutils.SplineAndPolyLineUtils;
+import fr.cirad.image.topologicaltracking.CC;
+import fr.cirad.image.topologicaltracking.ConnectionEdge;
 import fr.cirad.image.common.TransformUtils.VolumeComparator;
 /*import fr.cirad.image.rsmlviewer.FSR;
 import fr.cirad.image.rsmlviewer.Root;
@@ -44,16 +49,12 @@ public class RegionAdjacencyGraphUtils {
 	static int MAX_SPEED_LAT=33;
 	static int TYPICAL_SPEED=100/8;//pixels/timestep. pix=19µm , timestep=8h, meaning TYPICAL=237 µm/h
 	static double PENALTY_COST=0.5;
-	static double OUT_OF_SILHOUETTE_PENALTY=PENALTY_COST;//100;//5+2*daymax 50 100 1000
-	static double REVERSE_TIME_PENALTY=PENALTY_COST;//0.5;//
-	static double SEMI_PENALTY=PENALTY_COST;
-	static double IDENTITY_PENALTY=PENALTY_COST;
-	static int MAX_TIMESTEP=100;
 	static int MEAN_SPEED_LAT=10;
-	static int N_PLANTS_IN_BOX=5;
+	private static int nPlantsInBox=5;
+	int N_PLANTS_IN_BOX=5;
 	public static final boolean DO_DISTANCE=true;
 	public static final boolean DO_TIME=false;
-
+	static int nbMADforOutlierRejection=25;
 
 	public static ImagePlus getDistanceMapsToDateMaps(ImagePlus img) {
 		ImagePlus seedImage=VitimageUtils.thresholdFloatImage(img, 0.5, 10000);
@@ -132,23 +133,9 @@ public class RegionAdjacencyGraphUtils {
 		
 		
 		
-		/*
-		CC ccOl=getCC(graph, 3, 6294);
-		CC ccTm=getCC(graph, 141, 6321);
-		ConnectionEdge edg=graph.getEdge(ccOl, ccTm);
-		if(edg==null)System.out.println("\n///////////\nDEBEDG RAG 101 tout ok");
-		else System.out.println("\n///////////\nDEBEDG RAG 101 conn is "+edg.activated);
-		*/
-
-		
-
-		
-		
-		
 		
 		
 		int nLateral=0;
-		int nMaxSigma=25;
 		int dMax=getDayMax(graph);
 		int deltaTimeMax=dMax;
 		int []nEach=new int[deltaTimeMax+1];
@@ -527,6 +514,7 @@ public class RegionAdjacencyGraphUtils {
 					}
 				}
 
+
 				//Testing statistics
 				for(CC cc : ccStart.pathFromStart ) {				
 					
@@ -555,7 +543,7 @@ public class RegionAdjacencyGraphUtils {
 					for(int i=0;i<6;i++)rejectionCause+=(" ["+tempStd[i]+"] ");
 					rejectionCause+="\n";
 					if(cc !=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1 ) )for(int i=0;i<6;i++) {
-						if(tempStd[i]>=nMaxSigma) {
+						if(tempStd[i]>=nbMADforOutlierRejection) {
 							rejectionCause+=("\n Rejection at node "+nCur+" for cause "+i+" = "+tempStd[i]);
 							ccStart.nonValidLatStart=true;
 						}
@@ -612,7 +600,7 @@ public class RegionAdjacencyGraphUtils {
 		int sizeFactor=SIZE_FACTOR;
 		int connexity=8;
 		int nSteps=4;
-		int nbTrees=5;
+		int nbTrees=nPlantsInBox;
 		boolean goStraightPlease=false;
 		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=null;
 		if(compute) {		
@@ -1172,7 +1160,7 @@ public class RegionAdjacencyGraphUtils {
 	            for(int j=0;j<Nstart;j++) {    
 	            	boolean debug=((i==47) && (j==205));
 	            	if(listStart.get(j)==ccStartWant && listStop.get(i)==ccStopWant) { debug=true;System.out.println("DEBUGGG");}
-	            	if(listStop.get(i)==listStart.get(j))costMatrix[i][j]=IDENTITY_PENALTY;
+	            	if(listStop.get(i)==listStart.get(j))costMatrix[i][j]=PENALTY_COST;
 	            	else {
 	            		if(listStop.get(i).associateSuiv==listStart.get(j))costMatrix[i][j]=-VitimageUtils.EPSILON;
 	            		else {
@@ -2003,10 +1991,10 @@ public class RegionAdjacencyGraphUtils {
 	//Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
 	public static double weightingOfPossibleHiddenEdge_v2(ImagePlus img,SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
 		//if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
-		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
-		if(ccStop==ccStart)return REVERSE_TIME_PENALTY;
-		if(ccStop.bestIncomingActivatedCC()==ccStart)return REVERSE_TIME_PENALTY;
-		if(ccStart.bestIncomingActivatedCC()==ccStop)return REVERSE_TIME_PENALTY;
+		if(ccStop.day>ccStart.day)return PENALTY_COST;
+		if(ccStop==ccStart)return PENALTY_COST;
+		if(ccStop.bestIncomingActivatedCC()==ccStart)return PENALTY_COST;
+		if(ccStart.bestIncomingActivatedCC()==ccStop)return PENALTY_COST;
 		int nStop=1;
 		int nStart=1;
 		CC ccPrec=null;
@@ -2123,10 +2111,10 @@ public class RegionAdjacencyGraphUtils {
 	//Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
 	public static double weightingOfPossibleHiddenEdge_v3(ImagePlus img,SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
 		//if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
-		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
-		if(ccStop==ccStart)return REVERSE_TIME_PENALTY;
-		if(ccStop.bestIncomingActivatedCC()==ccStart)return REVERSE_TIME_PENALTY;
-		if(ccStart.bestIncomingActivatedCC()==ccStop)return REVERSE_TIME_PENALTY;
+		if(ccStop.day>ccStart.day)return PENALTY_COST;
+		if(ccStop==ccStart)return PENALTY_COST;
+		if(ccStop.bestIncomingActivatedCC()==ccStart)return PENALTY_COST;
+		if(ccStart.bestIncomingActivatedCC()==ccStop)return PENALTY_COST;
 		int nStop=1;
 		int nStart=1;
 		CC ccPrec=null;
@@ -2241,7 +2229,7 @@ public class RegionAdjacencyGraphUtils {
 
 	public static double weightingOfPossibleHiddenEdge(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
 		if(debug)System.out.println("\nH021 weighting with "+ccStop);
-		if(ccStop.day>ccStart.day)return REVERSE_TIME_PENALTY;
+		if(ccStop.day>ccStart.day)return PENALTY_COST;
 		CC ccStartNext=ccStart.bestOutgoingActivatedCC();
 		if(ccStartNext !=null && ccStartNext.trunk)ccStartNext=null;
 		CC ccStopPrevious=ccStop.bestIncomingActivatedCC();
@@ -2251,7 +2239,7 @@ public class RegionAdjacencyGraphUtils {
 		double connectedWeight=0;
 		//if a way does not exist
 		int way=areConnectedByPathOfCC(graph,ccStop,ccStart,debug);
-		if(way<0)connectedWeight=OUT_OF_SILHOUETTE_PENALTY;
+		if(way<0)connectedWeight=PENALTY_COST;
 		else connectedWeight=way*2;
 		if(debug)System.out.println("H022 establishing connexity weight="+connectedWeight);
 

@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstutils;
 
 import java.io.File;
 import java.io.IOException;
@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
@@ -17,14 +18,52 @@ import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
 import org.apache.commons.imaging.formats.tiff.TiffImageMetadata;
 import org.apache.commons.imaging.formats.tiff.write.TiffOutputSet;
 
+import fr.cirad.image.common.Timer;
 import fr.cirad.image.common.VitimageUtils;
+import ij.IJ;
+import ij.ImagePlus;
 import net.imagej.ImageMetadata;
 
+//Serie of helpers to handle BPMP data
 public class PrepareData {
 
 	
 	public static void main(String[]args) {
-				gatherDates();
+		prepareDataForDoi();
+		//gatherDates();
+	}
+	
+	
+	public static void prepareDataForDoi() {
+		int ml=1;
+		String extension=".jpg";
+		String outputDir="/home/rfernandez/Bureau/A_Test/RSML_For_DOI";
+		String inputDir="/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Second_dataset_2021_07/Data_Tidy/";
+		if(new File(inputDir).exists()) {}
+		else {
+			inputDir="/Donnees/DD_CIRS626_DATA/Racines/Data_BPMP/Second_dataset_2021_07/Data_Tidy/";
+			if(new File(inputDir).exists()) {}
+			else {IJ.showMessage("No hard disk found for source data. ");}			
+		}
+		ArrayList<ImagePlus> listImg=new ArrayList<ImagePlus>();
+		Timer t=new Timer();
+		for(int b=54;b<=54;b++) {
+			String boi="000"+(b<10 ?  "0" : "")+b;
+			new File(outputDir,"ML"+ml+"_Boite_"+boi).mkdirs();
+			t.print("Importing "+"ML"+ml+"_Boite_"+boi);
+			for(int i=0;i<100;i++) {
+				String seq=""+(i+1);
+				t.print("         seq="+seq);
+				String specName="ML"+ml+"_Seq_"+seq+"_Boite_"+boi;
+				if(new File(inputDir+"IMG/ML"+ml+"/Seq_"+seq+"/"+specName+extension).exists() ) {
+					ImagePlus img=IJ.openImage(inputDir+"IMG/ML"+ml+"/Seq_"+seq+"/"+specName+extension);
+					VitimageUtils.adjustImageCalibration(img, new double[] {19,19,19}, "µm");
+					img=VitimageUtils.resize(img, img.getWidth()/4,img.getHeight()/4,1);
+					IJ.saveAsTiff(img,outputDir+"/ML"+ml+"_Boite_"+boi+"/img_t"+i+".tif");
+					listImg.add(img);
+				}
+			}
+		}
 	}
 	
 	public static void gatherDates() {
@@ -117,7 +156,6 @@ public class PrepareData {
 	    }
 	}
 	
-
 	public static void printFileAr(File[]ar) {
 		for(int i=0;i<ar.length;i++) {
 			System.out.println("I="+i+getCreationDate(ar[i].getAbsolutePath())+" | "+ar[i].getAbsolutePath());

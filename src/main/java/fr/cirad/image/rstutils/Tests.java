@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstutils;
 
 import java.util.ArrayList;
 
@@ -11,6 +11,7 @@ import fr.cirad.image.registration.ItkTransform;
 import fr.cirad.image.registration.Transform3DType;
 import fr.cirad.image.rsml.Root;
 import fr.cirad.image.rsml.RootModel;
+import fr.cirad.image.rstdev.RhizoTrackPipeline;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;

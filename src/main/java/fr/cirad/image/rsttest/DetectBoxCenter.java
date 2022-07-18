@@ -1,7 +1,7 @@
-package fr.cirad.image.rootTest;
+package fr.cirad.image.rsttest;
 
 import fr.cirad.image.common.VitimageUtils;
-import fr.cirad.image.rootsystemtracker.MorphoUtils;
+import fr.cirad.image.rstutils.MorphoUtils;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;

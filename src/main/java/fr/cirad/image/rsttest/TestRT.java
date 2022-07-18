@@ -1,4 +1,4 @@
-package fr.cirad.image.rootTest;
+package fr.cirad.image.rsttest;
 
 import java.awt.Window;
 

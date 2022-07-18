@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstdev;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -12,6 +12,7 @@ import fr.cirad.image.common.Timer;
 import fr.cirad.image.common.VitimageUtils;
 import fr.cirad.image.rsml.Root;
 import fr.cirad.image.rsml.RootModel;
+import fr.cirad.image.rstutils.MorphoUtils;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
@@ -49,7 +50,7 @@ public class MovieBuilderAndTimeLapseInterpolation {
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();	
-		runInterpolation("1", "00002",vMaxInUse,timeStep); 
+		runInterpolation("1", "00010",vMaxInUse,timeStep); 
 	}
 		
 	public static void batchMovieComputationOnAllBoxes() {

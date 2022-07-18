@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.topologicaltracking;
 
 public class CCComparator implements java.util.Comparator {
    public int compare(Object o1, Object o2) {

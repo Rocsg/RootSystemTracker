@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.rstdev;
 
 //Import from std libs
 import java.io.File;
@@ -39,6 +39,9 @@ import fr.cirad.image.rsml.Node;
 import fr.cirad.image.rsml.Root;
 import fr.cirad.image.rsml.RootModel;
 //import fr.cirad.image.rsmlviewer.RootModel;
+import fr.cirad.image.rstutils.MorphoUtils;
+import fr.cirad.image.topologicaltracking.CC;
+import fr.cirad.image.topologicaltracking.ConnectionEdge;
 
 //Work in progress : parameters list of the pipeline
 //XMINCROP, YMINCROP, DXCROP, DYCROP : define the area of interest in the image, excluding the petri box, and including all root parts    
@@ -55,21 +58,21 @@ import fr.cirad.image.rsml.RootModel;
 
 
 
-
-
 public class RhizoTrackPipeline extends PlugInFrame{	
+	public static int XMINCROP=122;
+	public static int YMINCROP=152;
+	public static int DXCROP=1348;
+	public static int DYCROP=1226;
+	public static int MAXLINEAR=4;
+
 	private static final long serialVersionUID = 1L;
-	static int XMINCROP=122;
-	static int YMINCROP=152;
-	static int DXCROP=1348;
-	static int DYCROP=1226;
-	static int MAXLINEAR=4;
 	static boolean isRootnavData=false;
 	public boolean testing=false;
 	public String inputDataDir="/home/rfernandez/Bureau/A_Test/RSML";
 	public String processingDataDir="/home/rfernandez/Bureau/A_Test/RSML";
 	private static double TOLERANCE_DISTANCE_TO_CENTRAL_LINE_FOR_DOUGLAS_SIMPLIFICATION=0.9;
-	public static void setRootnavParams() {
+
+	/*public static void setRootnavParams() {
 		isRootnavData=true;
 		XMINCROP=0;
 		YMINCROP=0;
@@ -78,6 +81,7 @@ public class RhizoTrackPipeline extends PlugInFrame{
 		MAXLINEAR=4;
 		
 	}
+	*/
 	static boolean debugGraphConstruction=false;
 	public static String mainDataDir="/home/rfernandez/Bureau/A_Test/RSML";
 
@@ -134,7 +138,7 @@ public class RhizoTrackPipeline extends PlugInFrame{
 			for(int mli=1;mli<=1;mli++) {
 				for(int boi=37;boi<=54;boi++) {
 					debugGraphConstruction=false;
-					if(mli==5)setRootnavParams();				
+///					if(mli==5)setRootnavParams();				
 					String boite=(  (boi<10) ? ("0000"+boi) : ( (boi<100) ? ("000"+boi) : ("00"+boi) ) );
 					String ml=""+(mli==5 ? "RootNav" : mli);
 					System.out.println("Processing ML"+ml+"_Boite_"+boite);
@@ -186,10 +190,6 @@ public class RhizoTrackPipeline extends PlugInFrame{
 	public boolean verifyDirs() {
 		if (!new File(inputDataDir).exists()) {IJ.showMessage("Wrong inputDataDir, does not exist : "+inputDataDir);return false;}
 		if (!new File(processingDataDir).exists()) {IJ.showMessage("Wrong processingDataDir, does not exist : "+inputDataDir);return false;}
-		
-		
-		
-		
 		return true;
 	}
 	
@@ -204,7 +204,7 @@ public class RhizoTrackPipeline extends PlugInFrame{
 			System.out.print(" resize...");
 			//VitimageUtils.adjustImageCalibration(img, new double[] {19,19,19}, "µm");
 			//IJ.saveAsTiff(img, processingDataDir+"/0_Stacked_Highres/ML"+ml+"_Boite_"+boite);
-			img=VitimageUtils.resize(img, X/4, X/4, Z);
+			img=VitimageUtils.resize(img, X/4, Y/4, Z);
 			VitimageUtils.adjustImageCalibration(img, new double[] {19*4,19*4,19*4}, "µm");
 			IJ.saveAsTiff(img, processingDataDir+"/0_Stacked/"+imgName+".tif");
 			}				
@@ -294,10 +294,10 @@ public class RhizoTrackPipeline extends PlugInFrame{
 		IJ.saveAsTiff(imgOut, processingDataDir+"/2_Date_maps/"+imgName+".tif");
 	}
 
-	public void runBuildGraphs(String imgName) {
+	//public void runBuildGraphs(String imgName) {
 		//ImagePlus imgOut=buildAndProcessGraph(""+ml,boite);
 		//IJ.saveAsTiff(imgOut, processingDataDir+"/3_Graphs/ML"+ml+"_Boite_"+boite);
-	}
+	//}
 	
 	
 
@@ -648,7 +648,6 @@ public class RhizoTrackPipeline extends PlugInFrame{
 		for(int n=0;(n<N-1);n++) {
 			t.log("n="+n);
 
-			
 			ItkTransform trRoot=null;
 			RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n],tabImg[n+1],null,false);
 			regAct.setLevelMaxLinear(MAXLINEAR);			regAct.setLevelMinLinear(0);

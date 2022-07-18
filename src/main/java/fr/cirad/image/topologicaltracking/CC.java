@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.topologicaltracking;
 
 import java.awt.Rectangle;
 import java.io.Serializable;
@@ -17,6 +17,8 @@ import fr.cirad.image.common.Bord;
 import fr.cirad.image.common.Pix;
 import fr.cirad.image.common.TransformUtils;
 import fr.cirad.image.common.VitimageUtils;
+import fr.cirad.image.rstutils.MorphoUtils;
+import fr.cirad.image.rstutils.SplineAndPolyLineUtils;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
@@ -57,20 +59,20 @@ public class CC implements Serializable{
 	public int n;
 	public int count=0;
 	public Roi r;
-	double x;
-	double y;
-	int xB;
-	int yB;
+	public double x;
+	public double y;
+	public int xB;
+	public int yB;
 	public int stamp=0;
 	public int stamp2=0;
 	public double stampDist=0;
 	public int componentLabel=0;
 	public boolean illConnected=false;
-	SimpleWeightedGraph<Pix,Bord>pixGraph;
-	List<Pix>mainDjikstraPath;
-	List<List<Pix>>secondaryDjikstraPath;
-	ArrayList<CC>secondaryPathLookup;
-	SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph;
+	public SimpleWeightedGraph<Pix,Bord>pixGraph;
+	public List<Pix>mainDjikstraPath;
+	public List<List<Pix>>secondaryDjikstraPath;
+	public ArrayList<CC>secondaryPathLookup;
+	public SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph;
 	
 	public double getConnexionScore(CC cc,double x,double y,double expectedX,double expectedY,boolean debug,double vx,double vy) {
 		double[]vectFace=new double[] {vx,vy,0};
@@ -214,7 +216,7 @@ public class CC implements Serializable{
 	}
 	
 	public String toString() {
-		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[0])+" - "+(int)(RegionAdjacencyGraphUtils.SIZE_FACTOR*r.getContourCentroid()[1])+") "+(this.trunk ? " is trunk" : " ")+" stamp="+stamp;
+		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+r.getContourCentroid()[0]+" - "+r.getContourCentroid()[1]+") "+(this.trunk ? " is trunk" : " ")+" stamp="+stamp;
 	}
 	
 	public void setRoi(Roi r) {
@@ -425,8 +427,8 @@ public class CC implements Serializable{
 		double xExp=firstCalcul[1];
 		double yExp=firstCalcul[2];
 		boolean debug=false;
-		int SI=RegionAdjacencyGraphUtils.SIZE_FACTOR;
-		 if((this==RegionAdjacencyGraphUtils.getCC(graph,  21,5084,2032)) && (cc2==RegionAdjacencyGraphUtils.getCC(graph,22,5130,2080 )))debug=true;
+		//int SI=RegionAdjacencyGraphPipeline.SIZE_FACTOR;
+		 if((this==RegionAdjacencyGraphPipeline.getCC(graph,  21,5084,2032)) && (cc2==RegionAdjacencyGraphPipeline.getCC(graph,22,5130,2080 )))debug=true;
 		 if(debug) {
 			 System.out.println(r1.contains(636, 256));
 			 System.out.println(r2.contains(636, 257));
@@ -570,7 +572,7 @@ public class CC implements Serializable{
 		}
 
 		determineVoxelShortestPath (coordsS,coordsT,8,null);
-		if(!RegionAdjacencyGraphUtils.isExtremity(this, graph)) {
+		if(!RegionAdjacencyGraphPipeline.isExtremity(this, graph)) {
 			for(ConnectionEdge edges : graph.outgoingEdgesOf(this)) {
 				if(edges.target.trunk)continue;
 				if(!edges.activated)continue;

@@ -1,4 +1,4 @@
-package fr.cirad.image.rootsystemtracker;
+package fr.cirad.image.topologicaltracking;
 
 import java.io.Serializable;
 
@@ -6,17 +6,17 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 
 public class ConnectionEdge extends DefaultWeightedEdge implements Serializable {
 	private static final long serialVersionUID = 1L;
-	boolean hidden=false;
-	double connectionX;
-	double connectionY;	
-	double distanceConnectionTrunk=0;
-	boolean activated=true;
+	public boolean hidden=false;
+	public double connectionX;
+	public double connectionY;	
+	public double distanceConnectionTrunk=0;
+	public boolean activated=true;
 	public CC source;
 	public boolean isOut=false;
 	public CC target;
 	public int axisX;
 	public int axisY;
-	int nFacets;
+	public int nFacets;
 	public boolean trunk=false;
 	
 	
