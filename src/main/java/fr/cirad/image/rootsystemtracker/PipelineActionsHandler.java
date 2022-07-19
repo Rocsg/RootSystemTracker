@@ -31,8 +31,8 @@ import ij.plugin.RGBStackMerge;
 public class PipelineActionsHandler {
 	public static final int flagFinished=7;
 	public static final boolean proceedFullPipelineImageAfterImage=true;
-	public static final int firstStepToDo=0;
-	public static final int lastStepToDo=flagFinished;
+	public static final int firstStepToDo=2;
+	public static final int lastStepToDo=2;//flagFinished;
 	public static final int firstImageToDo=0;
 	public static final int lastImageToDo=10000;//flagFinished;
 	public static Timer t;
@@ -42,7 +42,7 @@ public class PipelineActionsHandler {
 		t=new Timer();		
 		if(proceedFullPipelineImageAfterImage) {
 			for(int i=firstImageToDo;i<Math.min(lastImageToDo,pph.nbData);i++) {
-				while((pph.imgSteps[i]>=firstStepToDo && pph.imgSteps[i]<lastStepToDo)) {
+				while(((pph.imgSteps[i]+1)>=firstStepToDo && pph.imgSteps[i]<lastStepToDo)) {
 					doNextStep(i,pph);
 				}				
 			}			
@@ -68,7 +68,7 @@ public class PipelineActionsHandler {
 		String inputDataDir=new File(pph.inputDir,pph.imgNames[indexImg]).getAbsolutePath();
 		String outputDataDir=new File(pph.outputDir,pph.imgNames[indexImg]).getAbsolutePath();
 		boolean executed=false;
-		if(step==1) {//Stack data
+		if(step==1) {//Stack data -O-
 			t.print("Starting step 1, stacking -  on img index "+step+" : "+pph.imgNames[indexImg]);
 			executed=PipelineActionsHandler.stackData(inputDataDir,outputDataDir,pph);
 		}
@@ -92,7 +92,7 @@ public class PipelineActionsHandler {
 			t.print("Starting step 6 -  on img "+pph.imgNames[indexImg]);
 			executed=PipelineActionsHandler.computeRSML(outputDataDir,pph);
 		}
-		if(step==7) {//MovieBuilding
+		if(step==7) {//MovieBuilding -O-
 			t.print("Starting step 7  -  on img "+pph.imgNames[indexImg]);
 			executed=MovieBuilder.buildMovie(outputDataDir,pph);
 		}
@@ -157,7 +157,7 @@ public class PipelineActionsHandler {
 			bm.mask=mask.duplicate();
 		    bm.defaultCoreNumber=VitimageUtils.getNbCores();
 		    bm.minBlockVariance/=4;
-		    boolean viewRegistrations=false;//Useful for debugging
+		    boolean viewRegistrations=true;//Useful for debugging
 			if(viewRegistrations) {
 				bm.displayRegistration=2;
 				bm.adjustZoomFactor(((512.0))/tabImg[n].getWidth());
@@ -211,7 +211,7 @@ public class PipelineActionsHandler {
 		    bm2.minBlockVariance=10;
 		    bm2.minBlockScore=0.10;
 		    bm2.displayR2=false;
-		    boolean viewRegistrations=false;
+		    boolean viewRegistrations=true;
 			if(viewRegistrations) {
 				bm2.displayRegistration=2;
 				bm2.adjustZoomFactor(512.0/tabImg[n1].getWidth());

@@ -35,7 +35,7 @@ public class MovieBuilder {
 	static int vMaxInUse=35;
 	static double startingBlockRatio=0.10;//time for a new root to appear, expressed as a ratio of the sequence length 
 	static boolean smartHandyStart=true;// Make a progressive start to make the movie more friendly
-	static double timeStep=0.05;//0.05 Determine the interpolation ratio : the initial timeseries have a timeStep=1
+	static double timeStep=0.1;//0.05 Determine the interpolation ratio : the initial timeseries have a timeStep=1
 	static int nTimeStepVirtualEnd=4; //Make a progressive end to make the movie more friendly
 	static double deltaPixelsSpeedInterpolation=4;// Compute the speed vectors over the interval [curPix-delta ; curPix + delta]
 	static double t0Fg=0.01;

@@ -54,8 +54,15 @@ public class PipelineParamHandler {
 		this.outputDir=outputDir;
 		this.pathToParameterFile=new File(outputDir,"Parameters.csv").getAbsolutePath(); 
 		
-		if(new File(this.pathToParameterFile).exists())   {  readParameters();                                   }
-		else                                              {  getParametersForNewExperiment(); writeParameters(true); }
+		if(new File(this.pathToParameterFile).exists())   { //Reading parameters from an existing file
+			readParameters();                                  
+		}
+		else                                              { //Proposing default parameters, and the possibility to edit them
+			getParametersForNewExperiment(); 
+			writeParameters(true); 
+			IJ.showMessage("Please edit parameters if needed, save file, then click ok.\n File="+this.pathToParameterFile +"" );
+			readParameters(); 
+		}
 	}
 
 	public PipelineParamHandler(String parametersFilePath) {
@@ -99,8 +106,6 @@ public class PipelineParamHandler {
 		if(nbData>MAX_NUMBER_IMAGES) {
 			IJ.showMessage("Critical warning : number of images is too high : "+nbData+" > "+MAX_NUMBER_IMAGES);
 		}
-		
-		//Eventuelly ask for parameters
 	}
 
 	
