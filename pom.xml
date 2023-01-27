@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<description>Root system tracker plugin</description>
+ 	<packaging>jar</packaging>
+    <version>1.5.0</version>
+    <name>rootsystemtracker</name>
+ 	<url>https://imagej.net/plugins/rootsystemtracker</url>
+	<inceptionYear>2022</inceptionYear>
+	<contributors>
+	    <contributor>
+	        <name>Romain Fernandez</name>
+	        <email>romainfernandez06@gmail.com</email>
+	    </contributor>
+	</contributors>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>fr.cirad.image</groupId>
-  <artifactId>RootSystemTracker</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <name>RootSystemTracker</name>
+  	<parent>
+	    <groupId>org.scijava</groupId>
+	    <artifactId>pom-scijava</artifactId>
+	    <version>30.0.0</version>
+    </parent>
+  <groupId>io.github.rocsg</groupId>
+  <artifactId>rootsystemtracker</artifactId>
 	<scm>
 		<connection>scm:git:git://github.com/Rocsg/RootSystemTracker</connection>
 		<developerConnection>scm:git:git@github.com:Rocsg/RootSystemTracker</developerConnection>
@@ -20,12 +35,12 @@
 	</ciManagement>
 
 	<properties>
-		<package-name>fr.cirad.image.rootsystemtracker</package-name>
+		<package-name>rootsystemtracker</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
 		<main-class>Plugin_RootSystemTracker</main-class>
-		<license.copyrightOwners>fr.cirad</license.copyrightOwners>
-  	    <maven.compiler.source>1.8</maven.compiler.source>
-	    <maven.compiler.target>1.8</maven.compiler.target>
+		<license.copyrightOwners>io.github.rocsg</license.copyrightOwners>
+  	    <maven.compiler.source>8</maven.compiler.source>
+	    <maven.compiler.target>8</maven.compiler.target>
 	    
 	</properties>
 	<repositories>
@@ -72,26 +87,111 @@
   	
   		
 	<dependencies>
-		<!-- https://mvnrepository.com/artifact/de.lmu.ifi.dbs.elki/elki -->
+		<dependency>
+		  <groupId>io.github.rocsg</groupId>
+		  <artifactId>fijiyama</artifactId>
+		  <version>4.0.10-SNAPSHOT</version>
+		</dependency> 
+
+        <dependency>
+             <groupId>sc.fiji</groupId>
+             <artifactId>Fiji_Plugins</artifactId>
+            </dependency>
+        <dependency>
+            <groupId>sc.fiji</groupId>
+            <artifactId>imagescience</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+		<dependency>
+		    <groupId>sc.fiji</groupId>
+		    <artifactId>VIB-lib</artifactId>
+	    </dependency>
+		<dependency>
+		    <groupId>net.imagej</groupId>
+		    <artifactId>ij</artifactId>
+	    </dependency>
+		<dependency>
+		    <groupId>org.scijava</groupId>
+		    <artifactId>scijava-java3d</artifactId>
+	    </dependency>
+		<dependency>
+		    <groupId>sc.fiji</groupId>
+		    <artifactId>3D_Viewer</artifactId>
+	    </dependency>
+		
+
+
+		<dependency>
+		    <groupId>loci</groupId>
+		    <artifactId>loci_plugins</artifactId>
+		    <version>4.5-imagej-2.0.0-beta6</version>
+		</dependency>
+		<dependency>
+	    <groupId>fr.inra.ijpb</groupId>
+	    <artifactId>MorphoLibJ_</artifactId>
+	    </dependency>
+
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-math3</artifactId>
+		</dependency>
+		<dependency>
+		    <groupId>org.apache.poi</groupId>
+		    <artifactId>poi</artifactId>
+	    </dependency>
+		<dependency>
+		    <groupId>org.apache.commons</groupId>
+		    <artifactId>commons-imaging</artifactId>
+		    <version>1.0-alpha3</version>
+		</dependency>
+
+		<dependency>
+		    <groupId>commons-io</groupId>
+		    <artifactId>commons-io</artifactId>
+	    </dependency>
 		<dependency>
 		    <groupId>de.lmu.ifi.dbs.elki</groupId>
 		    <artifactId>elki</artifactId>
 		    <version>0.7.5</version>
 		</dependency>
+		
 		<dependency>
-		    <groupId>com.vitimage</groupId>
-		    <artifactId>Fijiyama_GUI</artifactId>
-		    <version>4.0.0</version>	    
-		    <scope>system</scope>
-			<systemPath>${basedir}/lib/Fijiyama/Fijiyama-jar/4.0.0/Fijiyama-4.0.0.jar</systemPath>
-		</dependency> 
-       <dependency>
-            <groupId>sc.fiji</groupId>
-            <artifactId>imagescience</artifactId>
-            <version>3.0.0</version>
+		    <groupId>org.jgrapht</groupId>
+		    <artifactId>jgrapht-core</artifactId>
+	    </dependency>
+		<dependency>
+		    <groupId>org.jgrapht</groupId>
+		    <artifactId>jgrapht-opt</artifactId>
+	    </dependency>
+
+		   <dependency>
+		      <groupId>com.opencsv</groupId>
+		      <artifactId>opencsv</artifactId>
+	      </dependency>
+
+		<dependency>
+		    <groupId>org.itk.simple</groupId>
+		    <artifactId>simpleitk</artifactId>
+		    <version>0.9.0</version>
+		    <type>jar</type>
+		</dependency>
+
+ 		<dependency>
+		    <groupId>junit</groupId>
+		    <artifactId>junit</artifactId>
+		    <scope>test</scope>
+		</dependency>
+ 		<dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
         </dependency>
-			
-			<dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+ 		<!-- 	<dependency>
 			    <groupId>com.manyangled</groupId>
 			    <artifactId>snowball</artifactId>
 			    <version>0.3.0</version>
@@ -103,98 +203,42 @@
 			  <version>0.3.0</version>
 			  <type>pom</type>
 			</dependency>
-			
-				<dependency>
-			    <groupId>fr.inra.ijpb</groupId>
-			    <artifactId>MorphoLibJ_</artifactId>
-			    <version>1.4.2.1</version>
-			</dependency>
-		<dependency>
-		    <groupId>org.jgrapht</groupId>
-		    <artifactId>jgrapht-core</artifactId>
-		    <version>1.3.1</version>
-		</dependency>
-		<dependency>
-		<groupId>org.apache.commons</groupId>
-		<artifactId>commons-math3</artifactId>
-		<version>3.6.1</version>
-		</dependency>
-		<dependency>
+			-->
+ 		<dependency>
 		    <groupId>com.goebl</groupId>
 		    <artifactId>simplify</artifactId>
 		    <version>1.0.0</version>
-		</dependency>
+		</dependency>  
 		<!-- https://mvnrepository.com/artifact/org.jgrapht/jgrapht-opt -->
-		<dependency>
-		    <groupId>org.jgrapht</groupId>
-		    <artifactId>jgrapht-opt</artifactId>
-		    <version>1.3.1</version>
-		</dependency>
 		<!-- https://mvnrepository.com/artifact/org.apache.poi/poi -->
-		   <dependency>
-		      <groupId>com.opencsv</groupId>
-		      <artifactId>opencsv</artifactId>
-		      <version>5.4</version>
-		  </dependency>
-			<dependency>
-			    <groupId>fr.inra.ijpb</groupId>
-			    <artifactId>MorphoLibJ_</artifactId>
-			    <version>1.4.2.1</version>
-			</dependency>
 
-		<dependency>
-		    <groupId>org.apache.poi</groupId>
-		    <artifactId>poi</artifactId>
-		    <version>3.17</version>
-		</dependency>
 		 <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-imaging -->
-		<dependency>
+		<!--<dependency>
 		    <groupId>org.apache.commons</groupId>
 		    <artifactId>commons-imaging</artifactId>
 		    <version>1.0-alpha2</version>
-		</dependency>
+		</dependency>-->
+<!--
 		<dependency>
 		    <groupId>org.apache.poi</groupId>
 		    <artifactId>poi-ooxml</artifactId>
 		    <version>3.17</version>
-		</dependency>
-		<dependency>
-		    <groupId>net.imagej</groupId>
-		    <artifactId>ij</artifactId>
-		    <version>1.53i</version>
-		</dependency>
-		<dependency>
-		    <groupId>sc.fiji</groupId>
-		    <artifactId>VIB-lib</artifactId>
-		    <version>2.2.0</version>
-		</dependency>
-		<dependency>
-		    <groupId>commons-io</groupId>
-		    <artifactId>commons-io</artifactId>
-		    <version>2.5</version>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-simple -->
-		<dependency>
+		</dependency>-->
+
+		<!-- h 	<parent>
+	    <groupId>org.scijava</groupId>
+	    <artifactId>pom-scijava</artifactId>
+	    <version>30.0.0</version>
+    </parent>
+		ttps://mvnrepository.com/artifact/org.slf4j/slf4j-simple -->
+		<!--<dependency>
 		    <groupId>org.slf4j</groupId>
 		    <artifactId>slf4j-simple</artifactId>
-		    <version>1.6.1</version>
 		    <scope>test</scope>
-		</dependency>
-			<dependency>
-			    <groupId>loci</groupId>
-			    <artifactId>loci_plugins</artifactId>
-			    <version>4.5-imagej-2.0.0-beta6</version>
-			</dependency>
+		</dependency>-->
 
 		<!-- https://mvnrepository.com/artifact/org.itk.simple/simpleitk -->
-		<dependency>
-		    <groupId>org.itk.simple</groupId>
-		    <artifactId>simpleitk</artifactId>
-		    <version>0.9.0</version>
-		    <type>jar</type>
-		</dependency>
-
-
+ 
 		<dependency>
 		    <groupId>com.google.zxing</groupId>
 		    <artifactId>javase</artifactId>
@@ -206,57 +250,23 @@
 		    <version>3.4.1</version>
 		</dependency>
 
-
 		<!-- https://mvnrepository.com/artifact/sc.fiji/Trainable_Segmentation -->
-		<dependency>
+		<!--<dependency>
 		    <groupId>sc.fiji</groupId>
 		    <artifactId>Trainable_Segmentation</artifactId>
-		    <version>3.2.34</version>
-		</dependency>
-		
+	    </dependency>
+		-->
 		<!-- https://mvnrepository.com/artifact/com.github.mcib3d/mcib3d-core -->
-		<dependency>
+		<!-- <dependency>
 		    <groupId>com.github.mcib3d</groupId>
 		    <artifactId>mcib3d-core</artifactId>
 		    <version>master-47119b6729-1</version>
-		</dependency>
+		</dependency>-->
 
 		<!-- https://mvnrepository.com/artifact/org.scijava/scijava-java3d -->
-		<dependency>
-		    <groupId>org.scijava</groupId>
-		    <artifactId>scijava-java3d</artifactId>
-		    <version>0.1.0</version>
-		</dependency>
-
-		<!-- https://mvnrepository.com/artifact/sc.fiji/3D_Viewer -->
-		<dependency>
-		    <groupId>sc.fiji</groupId>
-		    <artifactId>3D_Viewer</artifactId>
-		    <version>4.0.3</version>
-		</dependency>
-		
-		<dependency>
-		    <groupId>org.apache.commons</groupId>
-		    <artifactId>commons-math3</artifactId>
-		    <version>3.6.1</version>
-		</dependency>
-         <dependency>
-             <groupId>sc.fiji</groupId>
-             <artifactId>Fiji_Plugins</artifactId>
-             <version>3.1.1</version>
-         </dependency>
 
 
 
 
-	</dependencies>
-  	
-  	
-  	
-  	
-
-
-  	
-  	
-  	
+	</dependencies>  	
 </project>
