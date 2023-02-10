@@ -291,7 +291,7 @@ public class PipelineActionsHandler {
 		IJ.run(img2,"8-bit","");
 		imgOut=VitimageUtils.makeOperationBetweenTwoImages(imgOut, img2, 2, true);
 		IJ.run(imgOut,"Fire","");
-		imgOut.setDisplayRange(-1, 22);
+		imgOut.setDisplayRange(0, pph.imgSerieSize[indexImg]+1);
 		IJ.saveAsTiff(imgOut, new File(outputDataDir,"40_date_map.tif").getAbsolutePath());
 		return true;
 	}
@@ -312,9 +312,10 @@ public class PipelineActionsHandler {
 		ImagePlus distOut=MorphoUtils.getDistOut(dates,false);
 		ImagePlus reg=IJ.openImage(new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath());
 
-		RootModel rm=RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(graph,distOut,pph.toleranceDistanceForBeuckerSimplification);
+		RootModel rm=RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(graph,distOut,pph,indexImg);
 		rm.cleanWildRsml();
 		rm.resampleFlyingRoots();
+		rm.cleanNegativeTh();
 		rm.writeRSML3D(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(), "",true,false);
 		//TODO : define target height
 		backTrackPrimaries(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(),new File(outputDataDir,"61_graph.rsml").getAbsolutePath(),mask,reg,pph.toleranceDistanceForBeuckerSimplification);
@@ -364,7 +365,7 @@ public class PipelineActionsHandler {
 			Node oldFirst=r.firstNode;
 			int xMid=(int) oldFirst.x;
 			int yMid=(int) oldFirst.y;
-		
+
 			//Identify the mean height of region to attain in this area
 			int upperPix=0;
 			for(int i=yMid;i>=0;i--) {
@@ -419,7 +420,7 @@ public class PipelineActionsHandler {
 			oldFirst.parent=n;
 			r.updateNnodes();
 			r.computeDistances();
-			r.resampleFlyingPoints();
+			r.resampleFlyingPoints(rmInit.hoursCorrespondingToTimePoints);
 		}
 		rmInit.writeRSML3D(pathToOutputRsml, "", true,false);
 	}

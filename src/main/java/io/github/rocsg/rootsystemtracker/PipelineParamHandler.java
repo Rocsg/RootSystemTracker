@@ -26,8 +26,8 @@ public class PipelineParamHandler {
 	int minSizeCC=5;
 	double rootTissueIntensityLevel=30;
 	double backgroundIntensityLevel=130;
-	double maxSpeedLateral=33;
-	double meanSpeedLateral=10;
+	double maxSpeedLateral=33;//Defined as the number of pixels per typical timestep
+	double meanSpeedLateral=10;//Defined as the number of pixels per typical timestep
 	double typicalSpeed=12;//pixels/hour   TYPICAL_SPEED=100/8;//pixels/timestep. pix=19µm , timestep=8h, meaning TYPICAL=237 µm/h
 	double penaltyCost=0.5;
 	double nbMADforOutlierRejection=25;
@@ -39,19 +39,20 @@ public class PipelineParamHandler {
 	int dxCrop=1348;
 	int dyCrop=1226;
 	int maxLinear=4;
-	int subsamplingFactor=4;
+	public int subsamplingFactor=4;
 	int marginRegisterLeft=12;
 	int marginRegisterUp=135;
 	int marginRegisterRight=0;
 	boolean applyFullPipelineImageAfterImage=true;
-	double toleranceDistanceForBeuckerSimplification=0.9;
+	public double toleranceDistanceForBeuckerSimplification=0.9;
 	String[]imgNames;
 	int[]imgSteps;
 	public String[] imgTimes;
 	public int[] imgSerieSize;
-	public double[][] acqTimes;
-	private int originalPixelSize=19;//µm
+	private double[][] acqTimes;
+	public int originalPixelSize=19;//µm
 	private String unit="µm";
+	public double typicalHourDelay=8;
 	
 	public static void main(String[]arg) {
 	}
@@ -113,11 +114,13 @@ public class PipelineParamHandler {
 		nbMADforOutlierRejection=getDouble("nbMADforOutlierRejection");
 		subsamplingFactor=getInt("subsamplingFactor");
 		nbData=getInt("nbData");
+		typicalHourDelay=getDouble("typicalHourDelay");
 		
 		imgNames=new String[nbData];
 		imgSteps=new int[nbData];
 		acqTimes=new double[nbData][0];
 		imgSerieSize=new int[nbData];
+		
 		for(int i=0;i<nbData;i++) {
 			imgNames[i]=getString("Img_"+i+"_name");
 			imgSteps[i]=getInt("Img_"+i+"_step");
@@ -130,6 +133,20 @@ public class PipelineParamHandler {
 				acqTimes[i][j]=Double.parseDouble(paramsImg[j+1][2]);
 			}
 		}
+		int ind=0;
+		double sum=0;
+		for(int i=0;i<nbData;i++) {
+			for(int j=1;j<imgSerieSize[i];j++) {
+				sum+=acqTimes[i][j]-acqTimes[i][j-1];
+				ind++;
+			}
+		}
+		this.typicalHourDelay=sum/ind;
+
+	}
+	
+	public void setAcqTimesForTest(double[][] tab) {
+		this.acqTimes=tab;
 	}
 	
 	public void getParametersForNewExperiment(){
@@ -142,8 +159,22 @@ public class PipelineParamHandler {
 		}
 	}
 
+	public double[]getHoursExtremities(int indexBox){
+		double[]ret=new double[acqTimes[indexBox].length+1];
+		for(int i=1;i<acqTimes[indexBox].length;i++) ret[i+1]=acqTimes[indexBox][i];
+		ret[0]=ret[1]-this.typicalHourDelay;
+		return ret;
+	}
+	
 	public double[]getHours(int indexBox){
-		return acqTimes[indexBox];
+		double[]ret=new double[acqTimes[indexBox].length+1];
+		for(int i=1;i<acqTimes[indexBox].length;i++) {
+			ret[i+1]=acqTimes[indexBox][i]*0.5+acqTimes[indexBox][i-1]*0.5;
+		}
+		double delta0=ret[3]-ret[2];
+		ret[1]=ret[2]-delta0;
+		ret[0]=ret[1]-delta0;
+		return ret;
 	}
 	
 	public double getMaxSpeedLateral() {
@@ -191,7 +222,7 @@ public class PipelineParamHandler {
 		addParam("subsamplingFactor",subsamplingFactor ,"");
 		addParam("originalPixelSize",originalPixelSize,"");
 		addParam("unit",unit,"");
-		addParam("-","-","-");
+		addParam("typicalHourDelay",typicalHourDelay,"");
 		addParam("-","-","-");
 		addParam("-","-","-");
 	}
@@ -239,7 +270,7 @@ public class PipelineParamHandler {
 	}
 	
 	public double getDouble(String tit) {
-		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return Double.parseDouble( params[i][1] );
+		for(int i=0;i<params.length;i++)if(params[i][0].equals(tit))return Double.parseDouble( params[i][1] );
 		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
 		return NO_PARAM_DOUBLE;
 	}

@@ -69,6 +69,8 @@ public class CC implements Serializable{
 	public List<List<Pix>>secondaryDjikstraPath;
 	public ArrayList<CC>secondaryPathLookup;
 	public SimpleDirectedWeightedGraph<CC,ConnectionEdge>graph;
+	public double deltaTimeHoursBefore;
+	public double deltaTimeHoursFromStart;
 	
 	public double getConnexionScore(CC cc,double x,double y,double expectedX,double expectedY,boolean debug,double vx,double vy) {
 		double[]vectFace=new double[] {vx,vy,0};
@@ -214,7 +216,7 @@ public class CC implements Serializable{
 	}
 	
 	public String toString() {
-		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+r.getContourCentroid()[0]+" - "+r.getContourCentroid()[1]+") "+(this.trunk ? " is trunk" : " ")+" stamp="+stamp;
+		return "CC "+day+"-"+n+" : "+VitimageUtils.dou(r.getContourCentroid()[0])+","+VitimageUtils.dou(r.getContourCentroid()[1])+" ("+VitimageUtils.dou(r.getContourCentroid()[0]*6)+" - "+VitimageUtils.dou(r.getContourCentroid()[1]*6)+") h="+hour+" "+(this.trunk ? " is trunk" : " ")+" stamp="+stamp;
 	}
 	
 	public void setRoi(Roi r) {
@@ -695,12 +697,17 @@ public class CC implements Serializable{
 		}
 		return bestEdge;
 	}
+	
+	
 	public ConnectionEdge bestCountOutgoingEdge_v2() {
 		double maxVal=-100000000;
 		ConnectionEdge bestEdge=null;
 		if(graph.outgoingEdgesOf(this).size()>0) {
 			for(ConnectionEdge edge : graph.outgoingEdgesOf(this)) {
-				double val=graph.getEdgeTarget(edge).count*1.0/(1+VitimageUtils.EPSILON+graph.getEdgeWeight(edge));
+				double val=graph.getEdgeTarget(edge).count*1.0/(VitimageUtils.EPSILON+1+graph.getEdgeWeight(edge));
+				if(val<0) {
+					System.out.println("En prison ! "+val);
+				}
 				if(  val>maxVal) {
 					maxVal=val;
 					bestEdge=edge;

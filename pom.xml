@@ -90,7 +90,6 @@
 		<dependency>
 		  <groupId>io.github.rocsg</groupId>
 		  <artifactId>fijiyama</artifactId>
-		  <version>4.0.10-SNAPSHOT</version>
 		</dependency> 
 
         <dependency>
@@ -269,4 +268,13 @@
 
 
 	</dependencies>  	
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>io.github.rocsg</groupId>
+				<artifactId>fijiyama</artifactId>
+				<version>4.0.10-SNAPSHOT</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 </project>

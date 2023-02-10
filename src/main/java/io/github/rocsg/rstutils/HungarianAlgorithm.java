@@ -104,6 +104,7 @@ public class HungarianAlgorithm {
         }
         for (int j = 0; j < this.cols; j++) {
           if (Double.isInfinite(costMatrix[w][j])) {
+        	System.out.println("A cost was detected infinite at "+w+","+j);
             throw new IllegalArgumentException("Infinite cost");
           }
           if (Double.isNaN(costMatrix[w][j])) {

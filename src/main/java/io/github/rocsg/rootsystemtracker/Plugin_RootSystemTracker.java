@@ -1,6 +1,8 @@
 package io.github.rocsg.rootsystemtracker;
 
 import io.github.rocsg.fijiyama.common.VitiDialogs;
+import io.github.rocsg.fijiyama.common.VitimageUtils;
+
 import java.io.File;
 import ij.IJ;
 import ij.ImageJ;
@@ -77,20 +79,34 @@ public class Plugin_RootSystemTracker extends PlugInFrame{
 	public void startNewExperimentFromNotInventoriedDataset(String inputDir,String outputDir) {
 		String inventoryDir=Plugin_RootDatasetMakeInventory.makeInventory(inputDir);
 		if(inventoryDir==null)return;
+		if(isZuluEndangered())return;
 		startNewExperimentFromInventoryAndProcessingDir(inventoryDir,outputDir);
 	}
 	
 	public static void startNewExperimentFromInventoryAndProcessingDir(String inventoryDir,String processingDir) {
 		PipelineParamHandler pph=new PipelineParamHandler(inventoryDir,processingDir); 
+		if(isZuluEndangered())return;
 		PipelineActionsHandler.goOnExperiment(pph);		
 	}
 
 	public void goOnPipelineFromProcessingDir(String processingDir){
 		PipelineParamHandler pph=new PipelineParamHandler(processingDir);
+		if(isZuluEndangered())return;
 		PipelineActionsHandler.goOnExperiment(pph);		
 	}
-
-
 	
+	
+	public static boolean isZuluEndangered() {
+		if(VitimageUtils.isWindowsOS() && System.getProperties().toString().contains("zulu")) {
+			IJ.showMessage("You run windows with zulu JDK. We are sorry, but this is unconvenient\n"+
+					" The plugin will close to let you adjust your setup (two operations to make). "+""
+				+ "\nTo do so, please check the windows installation instructions on the plugin page"+
+					"\nhttps://imagej.net/plugins/fijiyama (or find it by googling Fijiyama imagej");
+			return true;
+		}
+		IJ.log("\nZulu check ok\n\n");
+		return false;
+	}
+
 
 }
