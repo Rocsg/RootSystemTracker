@@ -83,7 +83,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	
 	public static String makeInventory(String inputDir) {
 		String outputDir=new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath();
-		int choice=VitiDialogs.getIntUI("Select 1 for a data input dir with subdirs containing image series, or 1 for a messy bunch of dirs and subdirs containing images (tif, png, or jpg), each one with a QR code describing the object ", 1);
+		int choice=VitiDialogs.getIntUI("Select 1 for a data input dir with subdirs containing image series, or 2 for a messy bunch of dirs and subdirs containing images (tif, png, or jpg), each one with a QR code describing the object ", 1);
 		if(choice<1 || choice >2) {IJ.showMessage("Critical fail : malicious choice ("+choice+"). Stopping now.");return null;}
 		if(choice==1)Plugin_RootDatasetMakeInventory.startInventoryOfAlreadyTidyDir(inputDir,outputDir);
 		if(choice==2)Plugin_RootDatasetMakeInventory.startInventoryOfAMessyDirButAllTheImagesContainQRCodes(inputDir,outputDir);
@@ -115,25 +115,47 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 
 	//Here we go for a messy bunch of dirs with at least QR code. Let's hope we can read them yet.
 	public static void startInventoryOfAMessyDirButAllTheImagesContainQRCodes(String inputDir,String outputDir){
+		double[]sumParams=new double[] {0,0,0,0,0,0};
+		int did=0;
 		new File(outputDir).mkdirs();
 		//aggregate a list of relative path to all image files
 		String[]allImgsPath=getRelativePathOfAllImageFilesInDir(inputDir);
 		allImgsPath=sortFilesByModificationOrder(inputDir,allImgsPath);
 		int NP=allImgsPath.length;
 		String[]code=new String[NP];
-		boolean reverse=true;//VitiDialogs.getYesNoUI("Are the image mirrored ?", "Is mirrored ?");
+		boolean reverse=VitiDialogs.getYesNoUI("Are the image mirrored ?", "Is mirrored ?");
 		//double[]paramsQRcode=new double[] {4.0,472.0,2916,668,15.8,142.2};
 		double[]paramsQRcode=askQRcodeParams(new File(inputDir,allImgsPath[0]).getAbsolutePath(),reverse);
-		System.out.println("Got QR params : ");
+
+		//Initialize aggregator with original value
+		for(int i=0;i<paramsQRcode.length;i++)sumParams[i]+=10*paramsQRcode[i];
+		did+=10;
+		int nNot=0;
+		
+		System.out.println("Got QR params from user : ");
 		for(double d:paramsQRcode)System.out.println(d);
 		//decode the qr code of each image
 		String codeNotFound="NOT_FOUND";
 		for(int n=0;n<NP;n++) {
+			for(int i=0;i<paramsQRcode.length;i++)paramsQRcode[i]=sumParams[i]/did;
+			double ratio=VitimageUtils.dou ((did-10)/(1.0*did));
+			System.out.print("\nNow decoding "+n+"/"+NP);
+			
+			System.out.print("...Opening "+allImgsPath[n]);
 			ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[n]).getAbsolutePath());
-			if(reverse) IJ.run(img, "Flip Horizontally", "");
-			System.out.println("\nNow decoding "+n+"/"+NP+" = "+allImgsPath[n]);
-			code[n]=QRcodeReader.decodeQRCodeRobust(img,(int)paramsQRcode[0],paramsQRcode[1],paramsQRcode[2],paramsQRcode[3],paramsQRcode[4],paramsQRcode[5]); 
-			if(code[n].length()<1 || code[n]==null)code[n]=codeNotFound;
+			System.out.println(" ok.");
+			System.out.println("Starting decoding with params inferred from user = "+VitimageUtils.dou (100*(1-ratio))+" % "+" . Inferred from data = "+VitimageUtils.dou (100*ratio)+" % ");
+			Object[]objs=QRcodeReader.decodeQRCodeRobust(img,reverse,(int)paramsQRcode[0],paramsQRcode[1],paramsQRcode[2],paramsQRcode[3],paramsQRcode[4],paramsQRcode[5]); 
+			code[n]=(String)objs[0];
+			double[]params=(double[])objs[1];
+			if(code[n].length()<1 || code[n]==null) {
+				code[n]=codeNotFound;
+				nNot++;
+			}
+			else {
+				for(int i=0;i<params.length;i++)sumParams[i]+=params[i];
+				did++;
+			}
 		}
 
 		//extract the set of these qr codes by alphanumeric order
@@ -144,6 +166,38 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		Arrays.sort(spec);
 		int N=spec.length;
 
+		
+		//Process not found
+		if(nNot>0) {
+			IJ.showMessage("Some QR codes have not been read.");
+			IJ.showMessage("Now I will display the list of codes detected, as a reference for cleaning");
+			for(int i=0;i<spec.length;i++)IJ.log(spec[i]);
+			IJ.selectWindow("Log");
+			IJ.showMessage("Please set the ImageJ log window somewhere on you screen in order to be able to inspect it.");
+			IJ.showMessage("I will show you all the images with QR code not found. With each image come a popup.");
+			IJ.showMessage("For each image, find the corresponding code in the list (see log window), and copy it into the prompt popup.");
+			for(int i=0;i<code.length;i++) if(code[i].equals(codeNotFound)){
+				int subFactor=(int)paramsQRcode[0];
+				ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[i]).getAbsolutePath());				
+				img=VitimageUtils.resize(img, img.getWidth()/subFactor, img.getHeight()/subFactor, 1);
+				if(reverse) IJ.run(img, "Flip Horizontally", "");
+				img.show();
+				String newCode=VitiDialogs.getStringUI("Give the code", "Code", "Type here", false);
+				img.close();
+				code[i]=newCode;
+			}
+			
+			setNames = new HashSet<String>(Arrays.asList(code));
+			spec=setNames.toArray(new String[setNames.size()]);
+			System.out.println("N specimens = "+spec.length);
+			Arrays.sort(spec);
+			N=spec.length;
+		}
+		
+		
+		
+		
+		
 		int header=7;
 		FileTime first=null;
 		FileTime last=null;

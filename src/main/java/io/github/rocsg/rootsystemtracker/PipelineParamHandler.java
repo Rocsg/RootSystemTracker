@@ -66,7 +66,19 @@ public class PipelineParamHandler {
 		readParameters();
 	}
 	
+
+	public void runCleaningAssistant(String inventoryDir){
+		String[][]dataClean=VitimageUtils.readStringTabFromCsv(new File(inventoryDir,"NOT_FOUND.csv").getAbsolutePath());
+		IJ.showMessage("Please open an explorer window to help the cleaning");
+		
+	}
+	
 	public PipelineParamHandler(String inventoryDir,String outputDir) {
+		if(new File(inventoryDir,"NOT_FOUND.csv").exists()) {
+			IJ.showMessage("Warning. Found a NOT_FOUND.csv in dir "+inventoryDir+" . The cleaning assistant will open now.");
+			runCleaningAssistant(inventoryDir);
+		}
+
 		this.inventoryDir=inventoryDir;
 		this.outputDir=outputDir;
 		this.pathToParameterFile=new File(outputDir,mainNameCsv).getAbsolutePath(); 
@@ -228,6 +240,7 @@ public class PipelineParamHandler {
 	}
 	
 	public void writeParameters(boolean firstWrite) {
+
 		addAllParametersToTab();
 		
 		if(firstWrite) {
@@ -235,11 +248,6 @@ public class PipelineParamHandler {
 			imgSteps=new int[nbData];
 			imgTimes=new String[nbData];
 			imgSerieSize=new int[nbData];
-			if(new File(inventoryDir,"NOT_FOUND.csv").exists()) {
-				IJ.showMessage("Warning. Found a NOT_FOUND.csv in dir "+inventoryDir);
-				IJ.showMessage("You should gather the lines of this file, set them in the right place, then go again");
-				if(!VitiDialogs.getYesNoUI("Go on anyway ?", "OK"))System.exit(0);;
-			}
 			String[]listImgs=new File(inventoryDir).list(new FilenameFilter() {		
 				@Override
 				public boolean accept(File arg0, String arg1) {

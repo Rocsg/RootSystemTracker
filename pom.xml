@@ -90,7 +90,10 @@
 		<dependency>
 		  <groupId>io.github.rocsg</groupId>
 		  <artifactId>fijiyama</artifactId>
-		</dependency> 
+		  <version>4.0.10</version>
+		  <scope>system</scope>
+		  <systemPath>/home/rfernandez/.m2/repository/io/github/rocsg/fijiyama/4.0.10/fijiyama-4.0.10.jar</systemPath>
+		</dependency>
 
         <dependency>
              <groupId>sc.fiji</groupId>
@@ -263,11 +266,11 @@
 		</dependency>-->
 
 		<!-- https://mvnrepository.com/artifact/org.scijava/scijava-java3d -->
-
-
-
-
 	</dependencies>  	
+
+
+
+	<!-- 
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -276,5 +279,5 @@
 				<version>4.0.10-SNAPSHOT</version>
 			</dependency>
 		</dependencies>
-	</dependencyManagement>
+	</dependencyManagement>-->
 </project>

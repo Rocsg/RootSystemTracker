@@ -51,20 +51,20 @@ public class Plugin_RootSystemTracker extends PlugInFrame{
 			startNewExperimentFromInventoryAndProcessingDir(inventoryDir,processingDir);
 		}
 		else {
-			if(VitiDialogs.getYesNoUI("Ongoing series ?", "")) {
+			if(VitiDialogs.getYesNoUI("Go on a previous experiment ?", "Use an ongoing series ? ")) {
 				String csvPath=VitiDialogs.chooseDirectoryNiceUI("Select a InfoSerieRootSystemTracker.csv file", "OK");
 				if(!csvPath.contains(".csv")){IJ.showMessage("No csv file there");return;}
 				goOnPipelineFromProcessingDir(new File(csvPath).getParent());
 			}
 			else {
 				String inventoryPath="";
-				if(VitiDialogs.getYesNoUI("Start from an existing inventory ?", "")) {
+				if(VitiDialogs.getYesNoUI("Start from an existing inventory ?", "Start from an existing inventory ?")) {
 					inventoryPath=VitiDialogs.chooseDirectoryNiceUI("Select a A_main_inventory.csv file (in a Inventory_of... dir)", "OK");
 					if(!inventoryPath.contains("A_main_inventory.csv")) {IJ.showMessage("No inventory csv there");return;}
 					inventoryPath=new File(inventoryPath).getParent();
 				}
 				else {
-					String inputDir=VitiDialogs.chooseDirectoryNiceUI("Please select your data path", "OK");
+					String inputDir=VitiDialogs.chooseDirectoryNiceUI("Please select your input non-inventoried data path", "OK");
 					inventoryPath=Plugin_RootDatasetMakeInventory.makeInventory(inputDir);
 				}
 				String processingPath=VitiDialogs.chooseDirectoryNiceUI("Select an output path (Processing_..bla..)", "OK");

@@ -72,66 +72,50 @@ public class QRcodeReader {
 	
     
     @SuppressWarnings("unchecked")
-	public static String decodeQRCodeRobust(ImagePlus img2,int subsamplingFactor,double originalQRwidth,double originalX, double originalY,double lowThresh,double highThresh) {
-    	String str="";//(img2);
-    	if(str.length()!=0)return str;
-    	else {
-    		int X=img2.getWidth()/subsamplingFactor;
-    		int Y=img2.getHeight()/subsamplingFactor;
-            ImagePlus img=VitimageUtils.resize(img2, img2.getWidth()/subsamplingFactor, img2.getHeight()/subsamplingFactor, 1);
-            ArrayList<Double[]>ar=new ArrayList<Double[]>();
-    		int sizeZone=(int) (1.6*originalQRwidth/(subsamplingFactor));
-    		double step=sizeZone/9;
-    		int deltaThresh=(int) (highThresh-lowThresh);
-    		int reducedX=(int) (originalX/subsamplingFactor-sizeZone/2);
-    		int reducedY=(int) (originalY/subsamplingFactor-sizeZone/2);
-    		int meanThresh=(int) ((lowThresh+highThresh)/2);
-    		for(int x0=0; x0<X-sizeZone-1;x0+=step) {
-        		for(int y0=0; y0<Y-sizeZone-1;y0+=step) {
-        			for(int thresh=(int) lowThresh;thresh<highThresh;thresh+=deltaThresh/8) {
-        				double score=VitimageUtils.distance(x0, y0, reducedX, reducedY)*(Math.abs(thresh-meanThresh));
-        				ar.add(new Double[] {score,(double) x0,(double) y0,(double) thresh});
-        			}
-        		}
-    		}
-    		
-    		boolean debug=false;
-    		Collections.sort(ar,new DeltaComparator());
-    		System.out.println("Looking QR code around "+reducedX+" , "+reducedY+" with thresh around "+meanThresh);
-    		Timer t=new Timer();
-    		t.getTime();
-    		String textGet="";
-    		boolean first=true;
-    		for(int i=0;i<ar.size() && t.getTime()<100 ;i++) {
-    			double x0=ar.get(i)[1];
-    			double y0=ar.get(i)[2];
-    			double tr=ar.get(i)[3];
-    			double score=ar.get(i)[0];
-    			ImagePlus imgPti=VitimageUtils.cropImage(img, (int)x0, (int)y0, 0, sizeZone, sizeZone, 1);
-    			if(debug && first) {
-    				imgPti.show();
-    				VitimageUtils.waitFor(500);
-        			imgPti.hide();
-        			first=false;
+	public static Object[]decodeQRCodeRobust(ImagePlus img2,boolean reverse,int subsamplingFactor,double originalQRwidth,double originalX, double originalY,double lowThresh,double highThresh) {
+		int X=img2.getWidth()/subsamplingFactor;
+		int Y=img2.getHeight()/subsamplingFactor;
+        ImagePlus img=VitimageUtils.resize(img2, img2.getWidth()/subsamplingFactor, img2.getHeight()/subsamplingFactor, 1);
+		if(reverse) IJ.run(img, "Flip Horizontally", "");
+        ArrayList<Double[]>ar=new ArrayList<Double[]>();
+		int sizeZone=(int) (1.6*originalQRwidth/(subsamplingFactor));
+		double step=sizeZone/9;
+		int deltaThresh=(int) (highThresh-lowThresh);
+		int reducedX=(int) (originalX/subsamplingFactor-sizeZone/2);
+		int reducedY=(int) (originalY/subsamplingFactor-sizeZone/2);
+		int meanThresh=(int) ((lowThresh+highThresh)/2);
+		for(int x0=0; x0<X-sizeZone-1;x0+=step) {
+    		for(int y0=0; y0<Y-sizeZone-1;y0+=step) {
+    			for(int thresh=(int) lowThresh;thresh<highThresh;thresh+=deltaThresh/8) {
+    				double score=VitimageUtils.distance(x0, y0, reducedX, reducedY)*(Math.abs(thresh-meanThresh));
+    				ar.add(new Double[] {score,(double) x0,(double) y0,(double) thresh});
     			}
-    			imgPti=VitimageUtils.thresholdImage(imgPti, tr, 1E10);
-    			textGet=decodeQRCode(imgPti);
-    			if(textGet.length()>0) {
-    				System.out.println(i+":"+ar.get(i));
-    				System.out.println("Found ! Time="+t.getTime()+" , attempt "+i+"/"+ar.size()+" .. around "+x0+" , "+y0+" , "+tr+" with score "+score);
-        			System.out.println("Found ! "+textGet);
-    				if(debug) {
-        			imgPti.show();
-    				VitimageUtils.waitFor(500);
-        			imgPti.hide();
-    				}
-    				return textGet;
-    			}
-    			imgPti.close();
     		}
-    	}
+		}
+		
+		Collections.sort(ar,new DeltaComparator());
+		System.out.println("Looking QR code around "+((reducedX+sizeZone/2)*subsamplingFactor)+" , "+((reducedY+sizeZone/2)*subsamplingFactor)+" with X/Y stride="+(step*subsamplingFactor)+" with threshold between "+(meanThresh-deltaThresh/2)+" and "+(meanThresh+deltaThresh/2)+" using subsampling factor="+subsamplingFactor);
+		Timer t=new Timer();
+		t.getTime();
+		String textGet="";
+		boolean first=true;
+		for(int i=0;i<ar.size() && t.getTime()<100 ;i++) {
+			double x0=ar.get(i)[1];
+			double y0=ar.get(i)[2];
+			double tr=ar.get(i)[3];
+			double score=ar.get(i)[0];
+			ImagePlus imgPti=VitimageUtils.cropImage(img, (int)x0, (int)y0, 0, sizeZone, sizeZone, 1);//w0, y0
+			imgPti=VitimageUtils.thresholdImage(imgPti, tr, 1E10); //tr-deltaThresh/2 , tr+deltaThresh/2
+			textGet=decodeQRCode(imgPti);
+			if(textGet.length()>0) {
+				System.out.println("Number "+i+" is Ok.");
+				System.out.println("Found code = "+textGet+" after computation time="+t.getTime()+" , attempt "+i+"/"+ar.size()+" .. found around ("+((x0+sizeZone/2)*subsamplingFactor)+" , "+(y0+sizeZone/2)*subsamplingFactor+") using threshold "+tr+" with score "+score);
+				return new Object[] {textGet,new double[] {subsamplingFactor,originalQRwidth,(x0+sizeZone/2)*subsamplingFactor,(y0+sizeZone/2)*subsamplingFactor,tr-deltaThresh/2 , tr+deltaThresh/2}};
+			}
+			imgPti.close();
+		}
     	System.out.println("\n\n NOT FOUND ! \n\n");
-    	return "";
+    	return new Object[]{"",new double[] {0,0,0,0,0,0}};
     }
 
     public static void main(String[] args) throws IOException {
@@ -139,7 +123,7 @@ public class QRcodeReader {
 		ImagePlus img= IJ.openImage(file.getAbsolutePath());
     	VitimageUtils.waitFor(6000);
 
-		String decodedText = decodeQRCodeRobust(img,4,456,3330,1100,11,160);
+		String decodedText = (String) decodeQRCodeRobust(img,true,4,456,3330,1100,11,160)[0];
 		if(decodedText.length()==0) {
 		    System.out.println("No QR Code found in the image");
 		} else {

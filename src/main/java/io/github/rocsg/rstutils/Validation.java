@@ -78,7 +78,8 @@ public class Validation extends PlugInFrame{
 		
 		FSR sr=new FSR();
 		System.out.println(pathRSML);
-		RootModel rm=RootModel.RootModelWildReadAnnotationFromRsml(pathRSML);
+		IJ.showMessage("Not yet implemented : visualValidationOfAnnotationFacingTimeDate in io.github.rocsg.rstutils.Validation.java");
+		RootModel rm=null;//RootModel.RootModelWildReadAnnotationFromRsml(pathRSML);
 		
 		ImagePlus compositeSource=rm.createGrayScaleImage(imgSource,0,false,true,2); 
 		compositeSource.setTitle("Composite source");
