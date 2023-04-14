@@ -53,6 +53,8 @@ public class PipelineParamHandler {
 	public int originalPixelSize=19;//µm
 	private String unit="µm";
 	public double typicalHourDelay=8;
+	public int xMinTree=90;//TODO
+	public int xMaxTree=1220;//TODO
 	
 	public static void main(String[]arg) {
 	}
@@ -79,9 +81,9 @@ public class PipelineParamHandler {
 			runCleaningAssistant(inventoryDir);
 		}
 
-		this.inventoryDir=inventoryDir;
-		this.outputDir=outputDir;
-		this.pathToParameterFile=new File(outputDir,mainNameCsv).getAbsolutePath(); 
+		this.inventoryDir=inventoryDir.replace("\\","/");;
+		this.outputDir=outputDir.replace("\\","/");;
+		this.pathToParameterFile=new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/");; 
 		
 		if(new File(this.pathToParameterFile).exists())   { //Reading parameters from an existing file
 			readParameters();                                  
@@ -96,7 +98,7 @@ public class PipelineParamHandler {
 	}
 
 	public PipelineParamHandler(String processingDir) {
-		outputDir=processingDir;
+		outputDir=processingDir.replace("\\","/");;
 		readParameters();
 	}
 
@@ -107,7 +109,8 @@ public class PipelineParamHandler {
 	
 	public void readParameters() {
 		System.out.println(new File(outputDir,mainNameCsv).getAbsolutePath());
-		params=VitimageUtils.readStringTabFromCsv(new File(outputDir,mainNameCsv).getAbsolutePath());
+		params=VitimageUtils.readStringTabFromCsv(new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/"));
+		IJ.log("The main CSV is opened with name : |"+new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/")+"|");
 		inventoryDir=getString("inventoryDir");
 		outputDir=getString("outputDir");
 		numberPlantsInBox=getInt("numberPlantsInBox");
@@ -136,9 +139,16 @@ public class PipelineParamHandler {
 		for(int i=0;i<nbData;i++) {
 			imgNames[i]=getString("Img_"+i+"_name");
 			imgSteps[i]=getInt("Img_"+i+"_step");
-			System.out.println("We have inventoryDir="+inventoryDir);
-			System.out.println("And making inventory of "+new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath());
+			IJ.log("We have inventoryDir="+inventoryDir);
+			IJ.log("We have outputDir="+outputDir);
+			System.out.println("And making inventory of |"+new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()+"|");
+			IJ.log("Did inventory of "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()));
+			IJ.log("Testing "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()));
 			String[][]paramsImg=VitimageUtils.readStringTabFromCsv(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath());
+			IJ.log("And the String tab initialized is null ? "+(paramsImg==null));
+			IJ.log("Or it has a number of lines = "+(paramsImg.length));
+			IJ.log("Or imgSerieSize is null ? "+(imgSerieSize==null));
+			IJ.log("Or imgSerieSize len is not good ? ="+(imgSerieSize.length));
 			imgSerieSize[i]=paramsImg.length-1;
 			acqTimes[i]=new double[imgSerieSize[i]];
 			for(int j=0;j<imgSerieSize[i];j++) {
@@ -272,7 +282,7 @@ public class PipelineParamHandler {
 	
 	
 	public String getString(String tit) {
-		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return params[i][1];
+		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return params[i][1].replace("\\", "/");
 		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
 		return null;
 	}

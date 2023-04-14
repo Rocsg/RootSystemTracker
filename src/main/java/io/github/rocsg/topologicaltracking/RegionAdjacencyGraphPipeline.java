@@ -38,20 +38,6 @@ public class RegionAdjacencyGraphPipeline {
 	
 	
 
-	///////////////////////////
-	//HIGHLY UNSAFE ZONE///////
-	///////////////////////////	
-
-
-
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
@@ -1160,14 +1146,25 @@ public class RegionAdjacencyGraphPipeline {
 		return cost;
 	}
 
+
+	/** Outliers detection
+	 * 
+	 * Steps are : 
+	 * 1) Identify forgotten axes
+	 * 2)
+	 * 3)
+	 * 4)
+	 */
 	public static void establishDataFromStartForEachNodeAndExcludeBasedOnStatistics(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims,PipelineParamHandler pph,int indexBox) {
-		double[]hours=pph.getHours(indexBox);
-		
-		//Identify forgotten axes
+		double[]hours=pph.getHours(indexBox);		
 		System.out.println("\n-------------------------------------------------------\nStarting outlier detection, rebranching forgotten branches and that folks in RAG\n-------------------------------------------------------");
 		int Xmax=sampleImgForDims.getWidth()-1;
 		int Ymax=sampleImgForDims.getHeight()-1;
-		for(int i=0;i<20;i++)System.out.println();
+		for(int i=0;i<5;i++)System.out.println();
+
+		
+		//1) Identify forgotten axes.
+		//These are the roots already existing at start. If they went on growing, they are now disconnected from the primary
 		for (CC cc:graph.vertexSet()) {
 			//If start of lateral with no entering arc from a trunk
 			if(!cc.trunk && cc.bestIncomingActivatedCC()==null) {
@@ -1296,7 +1293,7 @@ public class RegionAdjacencyGraphPipeline {
 								ccTmp.deltaTimeHoursFromStart=deltaTimeHoursFromStart;
 								int tmp=(int) (deltaTimeHoursFromStart/pph.typicalHourDelay);
 								if(tmp>nEach.length-1)tmp=nEach.length-1;
-								nEach[tmp]++;
+								//nEach[tmp]++;
 								
 								
 								
@@ -1318,7 +1315,7 @@ public class RegionAdjacencyGraphPipeline {
 		
 		
 		for(int i=0;i<deltaTimeMax+100;i++) {
-		//	System.out.println("CUREACH["+i+"]="+nEach[i]);
+		System.out.println("CUREACH["+i+"]="+nEach[i]);
 			iter[i]=nEach[i];
 		}
 		//Collect data for computing statistics over nodes, binned according to time latence from lateral initiation
@@ -1330,8 +1327,12 @@ public class RegionAdjacencyGraphPipeline {
 			if(ccStart.isLatStart ) {
 				listStart.add(ccStart);
 				for(CC cc : ccStart.pathFromStart ) {				
-					int nCur=(int) (cc.deltaTimeHoursFromStart/pph.typicalHourDelay);
-					if(nCur>data.length-1)nCur=data.length-1;
+					int nCur=(int) (cc.deltaTimeFromStart);
+					//int nCur=(int) (cc.deltaTimeHoursFromStart/pph.typicalHourDelay);
+					if(nCur>nEach.length-1)nCur=nEach.length-1;
+					if(nCur>data[0].length-1)nCur=data[0].length-1;
+					if(iter[nCur]==0) {IJ.showMessage("Bug is here !!!!!\n"+"nCur="+nCur+" CC="+cc);continue;}
+					System.out.println(iter[nCur]);
 					data[0][nCur][iter[nCur]-1]=cc.lengthBefore;
 					data[1][nCur][iter[nCur]-1]=cc.lengthFromStart;
 					data[2][nCur][iter[nCur]-1]=cc.lengthBefore/(Math.max(0.7,cc.deltaTimeHoursBefore));
@@ -2007,7 +2008,7 @@ public class RegionAdjacencyGraphPipeline {
 		}
 	}
 	
-	public static void pruneGraph(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,int nbTrees,boolean removeUnconnectedParts,double []hours) {
+	public static void pruneGraph(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,int nbTrees,int xMinTree,int xMaxTree,boolean removeUnconnectedParts,double []hours) {
 		//* If nbTrees>=1, select nbTrees elements of day 1  
 		//* Build element of day 0, and connect all selected elements of day 1
 		//* Remove all elements not connected
@@ -2047,7 +2048,7 @@ public class RegionAdjacencyGraphPipeline {
 					boolean found=false;				
 					for(int j=0;j<nbTrees;j++)if(tabCC[j]==cc)found=true;
 					if(found)continue;
-					if(cc.nPixels>max) {
+					if(cc.nPixels>max && cc.x >= xMinTree && cc.x<=xMaxTree ) {
 						max=cc.nPixels;
 						tabCC[i]=cc;
 					}
@@ -2136,7 +2137,7 @@ public class RegionAdjacencyGraphPipeline {
 //		imgDatesTmp.show();
 		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=null;
 		graph=buildGraphFromDateMap(imgDatesTmp,connexity,pph.getHours(indexBox));
-		pruneGraph(graph, nbTrees,true,pph.getHours(indexBox));
+		pruneGraph(graph, nbTrees,pph.xMinTree,pph.xMaxTree,true,pph.getHours(indexBox));
 		setFirstOrderCosts_phase1(graph,pph.getHoursExtremities(indexBox));
 		int upTen=0;
 		int upTwo=0;

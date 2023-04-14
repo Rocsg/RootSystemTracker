@@ -39,6 +39,11 @@ public class QRcodeReader {
 	It seems to be robust to pixel size (I handled 4 fold subsampling)
 	It seems to be not robust to relative size of QR // image, especially if other structures come there
 	*/
+	
+	
+	
+	
+	
 
 	public static String decodeQRCode(ImagePlus img) {
 		ImageProcessor ip=img.getProcessor();		
@@ -94,12 +99,12 @@ public class QRcodeReader {
 		}
 		
 		Collections.sort(ar,new DeltaComparator());
-		System.out.println("Looking QR code around "+((reducedX+sizeZone/2)*subsamplingFactor)+" , "+((reducedY+sizeZone/2)*subsamplingFactor)+" with X/Y stride="+(step*subsamplingFactor)+" with threshold between "+(meanThresh-deltaThresh/2)+" and "+(meanThresh+deltaThresh/2)+" using subsampling factor="+subsamplingFactor);
+		IJ.log("Looking QR code around "+((reducedX+sizeZone/2)*subsamplingFactor)+" , "+((reducedY+sizeZone/2)*subsamplingFactor)+" with X/Y stride="+(step*subsamplingFactor)+" with threshold between "+(meanThresh-deltaThresh/2)+" and "+(meanThresh+deltaThresh/2)+" using subsampling factor="+subsamplingFactor);
 		Timer t=new Timer();
 		t.getTime();
 		String textGet="";
 		boolean first=true;
-		for(int i=0;i<ar.size() && t.getTime()<100 ;i++) {
+		for(int i=0;i<ar.size() && t.getTime()<50 ;i++) {
 			double x0=ar.get(i)[1];
 			double y0=ar.get(i)[2];
 			double tr=ar.get(i)[3];
@@ -108,13 +113,13 @@ public class QRcodeReader {
 			imgPti=VitimageUtils.thresholdImage(imgPti, tr, 1E10); //tr-deltaThresh/2 , tr+deltaThresh/2
 			textGet=decodeQRCode(imgPti);
 			if(textGet.length()>0) {
-				System.out.println("Number "+i+" is Ok.");
-				System.out.println("Found code = "+textGet+" after computation time="+t.getTime()+" , attempt "+i+"/"+ar.size()+" .. found around ("+((x0+sizeZone/2)*subsamplingFactor)+" , "+(y0+sizeZone/2)*subsamplingFactor+") using threshold "+tr+" with score "+score);
+				IJ.log("Number "+i+" is Ok.");
+				IJ.log("Found code = "+textGet+" after computation time="+t.getTime()+" , attempt "+i+"/"+ar.size()+" .. found around ("+((x0+sizeZone/2)*subsamplingFactor)+" , "+(y0+sizeZone/2)*subsamplingFactor+") using threshold "+tr+" with score "+score);
 				return new Object[] {textGet,new double[] {subsamplingFactor,originalQRwidth,(x0+sizeZone/2)*subsamplingFactor,(y0+sizeZone/2)*subsamplingFactor,tr-deltaThresh/2 , tr+deltaThresh/2}};
 			}
 			imgPti.close();
 		}
-    	System.out.println("\n\n NOT FOUND ! \n\n");
+		IJ.log("\n\n NOT FOUND ! \n\n");
     	return new Object[]{"",new double[] {0,0,0,0,0,0}};
     }
 

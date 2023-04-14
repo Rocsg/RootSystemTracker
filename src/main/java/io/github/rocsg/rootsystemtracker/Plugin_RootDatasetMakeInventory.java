@@ -82,7 +82,8 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	}
 	
 	public static String makeInventory(String inputDir) {
-		String outputDir=new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath();
+		IJ.log("Starting inventory in Plugin_RootData");
+		String outputDir=new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/");
 		int choice=VitiDialogs.getIntUI("Select 1 for a data input dir with subdirs containing image series, or 2 for a messy bunch of dirs and subdirs containing images (tif, png, or jpg), each one with a QR code describing the object ", 1);
 		if(choice<1 || choice >2) {IJ.showMessage("Critical fail : malicious choice ("+choice+"). Stopping now.");return null;}
 		if(choice==1)Plugin_RootDatasetMakeInventory.startInventoryOfAlreadyTidyDir(inputDir,outputDir);
@@ -99,11 +100,11 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		if(choice<1 || choice >2) {
 			IJ.showMessage("Critical fail : malicious choice ("+choice+"). Stopping now.");return;
 		}
-		inputDir=VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK");
+		inputDir=VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK").replace("\\","/");
 
 		String outputDir="";
 		if(developerMode)outputDir="/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Third_dataset_2022_11/Source_data_after_renumbering/ML2";
-		else outputDir=VitiDialogs.chooseDirectoryNiceUI("Build and choose data output dir. Suggested : next to the first one, with name Inventory_of_(name of the original folder)", "OK");
+		else outputDir=VitiDialogs.chooseDirectoryNiceUI("Build and choose data output dir. Suggested : next to the first one, with name Inventory_of_(name of the original folder)", "OK").replace("\\","/");
 		if(new File(outputDir).list().length>0) {
 			IJ.showMessage("Critical fail : output dir is not empty. Stopping now.");return;
 		}
@@ -115,10 +116,13 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 
 	//Here we go for a messy bunch of dirs with at least QR code. Let's hope we can read them yet.
 	public static void startInventoryOfAMessyDirButAllTheImagesContainQRCodes(String inputDir,String outputDir){
+		IJ.log("Starting startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 		double[]sumParams=new double[] {0,0,0,0,0,0};
 		int did=0;
 		new File(outputDir).mkdirs();
 		//aggregate a list of relative path to all image files
+		IJ.log("01 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
+
 		String[]allImgsPath=getRelativePathOfAllImageFilesInDir(inputDir);
 		allImgsPath=sortFilesByModificationOrder(inputDir,allImgsPath);
 		int NP=allImgsPath.length;
@@ -126,25 +130,28 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		boolean reverse=VitiDialogs.getYesNoUI("Are the image mirrored ?", "Is mirrored ?");
 		//double[]paramsQRcode=new double[] {4.0,472.0,2916,668,15.8,142.2};
 		double[]paramsQRcode=askQRcodeParams(new File(inputDir,allImgsPath[0]).getAbsolutePath(),reverse);
+		IJ.log("02 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 
 		//Initialize aggregator with original value
 		for(int i=0;i<paramsQRcode.length;i++)sumParams[i]+=10*paramsQRcode[i];
 		did+=10;
 		int nNot=0;
-		
-		System.out.println("Got QR params from user : ");
+		IJ.log("03 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
+
+		IJ.log("Got QR params from user : ");
 		for(double d:paramsQRcode)System.out.println(d);
 		//decode the qr code of each image
 		String codeNotFound="NOT_FOUND";
+		IJ.log("04 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 		for(int n=0;n<NP;n++) {
 			for(int i=0;i<paramsQRcode.length;i++)paramsQRcode[i]=sumParams[i]/did;
 			double ratio=VitimageUtils.dou ((did-10)/(1.0*did));
-			System.out.print("\nNow decoding "+n+"/"+NP);
+			IJ.log("\nNow decoding "+n+"/"+NP);
 			
-			System.out.print("...Opening "+allImgsPath[n]);
+			IJ.log("...Opening "+allImgsPath[n]);
 			ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[n]).getAbsolutePath());
-			System.out.println(" ok.");
-			System.out.println("Starting decoding with params inferred from user = "+VitimageUtils.dou (100*(1-ratio))+" % "+" . Inferred from data = "+VitimageUtils.dou (100*ratio)+" % ");
+			IJ.log(" ok.");
+			IJ.log("Starting decoding with params inferred from user = "+VitimageUtils.dou (100*(1-ratio))+" % "+" . Inferred from data = "+VitimageUtils.dou (100*ratio)+" % ");
 			Object[]objs=QRcodeReader.decodeQRCodeRobust(img,reverse,(int)paramsQRcode[0],paramsQRcode[1],paramsQRcode[2],paramsQRcode[3],paramsQRcode[4],paramsQRcode[5]); 
 			code[n]=(String)objs[0];
 			double[]params=(double[])objs[1];
@@ -162,7 +169,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		Set<String> setNames = new HashSet<String>(Arrays.asList(code));
 		
 		String[]spec=setNames.toArray(new String[setNames.size()]);
-		System.out.println("N specimens = "+spec.length);
+		IJ.log("N specimens = "+spec.length);
 		Arrays.sort(spec);
 		int N=spec.length;
 
@@ -183,13 +190,14 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 				if(reverse) IJ.run(img, "Flip Horizontally", "");
 				img.show();
 				String newCode=VitiDialogs.getStringUI("Give the code", "Code", "Type here", false);
+				img.changes=false;
 				img.close();
 				code[i]=newCode;
 			}
 			
 			setNames = new HashSet<String>(Arrays.asList(code));
 			spec=setNames.toArray(new String[setNames.size()]);
-			System.out.println("N specimens = "+spec.length);
+			IJ.log("N specimens = "+spec.length);
 			Arrays.sort(spec);
 			N=spec.length;
 		}
@@ -361,13 +369,13 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		String rdt=new File(rootDir).getAbsolutePath();//Without the / at the end
 		File[]init =Arrays.stream(searchImagesInDir(rootDir)).map(x -> new File(x) ).toArray(File[]::new);
 		Arrays.sort(init,Comparator.comparingLong(File::lastModified));
-		return (Stream.of(init).map(f -> f.getAbsolutePath()).map(s -> s.replace(rdt,"").substring(1) )).toArray(String[]::new);
+		return (Stream.of(init).map(f -> f.getAbsolutePath()).map(s -> s.replace(rdt,"").substring(1).replace("\\","/") )).toArray(String[]::new);
 	}
 
 	
 	static String[]getRelativePathOfAllImageFilesInDir(String rootDir){		
 		String rdt=new File(rootDir).getAbsolutePath();//Without the / at the end
-		return Arrays.stream(searchImagesInDir(rootDir)).map( p -> p.replace(rdt,"").substring(1)).toArray(String[]::new);
+		return Arrays.stream(searchImagesInDir(rootDir)).map( p -> p.replace(rdt,"").substring(1).replace("\\","/")).toArray(String[]::new);
 	}
 
 	static String[]searchImagesInDir(String rootDir){

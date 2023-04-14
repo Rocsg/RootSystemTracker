@@ -156,7 +156,19 @@ public class MovieBuilder {
 		int Y=imgRoot.getHeight();
 		int delta=0;
 		if(joinOpening) {
-			delta=387;
+			delta=387;//TODO : determine delta
+			//determine delta
+			delta=0;
+			for(int n=0;n<75;n++) 				delta++;
+		
+			for(int m=1;m<=TN;m++) {
+				int lim=20;
+				if(m>5)lim=12;
+				if(m>10)lim=7;
+				if(m==TN)lim=75;
+				for(int n=0;n<lim;n++) delta++;
+			}
+
 		}
 		int N2=N+delta;
 		ImagePlus []resChan=new ImagePlus[] {IJ.createImage("", X, Y, N2, 8),IJ.createImage("", X, Y, N2, 8),IJ.createImage("", X, Y, N2, 8)};

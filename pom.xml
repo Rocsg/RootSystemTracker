@@ -87,13 +87,20 @@
   	
   		
 	<dependencies>
+	
+			<dependency>
+				<groupId>io.github.rocsg</groupId>
+				<artifactId>fijiyama</artifactId>
+				<version>4.0.10</version>
+			</dependency>
+	<!-- 	
 		<dependency>
 		  <groupId>io.github.rocsg</groupId>
 		  <artifactId>fijiyama</artifactId>
 		  <version>4.0.10</version>
 		  <scope>system</scope>
 		  <systemPath>/home/rfernandez/.m2/repository/io/github/rocsg/fijiyama/4.0.10/fijiyama-4.0.10.jar</systemPath>
-		</dependency>
+		</dependency>-->
 
         <dependency>
              <groupId>sc.fiji</groupId>
@@ -270,14 +277,10 @@
 
 
 
-	<!-- 
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>io.github.rocsg</groupId>
-				<artifactId>fijiyama</artifactId>
-				<version>4.0.10-SNAPSHOT</version>
-			</dependency>
-		</dependencies>
+	 
+	<!--<dependencyManagement>
+				<dependencies>
+	</dependencies>
+		
 	</dependencyManagement>-->
 </project>

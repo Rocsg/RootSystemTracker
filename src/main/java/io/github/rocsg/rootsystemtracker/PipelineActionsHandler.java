@@ -11,6 +11,7 @@ import io.github.rocsg.fijiyama.common.Bord;
 import io.github.rocsg.fijiyama.common.DouglasPeuckerSimplify;
 import io.github.rocsg.fijiyama.common.Pix;
 import io.github.rocsg.fijiyama.common.Timer;
+import io.github.rocsg.fijiyama.common.VitiDialogs;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
 import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
@@ -24,32 +25,90 @@ import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
 import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
 import ij.IJ;
+import ij.ImageJ;
 import ij.ImagePlus;
+import ij.gui.GenericDialog;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
 
 public class PipelineActionsHandler {
 	public static final int flagFinished=7;
+	public static final int flagLastImage=200;
 	public static final boolean proceedFullPipelineImageAfterImage=true;
 	public static final int firstStepToDo=0;
 	public static final int lastStepToDo=flagFinished;
 	public static final int firstImageToDo=0;
-	public static final int lastImageToDo=200;//flagFinished;
+	public static final int lastImageToDo=flagLastImage;//flagFinished;
+	public static final int yMaxStamp=110;//TODO. It is relative value Y, after the crop
 	public static Timer t;
+	
+	
+
+	public static int[]selectFirstAndLast(PipelineParamHandler pph){
+		if(VitiDialogs.getYesNoUI("Process everything box after box (select no to refine)?", "Process everything box after box (select no to refine)?"))return new int[] {0,flagFinished,0,flagLastImage,0};
+		else{
+			String[]actions=new String[] {"Step 0: setup part 1","Step 1:image stacking","Step 2: stack registration",
+					"Step 3 : mask computation, leaves removal","Step 4: spatio-temporal segmentation",
+					"Step 5 : graph computation","Step 6: RSML building", "Step 7: Movie building"}; 
+			String[]order=new String[] {"Box after box","Step after step"};
+			int[]vals=new int[5];
+			GenericDialog gd= new GenericDialog("Expert mode for RootSystemTracker");
+            gd.addMessage("Choose the steps to execute");
+			gd.addChoice("First step to run",actions, actions[0]);
+			gd.addChoice("Last step to run",actions, actions[0]);
+	        gd.addMessage("Choose the indices of box to be processed (from 0 to "+(pph.nbData-1)+")");
+    		gd.addNumericField("First box index to process",  0, 0 , 6 ,"");
+			gd.addNumericField("Last box index to process", pph.nbData-1, 0, 6,"");
+	        gd.addMessage("Choose the order : box after box (all steps) or step after step (all boxes)");
+			gd.addChoice("Order",order, order[0]);
+	        gd.showDialog();
+	        if (gd.wasCanceled()) return new int[] {0,flagFinished,0,flagLastImage,0};	        
+	        int st1=gd.getNextChoiceIndex();
+	        int st2=gd.getNextChoiceIndex();
+	        int im1=(int)Math.round(gd.getNextNumber());
+	        int im2=(int)Math.round(gd.getNextNumber());
+	        int ord=gd.getNextChoiceIndex();
+	        if(st1<0)st1=0;
+	        if(st2<0)st2=0;
+	        if(st2>flagFinished)st1=flagFinished;
+	        if(st1>st2)st1=st2;
+	        if(im1<0)im1=0;
+	        if(im2<0)im2=0;
+	        if(im2>flagLastImage)st1=flagLastImage;
+	        if(im1>im2)im1=im2;
+	        return new int[] {st1,st2,im1,im2,ord};
+		}
+	}
+	
 	
 	public static void goOnExperiment(PipelineParamHandler pph) {
 		System.out.println("Going on  !");
+		int[]vals=selectFirstAndLast(pph);
+		int indFirstImageToDo=vals[2];
+		int indLastImageToDo=vals[3];
+		int indFirstStepToDo=vals[0];
+		int indLastStepToDo=vals[1];
+		int order=vals[4];
+		IJ.showMessage("Params of processing=imgs "+indFirstImageToDo+"-"+indLastImageToDo+", Steps "+indFirstStepToDo+"-"+indLastStepToDo+", order "+order);
 		t=new Timer();		
-		if(proceedFullPipelineImageAfterImage) {
-			for(int i=firstImageToDo;i<Math.min(lastImageToDo,pph.nbData);i++) {
-				while(((pph.imgSteps[i]+1)>=firstStepToDo && pph.imgSteps[i]<lastStepToDo)) {
+		boolean rewriteNeeded=false;
+		for(int in=indFirstImageToDo;in<=indLastImageToDo;in++)if(pph.imgSteps[in]>indFirstStepToDo)rewriteNeeded=true;
+		if(rewriteNeeded) {
+			if(VitiDialogs.getYesNoUI("Rewrinting current step ?", "Some box to process are more advanced than step "+indFirstStepToDo+".\n Yes: recompute all the steps from step "+indFirstStepToDo+"  or   No: only compute missing steps")) {
+				for(int in=indFirstImageToDo;in<=indLastImageToDo;in++)if(pph.imgSteps[in]>indFirstStepToDo)pph.imgSteps[in]=indFirstStepToDo;
+				pph.writeParameters(false);				
+			}
+		}
+		if(order==0) {
+			for(int i=indFirstImageToDo;i<=Math.min(indLastImageToDo,pph.nbData-1);i++) {
+				while(((pph.imgSteps[i]+1)>=indFirstStepToDo && pph.imgSteps[i]<=indLastStepToDo)) {
 					doNextStep(i,pph);
 				}				
 			}			
 		}
 		else {
-			for(int s=firstStepToDo ; s<lastStepToDo; s++) {
-				for(int i=firstImageToDo;i<Math.min(lastImageToDo,pph.nbData);i++) {
+			for(int s=indFirstStepToDo ; s<=indLastStepToDo; s++) {
+				for(int i=indFirstImageToDo;i<=Math.min(indLastImageToDo,pph.nbData-1);i++) {
 					if(pph.imgSteps[i]==(s-1)) doNextStep(i,pph);
 				}				
 			}					
@@ -58,8 +117,9 @@ public class PipelineActionsHandler {
 	}
 	
 	public static void doNextStep(int indexImg,PipelineParamHandler pph) {
-		int lastStepDone=pph.imgSteps[indexImg];
-		if(doStepOnImg(lastStepDone+1,indexImg,pph))pph.imgSteps[indexImg]++;
+		System.out.println("Doing next step of img index "+indexImg);
+		int stepToDo=pph.imgSteps[indexImg];
+		if(doStepOnImg(stepToDo,indexImg,pph))pph.imgSteps[indexImg]++;
 		pph.writeParameters(false);
 	}
 
@@ -117,7 +177,7 @@ public class PipelineActionsHandler {
 		for(int n=0;n<N;n++) {
 			String date=csvDataImg[1+n][1];
 			double hours=Double.parseDouble(csvDataImg[1+n][2]);
-				System.out.println("Opening image "+new File (mainDataDir,csvDataImg[1+n][3]).getAbsolutePath());
+			IJ.log("Opening image "+new File (mainDataDir,csvDataImg[1+n][3]).getAbsolutePath());
 			tabImg[n]=IJ.openImage( new File (mainDataDir,csvDataImg[1+n][3]).getAbsolutePath());
 			tabImg[n].getStack().setSliceLabel(date+"_ = h0 + "+hours+" h", 1);
 		}
@@ -250,10 +310,10 @@ public class PipelineActionsHandler {
 	
 	public static boolean computeMasksAndRemoveLeaves(int indexImg,String outputDataDir,PipelineParamHandler pph) {
 		ImagePlus imgReg=IJ.openImage(new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath());
-		ImagePlus imgMask1=getMaskOfAreaInterestAtTime(imgReg, 1);
+		ImagePlus imgMask1=getMaskOfAreaInterestAtTime(imgReg, 1,false);
 		IJ.saveAsTiff(imgMask1,new File(outputDataDir,"31_mask_at_t1.tif").getAbsolutePath());
 
-		ImagePlus imgMaskN=getMaskOfAreaInterestAtTime(imgReg, imgReg.getStackSize());
+		ImagePlus imgMaskN=getMaskOfAreaInterestAtTime(imgReg, imgReg.getStackSize(),false);
 		IJ.saveAsTiff(imgMaskN,new File(outputDataDir,"32_mask_at_tN.tif").getAbsolutePath());
 
 		ImagePlus imgMask2=	MorphoUtils.erosionCircle2D(imgMask1, 250);//TODO : give a geometrical meaning to 250
@@ -361,25 +421,27 @@ public class PipelineActionsHandler {
 		int xTolerance=X/20;
 
 		for(Root r : prRoots) {
+			System.out.println("\nDebugging Root ");
+			System.out.println(r);
 			//Identify the first coordinates
 			Node oldFirst=r.firstNode;
 			int xMid=(int) oldFirst.x;
 			int yMid=(int) oldFirst.y;
-
+			System.out.println("Identified coordinates start="+xMid+","+yMid);
+			
 			//Identify the mean height of region to attain in this area
 			int upperPix=0;
 			for(int i=yMid;i>=0;i--) {
 				if(mask.getPixel(xMid, i)[0]>0)upperPix=i;
 			}
-			//TODO make it depending on the local conformation
-			upperPix-=10;
-			upperPix=0;
+			upperPix-=10;//TODO
+			
 			if(upperPix<0)upperPix=0;
 			
 			//Extract a rectangle around the first coordinate at time 0
-			ImagePlus imgExtractMask=VitimageUtils.cropImage(mask, xMid-xTolerance, upperPix, 0, xTolerance*2+1, yMid-upperPix+1, 1);
+			ImagePlus imgExtractMask=VitimageUtils.cropImage(mask, Math.max(0,xMid-xTolerance), Math.max(0,upperPix), 0, xTolerance*2+1, yMid-upperPix+1, 1);
 			imgExtractMask.setDisplayRange(0, 1);
-			ImagePlus imgExtract=VitimageUtils.cropImage(imgRegT0, xMid-xTolerance, upperPix, 0, xTolerance*2+1, yMid-upperPix+1, 1);
+			ImagePlus imgExtract=VitimageUtils.cropImage(imgRegT0, Math.max(0,xMid-xTolerance), Math.max(0,upperPix), 0, xTolerance*2+1, yMid-upperPix+1, 1);
 			
 			//Extract a min djikstra path to this region
 			GraphPath<Pix,Bord>graph=VitimageUtils.getShortestAndDarkestPathInImage(imgExtract,8,new Pix(xTolerance,0,0),new Pix (xTolerance,yMid-upperPix,0));
@@ -480,38 +542,91 @@ public class PipelineActionsHandler {
 		img2.setDisplayRange(0, 1);
 		return new ImagePlus [] {img1,img2};
 	}
+
+	public static void main(String[]args) {
+		ImageJ ij=new ImageJ();
+		ImagePlus imgReg=IJ.openImage("/home/rfernandez/Bureau/A_Test/RootSystemTracker/Debug_Amandine_Avril_2023/TEST_230306-CC-CO2/230306-CC-CO2/Processing_of_230306-CC-CO2-COMPIL/230306CC005/11_stack.tif");
+		getMaskOfAreaInterestAtTime(imgReg, 1,true);
+	}
 	
-	public static ImagePlus getMaskOfAreaInterestAtTime(ImagePlus imgReg,int time) {
+	
+	public static ImagePlus getMaskOfAreaInterestAtTime(ImagePlus imgReg,int time,boolean debug) {
 		ImagePlus imgMask1=new Duplicator().run(imgReg,1,1,time,time,1,1);
-		imgMask1=getMenisque(imgMask1);
+		if(debug)imgMask1.duplicate().show();
+		imgMask1=getMenisque(imgMask1,debug);
+		if(debug)imgMask1.duplicate().show();
 		imgMask1=VitimageUtils.invertBinaryMask(imgMask1);
 		imgMask1=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(imgMask1, 4, 1);
 		IJ.run(imgMask1,"8-bit","");
+		if(debug)imgMask1.duplicate().show();
 		imgMask1=VitimageUtils.getBinaryMaskUnary(imgMask1,0.5);
 		imgMask1.setDisplayRange(0, 1);
+		if(debug)imgMask1.duplicate().show();
 		return imgMask1;
 	}
 	
+	
+	/**
+	 * Draw rectangle in image.
+	 *
+	 * @param imgIn the img in
+	 * @param x0 the x 0
+	 * @param y0 the y 0
+	 * @param xf the xf
+	 * @param yf the yf
+	 * @param value the value
+	 * @return the image plus
+	 */
+	/* Helper functions to watermark various things in 3d image : Strings, rectangles, cylinders... */		
+	public static ImagePlus drawRectangleInImage(ImagePlus imgIn,int x0,int y0,int xf,int yf,float value) {
+		if(imgIn.getType() != ImagePlus.GRAY32)return imgIn;
+		ImagePlus img=new Duplicator().run(imgIn);
+		int xM=img.getWidth();
+		int zM=img.getStackSize();
+		float[][] valsImg=new float[zM][];
+		for(int z=0;z<zM;z++) {
+			valsImg[z]=(float [])img.getStack().getProcessor(z+1).getPixels();
+			for(int x=x0;x<=xf;x++) {
+				for(int y=y0;y<=yf;y++) {
+					valsImg[z][xM*y+x]=  value;
+				}
+			}
+		}			
+		return img;
+	}
+
+	
 	//TODO : give a geometrical meaning to the various params
-	public static ImagePlus getMenisque(ImagePlus img) {
+	public static ImagePlus getMenisque(ImagePlus img,boolean debug) {
 		//Compute the difference between a horizontal opening and a vertical opening
 		int factor=1;
+		if(debug) {ImagePlus im=img.duplicate();im.setTitle("Init");im.show();}
 		ImagePlus img2=MorphoUtils.dilationLine2D(img, 8*factor,false);
+//		if(debug) {ImagePlus im2=img2.duplicate();im2.setTitle("Im2");im2.show();}
 		img2=MorphoUtils.erosionLine2D(img2, 8*factor,false);
 		ImagePlus img3=MorphoUtils.dilationLine2D(img, 8*factor,true);
+		//		if(debug) {ImagePlus im3=img3.duplicate();im3.setTitle("Im3");im3.show();}
 		img3=MorphoUtils.erosionLine2D(img3, 8*factor,true);
 		ImagePlus img4=VitimageUtils.makeOperationBetweenTwoImages(img2, img3, 4, true);
+
 		
+		img4=drawRectangleInImage(img4, 0, 0, img4.getWidth(), yMaxStamp, 0);
+		if(debug) {ImagePlus im4=img4.duplicate();im4.setTitle("Im4");im4.show();}
+		
+				
 		//Open this difference, binarize and dilate, then select the biggest CC, and dilate it
-		ImagePlus img5=MorphoUtils.dilationLine2D(img4, 15*factor,true);
+		ImagePlus img5=MorphoUtils.dilationLine2D(img4, 100*factor,true);
 		img5=MorphoUtils.erosionLine2D(img5, 15*factor,true);
+		if(debug) {ImagePlus im5=img5.duplicate();im5.setTitle("Im5");im5.show();}
 		ImagePlus img6=VitimageUtils.thresholdImage(img5, 20, 500);
+		if(debug) {ImagePlus im6=img6.duplicate();im6.setTitle("Im6");im6.show();}
 		img6=MorphoUtils.dilationLine2D(img6, 50, true);
 		img6=MorphoUtils.dilationLine2D(img6, 2*factor,true);
 		img6=MorphoUtils.dilationLine2D(img6, 1*factor,false);
 		img6=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img6, 4, 1);
 		img6=MorphoUtils.dilationLine2D(img6, 3*factor,false);
 		IJ.run(img6,"8-bit","");
+		if(debug) {ImagePlus im8=img6.duplicate();im8.setTitle("Im8");im8.show();}
 		return img6;
 	}
 	
