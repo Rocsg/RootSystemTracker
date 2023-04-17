@@ -45,7 +45,7 @@ public class PipelineActionsHandler {
 	
 
 	public static int[]selectFirstAndLast(PipelineParamHandler pph){
-		if(VitiDialogs.getYesNoUI("Process everything box after box (select no to refine)?", "Process everything box after box (select no to refine)?"))return new int[] {0,flagFinished,0,flagLastImage,0};
+		if(VitiDialogs.getYesNoUI("Process everything box after box (select no to refine)?", "Process everything box after box (select no to refine)?"))return new int[] {0,flagFinished,0,pph.nbData-1,0};
 		else{
 			String[]actions=new String[] {"Step 0: setup part 1","Step 1:image stacking","Step 2: stack registration",
 					"Step 3 : mask computation, leaves removal","Step 4: spatio-temporal segmentation",

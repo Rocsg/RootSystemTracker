@@ -57,6 +57,9 @@ public class QRcodeReader {
         } catch (NotFoundException e) {
             //System.out.println("There is no QR code in the image");
             return "";
+        } catch (java.lang.ArrayIndexOutOfBoundsException i) {
+            //System.out.println("There is no QR code in the image");
+            return "";        	
         }
 	}
 
