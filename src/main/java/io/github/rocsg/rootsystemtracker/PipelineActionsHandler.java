@@ -39,7 +39,7 @@ public class PipelineActionsHandler {
 	public static final int lastStepToDo=flagFinished;
 	public static final int firstImageToDo=0;
 	public static final int lastImageToDo=flagLastImage;//flagFinished;
-	public static final int yMaxStamp=110;//TODO. It is relative value Y, after the crop
+	public static final int yMaxStamp=50;//TODO. It is relative value Y, after the crop
 	public static Timer t;
 	
 	
@@ -127,7 +127,7 @@ public class PipelineActionsHandler {
 	public static boolean doStepOnImg(int step,int indexImg,PipelineParamHandler pph) {
 		//Where processing data is saved
 		String outputDataDir=new File(pph.outputDir,pph.imgNames[indexImg]).getAbsolutePath();
-		boolean executed=false;
+		boolean executed=true;
 		if(step==1) {//Stack data -O-
 			t.print("Starting step 1, stacking -  on img index "+step+" : "+pph.imgNames[indexImg]);
 			executed=PipelineActionsHandler.stackData(indexImg,pph);
@@ -197,6 +197,7 @@ public class PipelineActionsHandler {
 		ImagePlus imgInit=VitimageUtils.cropImage(imgInit2, pph.xMinCrop,pph.yMinCrop,0,pph.dxCrop,pph.dyCrop,N);
 		ImagePlus imgOut=imgInit.duplicate();
 		IJ.run(imgOut,"32-bit","");
+
 		//Create mask
 		ImagePlus mask=new Duplicator().run(imgInit,1,1,1,1,1,1);
 		mask=VitimageUtils.nullImage(mask);
@@ -217,8 +218,6 @@ public class PipelineActionsHandler {
 		t.log("Starting registration");
 		for(int n=0;(n<N-1);n++) {
 			t.log("n="+n);
-
-			
 			ItkTransform trRoot=null;
 			RegistrationAction regAct=new RegistrationAction().defineSettingsFromTwoImages(tabImg[n],tabImg[n+1],null,false);
 			regAct.setLevelMaxLinear(pph.maxLinear);
@@ -312,7 +311,8 @@ public class PipelineActionsHandler {
 		ImagePlus imgReg=IJ.openImage(new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath());
 		ImagePlus imgMask1=getMaskOfAreaInterestAtTime(imgReg, 1,false);
 		IJ.saveAsTiff(imgMask1,new File(outputDataDir,"31_mask_at_t1.tif").getAbsolutePath());
-
+		
+		
 		ImagePlus imgMaskN=getMaskOfAreaInterestAtTime(imgReg, imgReg.getStackSize(),false);
 		IJ.saveAsTiff(imgMaskN,new File(outputDataDir,"32_mask_at_tN.tif").getAbsolutePath());
 
@@ -600,33 +600,33 @@ public class PipelineActionsHandler {
 	public static ImagePlus getMenisque(ImagePlus img,boolean debug) {
 		//Compute the difference between a horizontal opening and a vertical opening
 		int factor=1;
-		if(debug) {ImagePlus im=img.duplicate();im.setTitle("Init");im.show();}
+		if(debug) {ImagePlus im=img.duplicate();im.setTitle("Init");im.show();IJ.showMessage("Original image for get menisque");}
 		ImagePlus img2=MorphoUtils.dilationLine2D(img, 8*factor,false);
-//		if(debug) {ImagePlus im2=img2.duplicate();im2.setTitle("Im2");im2.show();}
+		if(debug) {ImagePlus im2=img2.duplicate();im2.setTitle("Im2");im2.show();IJ.showMessage("After vertical dilation");}
 		img2=MorphoUtils.erosionLine2D(img2, 8*factor,false);
+		if(debug) {ImagePlus im25=img2.duplicate();im25.setTitle("Im25");im25.show();IJ.showMessage("After vertical erosion");}
 		ImagePlus img3=MorphoUtils.dilationLine2D(img, 8*factor,true);
-		//		if(debug) {ImagePlus im3=img3.duplicate();im3.setTitle("Im3");im3.show();}
+		if(debug) {ImagePlus im3=img3.duplicate();im3.setTitle("Im3");im3.show();IJ.showMessage("After horizontal dilation");}
 		img3=MorphoUtils.erosionLine2D(img3, 8*factor,true);
+		if(debug) {ImagePlus im35=img3.duplicate();im35.setTitle("Im35");im35.show();IJ.showMessage("After horizontal erosion");}
 		ImagePlus img4=VitimageUtils.makeOperationBetweenTwoImages(img2, img3, 4, true);
-
-		
 		img4=drawRectangleInImage(img4, 0, 0, img4.getWidth(), yMaxStamp, 0);
-		if(debug) {ImagePlus im4=img4.duplicate();im4.setTitle("Im4");im4.show();}
+		if(debug) {ImagePlus im4=img4.duplicate();im4.setTitle("Im4");im4.show();IJ.showMessage("After diff of 2 and 3 and removal of the stamp qr possible place");}
 		
 				
 		//Open this difference, binarize and dilate, then select the biggest CC, and dilate it
 		ImagePlus img5=MorphoUtils.dilationLine2D(img4, 100*factor,true);
 		img5=MorphoUtils.erosionLine2D(img5, 15*factor,true);
-		if(debug) {ImagePlus im5=img5.duplicate();im5.setTitle("Im5");im5.show();}
+		if(debug) {ImagePlus im5=img5.duplicate();im5.setTitle("Im5");im5.show();IJ.showMessage("After closing horizontally");}
 		ImagePlus img6=VitimageUtils.thresholdImage(img5, 20, 500);
-		if(debug) {ImagePlus im6=img6.duplicate();im6.setTitle("Im6");im6.show();}
+		if(debug) {ImagePlus im6=img6.duplicate();im6.setTitle("Im6");im6.show();IJ.showMessage("After thresholding from 20 to 500");}
 		img6=MorphoUtils.dilationLine2D(img6, 50, true);
 		img6=MorphoUtils.dilationLine2D(img6, 2*factor,true);
 		img6=MorphoUtils.dilationLine2D(img6, 1*factor,false);
 		img6=VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img6, 4, 1);
 		img6=MorphoUtils.dilationLine2D(img6, 3*factor,false);
 		IJ.run(img6,"8-bit","");
-		if(debug) {ImagePlus im8=img6.duplicate();im8.setTitle("Im8");im8.show();}
+		if(debug) {ImagePlus im8=img6.duplicate();im8.setTitle("Im8");im8.show();IJ.showMessage("After many dilations and selection of best component");}
 		return img6;
 	}
 	

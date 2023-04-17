@@ -57,21 +57,6 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	public static String versionFlag="Handsome honeysuckle   2022-07-07 09:45";
 	
 
-	public static void main(String[]args) {
-		ImageJ ij=new ImageJ();
-		String inputDir="/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Third_dataset_2022_11/Source_data/ML3";
-		String outputDir="/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Third_dataset_2022_11/Source_data/Inventory_of_ML3";
-		//extract the set of these qr codes by alphanumeric order
-		//startInventoryOfAMessyDirButAllTheImagesContainQRCodes(inputDir,outputDir);
-		startInventoryOfAlreadyTidyDir(inputDir, outputDir);
-	}
-
-	
-	public static void main2(String[]args) {
-		Plugin_RootDatasetMakeInventory pl=new Plugin_RootDatasetMakeInventory();
-		pl.developerMode=true;		
-		pl.run("");
-	}
 
 	public Plugin_RootDatasetMakeInventory()       {		super("");	 	}
 
@@ -84,8 +69,22 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	public static String makeInventory(String inputDir) {
 		IJ.log("Starting inventory in Plugin_RootData");
 		String outputDir=new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/");
-		int choice=VitiDialogs.getIntUI("Select 1 for a data input dir with subdirs containing image series, or 2 for a messy bunch of dirs and subdirs containing images (tif, png, or jpg), each one with a QR code describing the object ", 1);
+		int choice=VitiDialogs.getIntUI("Select 1 for a data input dir with subdirs containing image series, 2 for a messy bunch of dirs and subdirs containing images (tif, png, or jpg), each one with a QR code", 1);
 		if(choice<1 || choice >2) {IJ.showMessage("Critical fail : malicious choice ("+choice+"). Stopping now.");return null;}
+		String expectedInventoryPath=new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/");
+		if(new File(expectedInventoryPath).exists()) {
+			IJ.showMessage("Directory already exists ! Please remove previous "+expectedInventoryPath);
+			return "";
+		}
+		String expectedProcessingPath=new File(new File(inputDir).getParent(),"Processing_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/");
+		if(new File(expectedProcessingPath).exists()) {
+			IJ.showMessage("Directory already exists ! Please remove previous "+expectedProcessingPath);
+			return "";
+		}
+		
+		new File(new File(new File(inputDir).getParent(),"Inventory_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/")).mkdirs();
+		new File(new File(new File(inputDir).getParent(),"Processing_of_"+(new File(inputDir).getName())).getAbsolutePath().replace("\\","/")).mkdirs();
+
 		if(choice==1)Plugin_RootDatasetMakeInventory.startInventoryOfAlreadyTidyDir(inputDir,outputDir);
 		if(choice==2)Plugin_RootDatasetMakeInventory.startInventoryOfAMessyDirButAllTheImagesContainQRCodes(inputDir,outputDir);
 		return outputDir;
@@ -119,10 +118,10 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		IJ.log("Starting startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 		double[]sumParams=new double[] {0,0,0,0,0,0};
 		int did=0;
-		new File(outputDir).mkdirs();
 		//aggregate a list of relative path to all image files
 		IJ.log("01 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
-
+		int patience=VitiDialogs.getIntUI("Please indicate your patience (in seconds) for each QR code detection" , 10);
+		
 		String[]allImgsPath=getRelativePathOfAllImageFilesInDir(inputDir);
 		allImgsPath=sortFilesByModificationOrder(inputDir,allImgsPath);
 		int NP=allImgsPath.length;
@@ -152,7 +151,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[n]).getAbsolutePath());
 			IJ.log(" ok.");
 			IJ.log("Starting decoding with params inferred from user = "+VitimageUtils.dou (100*(1-ratio))+" % "+" . Inferred from data = "+VitimageUtils.dou (100*ratio)+" % ");
-			Object[]objs=QRcodeReader.decodeQRCodeRobust(img,reverse,(int)paramsQRcode[0],paramsQRcode[1],paramsQRcode[2],paramsQRcode[3],paramsQRcode[4],paramsQRcode[5]); 
+			Object[]objs=QRcodeReader.decodeQRCodeRobust(img,reverse,(int)paramsQRcode[0],paramsQRcode[1],paramsQRcode[2],paramsQRcode[3],paramsQRcode[4],paramsQRcode[5],patience); 
 			code[n]=(String)objs[0];
 			double[]params=(double[])objs[1];
 			if(code[n].length()<1 || code[n]==null) {
@@ -185,11 +184,16 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			IJ.showMessage("For each image, find the corresponding code in the list (see log window), and copy it into the prompt popup.");
 			for(int i=0;i<code.length;i++) if(code[i].equals(codeNotFound)){
 				int subFactor=(int)paramsQRcode[0];
+				String guessedCode=guessCode(spec,new File(inputDir,allImgsPath[i]).getName());
+
+				if(inputDir.contains("230403-SR-split")){code[i]=guessedCode;continue;}//Hack for the first split serie that had perfect robot run but incorrect QR positioning
+				
 				ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[i]).getAbsolutePath());				
 				img=VitimageUtils.resize(img, img.getWidth()/subFactor, img.getHeight()/subFactor, 1);
 				if(reverse) IJ.run(img, "Flip Horizontally", "");
 				img.show();
-				String newCode=VitiDialogs.getStringUI("Give the code", "Code", "Type here", false);
+				guessedCode=guessCode(spec,new File(inputDir,allImgsPath[i]).getName());
+				String newCode=VitiDialogs.getStringUI("Give the code ("+i+"/"+code.length+")", "Guess (change if needed):", guessedCode, false);
 				img.changes=false;
 				img.close();
 				code[i]=newCode;
@@ -251,9 +255,79 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		System.out.println("Written : "+new File(outputDir,"A_main_inventory.csv").getAbsolutePath());
 	}
 
+	public static String commonSubStringAtTheBeginning(String s1, String s2) {
+		 int maxLength = Math.min(s1.length(), s2.length());
+        StringBuilder commonSubstring = new StringBuilder();
+        for (int i = 0; i < maxLength; i++) {
+            if (s1.charAt(i) == s2.charAt(i)) {
+                commonSubstring.append(s1.charAt(i)); // Append matching characters to the common substring
+            }
+            else {
+                break; // Break the loop when a mismatch is found
+            }
+        }
+        return commonSubstring.toString();
+    }
+	
+	
+	public static String commonSubStringAtTheBeginning(String[]tab,boolean ignoreLastOne) {
+		if((tab==null)||tab.length<1)return "";
+		String ret=tab[0];
+		for(int i=1;i<tab.length+(ignoreLastOne ? -1 : 0);i++)ret=commonSubStringAtTheBeginning(ret, tab[i]);
+		return ret;
+	}
+
+	public static int nbOccurences(String substring, String mainString) {
+		int count = 0;
+        int index = 0;
+        boolean found = true;
+        while (found) {
+            index = mainString.indexOf(substring, index);
+            if (index == -1) {
+                found = false; // Set found to false when no more occurrences are found
+            } else {
+                count++;
+                index += substring.length();
+            }
+        }
+        return count;
+	}
+	
+	
+	public static void main(String[]args) {
+		String a=guessCode(new String[] {"DSC01","DSC02","DSC03","DSC88"},"imgcecicela03");
+		System.out.println(a);
+	}
+	
+	public static String guessCode(String[]specs,String name) {
+		System.out.println("Guessing code for name="+name);
+		if(specs==null || specs.length<1)return "";
+		String common=commonSubStringAtTheBeginning(specs,true);
+		System.out.println("Common="+common);
+		String[]vals=new String[specs.length];
+		for(int i=0;i<specs.length;i++)vals[i]=specs[i].replace(common,"");		
+		int countMax=0;
+		int indMax=0;
+		for(int i=0;i<vals.length;i++) {
+			System.out.println("Testing "+i);
+			System.out.println("Vals="+vals[i]);
+			System.out.println("nbOcc="+nbOccurences(vals[i], name));
+			if(nbOccurences(vals[i], name)>countMax) {countMax=nbOccurences(vals[i], name);indMax=i;}
+		}
+		System.out.println("ind="+indMax);
+		System.out.println("Thus"+specs[indMax]);
+		if(countMax>0)return specs[indMax];
+		else {
+			//Guess from some pattern
+			String[]tab=name.split("Boite 000");
+			if(tab==null)return specs[indMax];
+			if(tab.length<1)return specs[indMax];
+			String pat=tab[1].substring(0,2);
+			return (common+pat);
+		}
+	}
 	
 	public static void startInventoryOfAlreadyTidyDir(String inputDir,String outputDir){
-		new File(outputDir).mkdirs();
 		//Here we go for a data input dir with subdirs containing image series
 		//list the data
 		String []spec= new File(inputDir).list();
@@ -283,7 +357,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 				String path=new File(pathDir,obs[no]).getAbsolutePath();
 				FileTime ft=getTime(path);
 				String rtd=new File(inputDir).getAbsolutePath();
-				objCSV[no+1]=new String[] {""+no,ft.toString(),""+VitimageUtils.dou(hoursBetween(path0, path)),path.replace(rtd,"").substring(1)};			
+				objCSV[no+1]=new String[] {""+no,ft.toString(),""+VitimageUtils.dou(hoursBetween(path0, path)),path.replace(rtd,"").substring(1).replace("\\","/")};			
 				if(first==null)first=getTime(path);
 				if(last==null)last=getTime(path);
 				if(first.compareTo(ft)==1)first=getTime(path);

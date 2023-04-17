@@ -35,9 +35,9 @@ public class PipelineParamHandler {
 	double minLateralStuckedToOtherLateral=30;
 	public int memorySaving=0;//if 1, don't save very big debug images;
 	int xMinCrop=122;
-	int yMinCrop=152;
+	int yMinCrop=212;
 	int dxCrop=1348;
-	int dyCrop=1226;
+	int dyCrop=1166;
 	int maxLinear=4;
 	public int subsamplingFactor=4;
 	int marginRegisterLeft=12;
@@ -98,7 +98,7 @@ public class PipelineParamHandler {
 	}
 
 	public PipelineParamHandler(String processingDir) {
-		outputDir=processingDir.replace("\\","/");;
+		outputDir=processingDir.replace("\\","/");
 		readParameters();
 	}
 
@@ -112,6 +112,10 @@ public class PipelineParamHandler {
 		params=VitimageUtils.readStringTabFromCsv(new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/"));
 		IJ.log("The main CSV is opened with name : |"+new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/")+"|");
 		inventoryDir=getString("inventoryDir");
+		xMinCrop=getInt("xMinCrop");
+		yMinCrop=getInt("yMinCrop");
+		dxCrop=getInt("dxCrop");
+		dyCrop=getInt("dyCrop");
 		outputDir=getString("outputDir");
 		numberPlantsInBox=getInt("numberPlantsInBox");
 		minSizeCC=getInt("minSizeCC");

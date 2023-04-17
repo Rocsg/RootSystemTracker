@@ -77,7 +77,7 @@ public class QRcodeReader {
 	
     
     @SuppressWarnings("unchecked")
-	public static Object[]decodeQRCodeRobust(ImagePlus img2,boolean reverse,int subsamplingFactor,double originalQRwidth,double originalX, double originalY,double lowThresh,double highThresh) {
+	public static Object[]decodeQRCodeRobust(ImagePlus img2,boolean reverse,int subsamplingFactor,double originalQRwidth,double originalX, double originalY,double lowThresh,double highThresh,int patience) {
 		int X=img2.getWidth()/subsamplingFactor;
 		int Y=img2.getHeight()/subsamplingFactor;
         ImagePlus img=VitimageUtils.resize(img2, img2.getWidth()/subsamplingFactor, img2.getHeight()/subsamplingFactor, 1);
@@ -104,7 +104,7 @@ public class QRcodeReader {
 		t.getTime();
 		String textGet="";
 		boolean first=true;
-		for(int i=0;i<ar.size() && t.getTime()<50 ;i++) {
+		for(int i=0;i<ar.size() && t.getTime()<patience ;i++) {
 			double x0=ar.get(i)[1];
 			double y0=ar.get(i)[2];
 			double tr=ar.get(i)[3];
@@ -128,7 +128,7 @@ public class QRcodeReader {
 		ImagePlus img= IJ.openImage(file.getAbsolutePath());
     	VitimageUtils.waitFor(6000);
 
-		String decodedText = (String) decodeQRCodeRobust(img,true,4,456,3330,1100,11,160)[0];
+		String decodedText = (String) decodeQRCodeRobust(img,true,4,456,3330,1100,11,160,5)[0];
 		if(decodedText.length()==0) {
 		    System.out.println("No QR Code found in the image");
 		} else {

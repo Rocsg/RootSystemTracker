@@ -19,7 +19,7 @@ public class Plugin_RootSystemTracker extends PlugInFrame{
 	private static final long serialVersionUID = 1L;
 	public boolean developerMode=false;
 	public String currentRstFlag="1.0";
-	public static String versionFlag="Handsome honeysuckle v1.5.1  2023-04-14 09:30 ScotchsFixed";
+	public static String versionFlag="Handsome honeysuckle v1.5.1  2023-04-17 7:50 Split-root-01-no-scotch";
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();
@@ -72,8 +72,7 @@ public class Plugin_RootSystemTracker extends PlugInFrame{
 					String inputDir=VitiDialogs.chooseDirectoryNiceUI("Please select your input non-inventoried data path", "OK").replace("\\","/");;
 					inventoryPath=Plugin_RootDatasetMakeInventory.makeInventory(inputDir).replace("\\","/");;
 				}
-				String processingPath=VitiDialogs.chooseDirectoryNiceUI("Select an output path (Processing_..bla..)", "OK").replace("\\","/");;
-				if(new File(processingPath).list().length>0){IJ.showMessage("There are already files there.");return;}
+				String processingPath=inventoryPath.replace("Inventory","Processing");
 				startNewExperimentFromInventoryAndProcessingDir(inventoryPath,processingPath);			
 			}
 			//startPipeline();

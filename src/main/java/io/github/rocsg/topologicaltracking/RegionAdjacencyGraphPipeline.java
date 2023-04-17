@@ -29,6 +29,7 @@ import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
 import io.github.rocsg.rstutils.HungarianAlgorithm;
 import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.rstutils.SplineAndPolyLineUtils;
+import it.unimi.dsi.fastutil.bytes.ByteSortedSets.SynchronizedSortedSet;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
@@ -36,6 +37,11 @@ import ij.gui.Roi;
 public class RegionAdjacencyGraphPipeline {
 
 	
+	public static int MIN_SIZE_CC=5;
+	static double PENALTY_COST=0.5;
+	public static final boolean DO_DISTANCE=true;
+	public static final boolean DO_TIME=false;
+	public static final int minFinalDepthForAcceptingLatRoot=300;
 	
 
 	
@@ -835,18 +841,19 @@ public class RegionAdjacencyGraphPipeline {
         }
 		double[][]costMatrix=new double[Nstop][Nstart];
 		Timer t2=new Timer();
+		boolean isTheFirstStep=true;
 		while(!finished) {
 
 			CC ccstoptest=getCC(graph,2026,2498);
 			CC ccstarttest=getCC(graph,2025,2550);
 			
-			t2.print("Loop ");
 			//Build score matrix
 			int nStill=0;
 			for(int i=0;i<Nstop;i++) {
+				if(isTheFirstStep)if((i%10)==0)t2.print("Hungarian algo : building initial score matrix, line  "+i+" / "+Nstop);
 	            for(int j=0;j<Nstart;j++) {    
-	            	boolean debug=( (i==33) && (j==119));
-	            	if(listStart.get(j)==ccStartWant && listStop.get(i)==ccStopWant) { debug=true;System.out.println("DEBUGGG");}
+	            	boolean debug=false &&( (i==33) && (j==119));
+	            	if(listStart.get(j)==ccStartWant && listStop.get(i)==ccStopWant) { debug=false;System.out.println("DEBUGGG");}
 	            	if(listStop.get(i)==listStart.get(j))costMatrix[i][j]=PENALTY_COST;
 	            	else {
 	            		if(listStop.get(i).associateSuiv==listStart.get(j))costMatrix[i][j]=-VitimageUtils.EPSILON;
@@ -866,6 +873,7 @@ public class RegionAdjacencyGraphPipeline {
 	            	if(debug)System.out.println("FINAL VAL="+costMatrix[i][j]);
 	            }
 	        }
+			isTheFirstStep=false;
 			for(int i=0;i<Nstop;i++) listStop.get(i).changedRecently=false;
             for(int j=0;j<Nstart;j++)listStart.get(j).changedRecently=false;   
             if(nStill==0) {
@@ -1147,489 +1155,555 @@ public class RegionAdjacencyGraphPipeline {
 	}
 
 
-	/** Outliers detection
-	 * 
-	 * Steps are : 
-	 * 1) Identify forgotten axes
-	 * 2)
-	 * 3)
-	 * 4)
-	 */
-	public static void establishDataFromStartForEachNodeAndExcludeBasedOnStatistics(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims,PipelineParamHandler pph,int indexBox) {
-		double[]hours=pph.getHours(indexBox);		
+	public static void reconnectLateralThatWereThereFromTheStart(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims,PipelineParamHandler pph,int indexBox) {
 		System.out.println("\n-------------------------------------------------------\nStarting outlier detection, rebranching forgotten branches and that folks in RAG\n-------------------------------------------------------");
-		int Xmax=sampleImgForDims.getWidth()-1;
-		int Ymax=sampleImgForDims.getHeight()-1;
-		for(int i=0;i<5;i++)System.out.println();
+		int nTimesSeries=pph.imgSerieSize[indexBox];
 
-		
 		//1) Identify forgotten axes.
-		//These are the roots already existing at start. If they went on growing, they are now disconnected from the primary
-		for (CC cc:graph.vertexSet()) {
-			//If start of lateral with no entering arc from a trunk
-			if(!cc.trunk && cc.bestIncomingActivatedCC()==null) {
-				//Count total number of vertices among successors and reject if less than four
-				int succ=1;
-				CC ct=cc;
-				while(ct.bestOutgoingActivatedCC()!=null) {
-					ct=ct.bestOutgoingActivatedCC();
-					succ++;
+		//These are the roots already existing at start.
+		//If they went on growing, they are now disconnected from the primary
+		for (CC ccStart:graph.vertexSet()) {
+			if(!ccStart.trunk && ccStart.bestIncomingActivatedCC()==null) {//If start of lateral with no entering arc from a trunk
+				//Count total number of successors components and reject if less than four 
+				//As we are focusing on roots present from the start, thus there should be a lot of successors)
+				int nSuccessors=1;
+				CC cEnd=ccStart;
+				while(cEnd.bestOutgoingActivatedCC()!=null) {
+					cEnd=cEnd.bestOutgoingActivatedCC();
+					nSuccessors++;
 				}
-				if(succ<4)continue;
+				if(nSuccessors<4)continue;
 				
 				
 				
-				//Look for a connexion to trunk
+				//This one was selected. Now looking for a possible connexion to the trunk
 				ConnectionEdge edge=null;
-				for(ConnectionEdge ed : graph.incomingEdgesOf(cc)) {
-					if(ed.source.trunk && ed.source.day<=cc.day)edge=ed;
+				for(ConnectionEdge ed : graph.incomingEdgesOf(ccStart)) {
+					if(ed.source.trunk && ed.source.day<=ccStart.day)edge=ed;
 				}
-				if(edge!=null) {
+				if(edge!=null) {// We found a possible conexion to the trunk. Let's just activate it, and it's on.
 					edge.activated=true;
 					continue;
 				}
 
 				
-				//Look for a lat to reattach, that is really detached from anything.
-				if(ct.euclidianDistanceToCC(cc)>pph.getMeanSpeedLateral()*10 && (cc.bestIncomingEdge()==null || (succ>9) ) ) { // TODO : Then The second condition is really questionable. There should be specific tests here to improve performances
-					//This is a forgotten big root
+				//From there, the root is an actual lateral root, grew for the series, but there is no straightforward attachment, by a physical connexion
+				//Let s test if this thing has grew a bit
+				if(cEnd.euclidianDistanceToCC(ccStart)>(pph.getMeanSpeedLateral()*nTimesSeries/4.0)  &&  nSuccessors>(nTimesSeries/4.0) ) {
+					//This is a forgotten root of a certain size : a quarter of the mean size in length and number of successors
 
-					//Identify the nearer trunk
+					//Identify the nearer trunk that was present the instant before this root, and do the connexion
 					double distMin=1000000;
-					CC no=null;
+					CC findOut=null;
 					for (CC cctr:graph.vertexSet()) {
 						if (!cctr.trunk || cctr.day==0)continue;
-						if (cctr.day>cc.day)continue;
-						double dist=cctr.euclidianDistanceToCC(cc);
-						if(dist<distMin) {distMin=dist;no=cctr;}
+						if (cctr.day>ccStart.day)continue;
+						double dist=cctr.euclidianDistanceToCC(ccStart);
+						if(dist<distMin) {distMin=dist;findOut=cctr;}
 					}
-					if(no==null)continue;
-					ConnectionEdge edd=new ConnectionEdge( no.x*0.5 + cc.x*0.5, no.y*0.5 + cc.y*0.5, 0, no,cc,no.x>cc.x ? -1 : 1 ,no.y>cc.y ? -1 : 1); 
+					if(findOut==null)continue;
+					ConnectionEdge edd=new ConnectionEdge( findOut.x*0.5 + ccStart.x*0.5, findOut.y*0.5 + ccStart.y*0.5, 0, findOut,ccStart,findOut.x>ccStart.x ? -1 : 1 ,findOut.y>ccStart.y ? -1 : 1); 
 					edd.activated=true;
 					edd.hidden=true;
 					edd.trunk=false;
-					graph.addEdge(no,cc,edd); 
+					graph.addEdge(findOut,ccStart,edd); 
 				}
 			}
 		}
-		
-		
-		
-		
-		
-		double nbMADforOutlierRejection=25;
-		int nLateral=0;
+	}
+	
+	
+	/** Outliers detection
+	 * 
+	 * Steps are : 
+	 * 1) Identify forgotten axes. These are the roots already existing at start. If they went on growing, they are now disconnected from the primary
+	 * 2)
+	 * 3)
+	 * 4)
+	 */
+	public static void detectObviouslyOutlierOrganAndProlongateIncidentStopped(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims,PipelineParamHandler pph,int indexBox) {
+		for(int i=0;i<5;i++)System.out.println();
+		System.out.println("\n-------------------------------------------------------\nStarting outlier detection, rebranching forgotten branches and that folks in RAG\n-------------------------------------------------------");
+
+		double[]hours=pph.getHours(indexBox);		
+		int Xmax=sampleImgForDims.getWidth()-1;
+		int Ymax=sampleImgForDims.getHeight()-1;
 		int dMax=getDayMax(graph);
 		int deltaTimeMax=dMax;
-		int []nEach=new int[deltaTimeMax+100];
-		int []iter=new int[deltaTimeMax+100];
-		int nAccepted=1;
-		int nRejected=1;
-		double ratioMinVisible=0.4;
+		int []nEach=new int[deltaTimeMax];//This tab will count organs lying in cases by apparition timestep
+		int []iter=new int[deltaTimeMax];
+		double ratioMinVisible=0.4;//If a root is visible less than 40 % of its path, we reject it
 		
-	
-		//Exclude some laterals
-		for (CC cc:graph.vertexSet()) {
-			if(cc.trunk) {
-				for(ConnectionEdge edge:graph.outgoingEdgesOf(cc)) {
+		int nLateral=0;
+		int nAccepted=1;//Tf ? 0 ?
+		int nRejected=1;
+		int nTmpTot=0;
+		int nTmpKo=0;
+		int nTmpOk=0;
+		int []warns=new int[] {0,0,0};
+		
+		//Detect some obviously outlying laterals, and exclude them from the topology
+		//Based on the portion of their path that is hidden
+		System.out.println("-- Outliers Part1 detect portions hidden and remove corresponding roots" );
+		for (CC ccTrunk:graph.vertexSet()) {
+			if(ccTrunk.trunk) {
+				for(ConnectionEdge edge:graph.outgoingEdgesOf(ccTrunk)) {
 					if(edge.activated) {
 						CC ccStart=edge.target;
-						if(!ccStart.trunk) {//On a un début de laterale
+						if(!ccStart.trunk) {//Here is a lateral start
+							System.out.println("  -- Part1 processing root starting at "+ccStart);
+							if(ccStart.isLateral) {IJ.log("WARNING Part1 : setting lateral an already lateral : "+ccStart);warns[1]++;}
+							
+							nTmpTot++;
+							nLateral++;
+							nEach[0]++;
+
 							double lenHid=0;
 							double lenVis=0;
-							ccStart.isLatStart=true;
-							ccStart.ccLateralStart=ccStart;
-							ccStart.pathFromStart=new ArrayList<CC>();
-							ccStart.pathFromStart.add(ccStart);
-							//System.out.println("Processing 1"+ccStart);
-							if(ccStart.trunk)IJ.log("WARNING 1 : setting lateral a trunk : "+ccStart);
-							if(ccStart.isLateral)IJ.log("WARNING 1 : setting lateral an already lateral : "+ccStart);
-							ccStart.isLateral=true;nLateral++;
-							CC ccTmp=ccStart;
-							CC ccOld;
 							double lengthFromStart=0;
 							int surfaceFromStart=ccStart.nPixels;
 							int deltaTimeFromStart=0;
 							int deltaTimeHoursFromStart=0;
-							nEach[0]++;
-							ccTmp.surfaceFromStart=surfaceFromStart;
-							ccTmp.deltaTimeBefore=0;//TODO one day when reviewing MADe exclusion. This should be by bin of delta hours
-							ccTmp.deltaTimeFromStart=0;
-							ccTmp.deltaTimeHoursBefore=0;//TODO one day when reviewing MADe exclusion. This should be by bin of delta hours
-							ccTmp.deltaTimeHoursFromStart=0;
-							ccTmp.lengthBefore=0;
-							ccTmp.lengthFromStart=0;
-							ccTmp.lateralStamp=nLateral;
+
+							ccStart.isLatStart=true;
+							ccStart.ccLateralStart=ccStart;
+							ccStart.pathFromStart=new ArrayList<CC>();
+							ccStart.pathFromStart.add(ccStart);
+							ccStart.isLateral=true;
+							ccStart.surfaceFromStart=surfaceFromStart;
+							ccStart.deltaTimeBefore=0;//TODO one day when reviewing MADe exclusion. This should be by bin of delta hours
+							ccStart.deltaTimeFromStart=0;
+							ccStart.deltaTimeHoursBefore=0;//TODO one day when reviewing MADe exclusion. This should be by bin of delta hours
+							ccStart.deltaTimeHoursFromStart=0;
+							ccStart.lengthBefore=0;
+							ccStart.lengthFromStart=0;
+							ccStart.lateralStamp=nLateral;
 							
 						
 						
-							
+							//Root traversal to measure some info about it
+							CC ccTmp=ccStart;
+							CC ccOld;
 							while(ccTmp.bestOutgoingActivatedCC()!=null) {
+								//Traversal of the current component, and updating hidden lenght or visible length
 								ConnectionEdge curEdge=ccTmp.bestOutgoingActivatedEdge();
 								if(curEdge.hidden)lenHid+=ccTmp.euclidianDistanceToCC(ccTmp.bestOutgoingActivatedCC());
 								else lenVis+=ccTmp.euclidianDistanceToCC(ccTmp.bestOutgoingActivatedCC());
 								ccOld=ccTmp;
 								ccTmp=ccTmp.bestOutgoingActivatedCC();
-								if(!ccOld.trunk && ccTmp.trunk) {IJ.showMessage("WARNING : lateral "+ccOld+" incoming to trunk "+ccTmp);}
+
+								//Eventually detect silly things with trunks
+								if(!ccOld.trunk && ccTmp.trunk) {IJ.showMessage("WARNING : lateral "+ccOld+" incoming to trunk "+ccTmp);warns[2]++;}
 								ccStart.pathFromStart.add(ccTmp);
-								//System.out.println("Processing 2"+ccStart);
-								if(ccTmp.trunk)IJ.log("WARNING 2 : setting lateral a trunk : "+ccTmp);
-								if(ccTmp.isLateral)IJ.log("WARNING 2 : setting lateral an already lateral : "+ccTmp);
+								if(ccTmp.trunk) {IJ.log("WARNING 2 : setting lateral a trunk : "+ccTmp);warns[2]++;}
+								if(ccTmp.isLateral) {IJ.log("WARNING 2 : setting lateral an already lateral : "+ccTmp);warns[1]++;}
+
+								//Propagate belonging info from the ccStart
 								ccTmp.isLateral=true;
 								ccTmp.ccLateralStart=ccStart;
-								ccTmp.lateralStamp=nLateral;
+								ccTmp.lateralStamp=ccStart.lateralStamp;
 
+								//Count the distance, time and time in hours from the original root
 								ccTmp.lengthBefore=ccTmp.euclidianDistanceToCC(ccOld);
-								lengthFromStart+=ccTmp.lengthBefore;
-								ccTmp.lengthFromStart=lengthFromStart;
-
 								ccTmp.deltaTimeBefore=ccTmp.day-ccOld.day;
-								deltaTimeFromStart+=ccTmp.deltaTimeBefore;
-								ccTmp.deltaTimeFromStart=deltaTimeFromStart;
-								nEach[deltaTimeFromStart]++;
-								
 								ccTmp.deltaTimeHoursBefore=ccTmp.hour-ccOld.hour;
+
+								lengthFromStart+=ccTmp.lengthBefore;
+								deltaTimeFromStart+=ccTmp.deltaTimeBefore;
 								deltaTimeHoursFromStart+=ccTmp.deltaTimeBefore;
+								surfaceFromStart+=ccTmp.nPixels;
+								
+								ccTmp.lengthFromStart=lengthFromStart;
+								ccTmp.deltaTimeFromStart=deltaTimeFromStart;
 								ccTmp.deltaTimeHoursFromStart=deltaTimeHoursFromStart;
-								int tmp=(int) (deltaTimeHoursFromStart/pph.typicalHourDelay);
-								if(tmp>nEach.length-1)tmp=nEach.length-1;
+								ccTmp.surfaceFromStart=surfaceFromStart;
+
+	//							int tmp=(int) (deltaTimeHoursFromStart/pph.typicalHourDelay);
+//								if(tmp>nEach.length-1)tmp=nEach.length-1;
 								//nEach[tmp]++;
 								
+								//Say that there is one more component of lateral in this bin
+								nEach[deltaTimeFromStart]++;
 								
 								
-								surfaceFromStart+=ccTmp.nPixels;
-								ccTmp.surfaceFromStart=surfaceFromStart;
 							}
-							if(lenVis/(lenVis+lenHid)<ratioMinVisible)ccStart.nonValidLatStart=true;
+							
+							//Declare not valid lateral start if the ratio is not good
+							if(lenVis/(lenVis+lenHid)<ratioMinVisible) {
+								ccStart.nonValidLatStart=true;
+								nTmpKo++;
+							}
+							else {nTmpOk++;}
 						}
 					}
 				}
 			}
 		}
-		for (CC cc:graph.vertexSet()) if(!cc.trunk && !cc.isLateral)cc.setOut();
-		
-		
-		
-		
-		
-		
-		
-		for(int i=0;i<deltaTimeMax+100;i++) {
-		System.out.println("CUREACH["+i+"]="+nEach[i]);
-			iter[i]=nEach[i];
-		}
-		//Collect data for computing statistics over nodes, binned according to time latence from lateral initiation
-		double[][][]data=new double[6][deltaTimeMax+100][];//lenbef,lentot,speedbef,speedtot,surfthis,surftot
-		double[][][]stats=new double[6][deltaTimeMax+100][3];//lenbef,lentot,speedbef,speedtot,surfthis,surftot
-		for(int i=0;i<6;i++)for(int j=0;j<deltaTimeMax+1;j++)data[i][j]=new double[nEach[j]];		
-		ArrayList<CC>listStart=new ArrayList<CC>();
-		for (CC ccStart:graph.vertexSet()) {
-			if(ccStart.isLatStart ) {
-				listStart.add(ccStart);
-				for(CC cc : ccStart.pathFromStart ) {				
-					int nCur=(int) (cc.deltaTimeFromStart);
-					//int nCur=(int) (cc.deltaTimeHoursFromStart/pph.typicalHourDelay);
-					if(nCur>nEach.length-1)nCur=nEach.length-1;
-					if(nCur>data[0].length-1)nCur=data[0].length-1;
-					if(iter[nCur]==0) {IJ.showMessage("Bug is here !!!!!\n"+"nCur="+nCur+" CC="+cc);continue;}
-					System.out.println(iter[nCur]);
-					data[0][nCur][iter[nCur]-1]=cc.lengthBefore;
-					data[1][nCur][iter[nCur]-1]=cc.lengthFromStart;
-					data[2][nCur][iter[nCur]-1]=cc.lengthBefore/(Math.max(0.7,cc.deltaTimeHoursBefore));
-					data[3][nCur][iter[nCur]-1]=cc.lengthFromStart/(Math.max(0.7,cc.deltaTimeHoursFromStart));
-					data[4][nCur][iter[nCur]-1]=cc.nPixels;
-					data[5][nCur][iter[nCur]-1]=cc.surfaceFromStart;
-					iter[nCur]--;
-				}
-				if(ccStart.bestOutgoingActivatedCC()==null)ccStart.goesToTheLeft=2;
-				else if(ccStart.x<ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).x)ccStart.goesToTheLeft=1;
-				else ccStart.goesToTheLeft=0;
-			}
-		}
-		//for(int i=0;i<deltaTimeMax+100;i++)if(iter[i]!=0)IJ.showMessage("WARNING AT RAG in establish, at i="+i+", residual="+nEach[i]);
+		System.out.println("After part 1 : summary. TotLatRootsProcessed="+nTmpTot+" , ko="+nTmpKo+" ok="+nTmpOk);
+		System.out.println("Warns were : "+warns[0]+" "+warns[1]+" "+warns[2]);
+		warns=new int[] {0,0,0};nTmpKo=0;nTmpOk=0;nTmpTot=0;
 
 		
-		//Sort listStart
-		listStart=sortCC(listStart);
+		//Set a rejection flag to all incident and outgoing arcs of component that are not stamped 1 trunk or 2 lateral
+		for (CC cc:graph.vertexSet()){
+			nTmpTot++;
+			if(!cc.trunk && !cc.isLateral) {cc.setOut();nTmpKo++;}
+		}
+		System.out.println("Number of set out's = "+nTmpKo+" over "+nTmpTot);
+		nTmpKo=0;nTmpTot=0;
 		
 		
 		
-		//Compute outlier exclusion based on double sided MADE
-		for(int i=0;i<6;i++)for(int j=0;j<deltaTimeMax+1;j++) {
-			if(nEach[j]==0)continue;
+		//Compute outlier exclusion based on double sided MAD-e
+		System.out.println("-- Outliers Part2 compute median average deviation and process components based on this" );
+		int nExcludeCosOnlyOneNode=0;
+		int nExcludeCosRootTipTooHighInTheImage=0;
+		int nExcludeCosDieEarlyAndIsShort=0;
+		int nExcludeBeforeStartingStats=0;
+
+		ArrayList<CC>listStart=new ArrayList<CC>();
+		for (CC ccStart:graph.vertexSet()) if(ccStart.isLatStart ) listStart.add(ccStart);
+		for (CC ccStart:listStart) {
+			CC ccLast=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1);				
+			nTmpTot++;
+			boolean debug=false && ccStart.day==11 && ccStart.n==20;
+			String rejectionCause="";
+			rejectionCause+="\n\n ** Computing outlier exclusion on lateral starting at "+ccStart+"\n";
+			if(ccStart.nonValidLatStart) {
+				nExcludeBeforeStartingStats++;
+				rejectionCause+=" Rejected in part 1 ! ";
+				continue;
+			}
+			
+			//Testing a potential lonely node
+			if(ccStart.pathFromStart.size()==1) {
+				ccStart.nonValidLatStart=true;
+				nExcludeCosOnlyOneNode++;
+				rejectionCause+=" Have a single node ! ";
+				continue;
+			}
+
+			//Testing a potential weird root at top of tissue that goes to the top
+			if(ccLast.y<minFinalDepthForAcceptingLatRoot /*&& (ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).y<ccStart.y)*/) {
+				ccStart.nonValidLatStart=true;
+				nExcludeCosRootTipTooHighInTheImage++;
+				rejectionCause+=" Finish too high in the image ! "+ccLast.y;
+				continue;
+			}
+
+			
+			/*Testing a potential false start of lateral based on the alternance left/right
+			for(CC ccs:listStart) {
+				if(ccs==ccStart || ccStart.nonValidLatStart)continue;//Not anymore active. In fact this have no meaning
+				if(ccs.goesToTheLeft<2 && ccStart.goesToTheLeft<2 && ccs.goesToTheLeft!=ccStart.goesToTheLeft)continue;
+				if(ccs.euclidianDistanceToCC(ccStart)<=pph.getMinDistanceBetweenLateralInitiation()) {
+					int curSurf=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).surfaceFromStart;
+					int otherSurf=ccs.pathFromStart.get(ccs.pathFromStart.size()-1).surfaceFromStart;
+					if(otherSurf>=curSurf && curSurf<pph.getMinLateralStuckedToOtherLateral()) {
+						ccStart.nonValidLatStart=true;
+						
+						rejectionCause+=" this goes "+ccStart.goesToTheLeft+" is starting at proximity of a bigger root that is \n"+ccs+" with goes="+ccs.goesToTheLeft;
+					}
+				}
+			}
+			*/
+
+			//			Is this lateral died, having no footprint on the last day and being only one component long ?					
+			if(ccLast.day<(dMax)) {
+				if(ccStart.pathFromStart.size()<2) {
+					nExcludeCosDieEarlyAndIsShort++;
+					rejectionCause+="Ending too early (have no dayMax footprint), and is only one component long";
+					ccStart.nonValidLatStart=true;
+					continue;
+				}
+			}
+				
+
+			//The same, but can the end of the root being hidden under another lateral ? We check the global topological context
+			if(ccLast.day<(dMax)) {
+				boolean couldBeIncident=false;
+				if(debug)System.out.println("Debug : setting false incidence");
+				int nAddFirst=0;
+				int nAddSecond=0;
+
+				//Step 3-1 : Test if it hides below a root that was there in first. Check neighbouring comp. before (c1), if from another branch, and their parent and son (c2).
+				ArrayList<CC>incidencialCC=new ArrayList<CC>();
+				ArrayList<Double>incidencialCost=new ArrayList<Double>();
+				ArrayList<CC>ccToTest=new ArrayList<CC>();
+				for(ConnectionEdge edge1 : graph.incomingEdgesOf(ccLast)) {
+					CC c1=edge1.source;//A CC neighbour of ccLast that have its apparition day lower (been there in first)
+					if(c1.isLateral && c1.lateralStamp==ccLast.lateralStamp)continue;
+					if(c1.isLateral && c1.lateralStamp != ccLast.lateralStamp) ccToTest.add(c1);
+					
+					for(ConnectionEdge edge2 : graph.incomingEdgesOf(c1)) {
+						CC c2=edge2.source;
+						if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
+						if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
+					}
+					for(ConnectionEdge edge2 : graph.outgoingEdgesOf(c1)) {
+						CC c2=edge2.target;
+						if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
+						if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
+					}
+				}
+				System.out.println("After 3-1, ccToTest len="+ccToTest.size());
+				
+				
+				//Step 3-2 : Test if it hides below a root that arrived at the same time. Check neighbouring comp. after (c1), if from another branch, and their parent and son (c2).
+				for(ConnectionEdge edge1 : graph.outgoingEdgesOf(ccLast)) {
+					CC c1=edge1.target;
+					if(c1.isLateral && c1.lateralStamp==ccLast.lateralStamp)continue;
+					if(c1.isLateral && c1.lateralStamp != ccLast.lateralStamp) ccToTest.add(c1);
+					for(ConnectionEdge edge2 : graph.incomingEdgesOf(c1)) {
+						CC c2=edge2.source;
+						if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
+						if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
+					}
+					for(ConnectionEdge edge2 : graph.outgoingEdgesOf(c1)) {
+						CC c2=edge2.target;
+						if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
+						if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
+					}
+				}
+				System.out.println("After 3-2, ccToTest len="+ccToTest.size());
+
+				
+				//Step 3-3 : FOr all possible collected CC to test, compute the cost, based on orientation, and reject if it is waaay too long. If not, add it to list incidencial 
+				for(CC ccTest : ccToTest) {
+					double cost=-prodScal(ccLast.bestIncomingActivatedCC(), ccLast, ccLast, ccTest);
+					if(ccLast.euclidianDistanceToCC(ccTest)>2*pph.getMaxSpeedLateral())continue;
+					incidencialCC.add(ccTest);
+					incidencialCost.add(cost);
+				}
+				couldBeIncident=incidencialCC.size()>0;
+				
+				//Reject the possible incident that could not be incident, and which are smaller than 3*average root speed
+				if(true || (! couldBeIncident)) {//TODO : incidence lookup desactivated
+					if(ccLast.lengthFromStart<(3*pph.getMeanSpeedLateral())) {
+						ccStart.nonValidLatStart=true;
+						rejectionCause+=" reject cause ending too early, and too small (3*pph.meanSpeed)";
+					}
+				}
+				else {//Possible Incidence, deactivated for the moment
+					//Find the best possible incidence, and check if it is concluding
+					CC bestIncidenceCC=null;
+					double lowerCost=1000000;
+					for(int i=0;i<incidencialCost.size();i++) {
+						if(incidencialCost.get(i)<lowerCost) {
+							bestIncidenceCC=incidencialCC.get(i);
+							lowerCost=incidencialCost.get(i);
+						}
+					}
+				
+					//Locate if at left or right side of growing incidence
+					double []v1=new double[] {bestIncidenceCC.x-bestIncidenceCC.bestIncomingActivatedCC().x, -bestIncidenceCC.y+bestIncidenceCC.bestIncomingActivatedCC().y, 0};
+					double []v2=new double[] {bestIncidenceCC.x-ccLast.x,-bestIncidenceCC.y+ccLast.y,0};
+					double []z=new double[] {0,0,1};
+					double []toLeft=TransformUtils.vectorialProduct(z, v1);
+					toLeft=TransformUtils.normalize(toLeft);
+					double sign=TransformUtils.scalarProduct(toLeft,v2);
+					boolean arrivesFromLeft=(sign<0);//Inverted because y axis points to the bottom
+
+					//Make best estimation possible of speed
+					double dt=ccLast.hour-ccLast.bestIncomingActivatedCC().bestIncomingActivatedCC().hour;
+					if(dt<=0)dt=0.7*pph.typicalHourDelay;
+					double dl=(ccLast.lengthBefore+ccLast.bestIncomingActivatedCC().lengthBefore);
+					double speed=dl/dt;
+					
+					//Estimate expected length in more
+					double additionalLenExpected=speed*(hours[dMax-1]-hours[ccLast.day]+0.5*(pph.typicalHourDelay));
+					double wayStill=additionalLenExpected;
+					CC lastIncidenceCC=bestIncidenceCC.ccLateralStart.pathFromStart.get(bestIncidenceCC.ccLateralStart.pathFromStart.size()-1);
+					CC ccToAdd=null;
+					
+					
+					//Estimate position
+					if(wayStill<=ccLast.euclidianDistanceToCC(bestIncidenceCC)){
+						//If before join
+						double []v=new double[] {bestIncidenceCC.x-ccLast.x,bestIncidenceCC.y-ccLast.y,0};
+						v=TransformUtils.normalize(v);
+						if(debug)System.out.println("Vect directeur="+v[0]+" "+v[1]);
+						v=TransformUtils.multiplyVector(v, wayStill);
+						Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (ccLast.x+v[0]))),(int)Math.min(Ymax,Math.max(0, (ccLast.y+v[1]))),1,1);
+						ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
+					}
+					else if(wayStill>=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+lastIncidenceCC.lengthFromStart){
+						wayStill-=(ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+lastIncidenceCC.lengthFromStart);
+						//If longer than incidence one
+						double[]vectDir=new double[] {lastIncidenceCC.x-lastIncidenceCC.bestIncomingActivatedCC().x,lastIncidenceCC.y-lastIncidenceCC.bestIncomingActivatedCC().y,0};
+						vectDir=TransformUtils.normalize(vectDir);
+						double []vectRab=TransformUtils.multiplyVector(vectDir, wayStill);
+						double[]vectToNewLat;
+						if(arrivesFromLeft)vectToNewLat=toLeft;
+						else vectToNewLat=TransformUtils.multiplyVector(toLeft, -1);
+						vectToNewLat[1]=-vectToNewLat[1];
+						double estimateRay=lastIncidenceCC.nPixels*2.0/lastIncidenceCC.lengthBefore;
+						if(estimateRay>3 || estimateRay<=0)estimateRay=3;
+						vectToNewLat=TransformUtils.multiplyVector(vectToNewLat, estimateRay);
+						vectToNewLat=TransformUtils.vectorialAddition(vectToNewLat, vectRab);
+						Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (lastIncidenceCC.x+vectToNewLat[0]))),(int)Math.min(Ymax,Math.max(0, (lastIncidenceCC.y+vectToNewLat[1]))),1,1);
+						ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
+					}
+					else {
+						//A point somewhere between bestIncidenceCC and lastIncidenceCC
+						//Determine before and after
+						CC ccBef=null;CC ccAft=null;
+						CC ccTmp=bestIncidenceCC;
+						CC ccOld=bestIncidenceCC;
+						while(ccBef==null) {
+							ccOld=ccTmp;
+							ccTmp=ccTmp.bestOutgoingActivatedCC();
+							double lenBef=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccOld.lengthFromStart;
+							double lenAft=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccTmp.lengthFromStart;
+							if(wayStill<lenAft && wayStill>lenBef) {
+								ccBef=ccOld;
+								ccAft=ccTmp;
+							}
+						}
+						wayStill-=(ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccBef.lengthFromStart);
+						double[]vectDir=new double[] {ccAft.x-ccBef.x,ccAft.y-ccBef.y,0};
+						vectDir=TransformUtils.normalize(vectDir);
+						double[]vectPos=TransformUtils.multiplyVector(vectDir, wayStill);
+						vectPos=TransformUtils.vectorialAddition(vectPos,new double[] {ccBef.x,ccBef.y,0});
+						double[]vectToNewLat;
+						if(arrivesFromLeft)vectToNewLat=toLeft;
+						else vectToNewLat=TransformUtils.multiplyVector(toLeft, -1);
+						vectToNewLat[1]=-vectToNewLat[1];
+						double estimateRay=ccBef.nPixels/(2.0*ccBef.lengthBefore);
+						if(estimateRay>3 || estimateRay<=0)estimateRay=3;
+						vectToNewLat=TransformUtils.multiplyVector(vectToNewLat, estimateRay);
+						vectPos=TransformUtils.vectorialAddition(vectPos, vectToNewLat);
+						Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (vectPos[0]))),(int)Math.min(Ymax,Math.max(0, (vectPos[1]))),1,1);
+						ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
+					}
+					//Actualize it.
+					graph.addVertex(ccToAdd);
+					ccToAdd.ccLateralStart=ccLast.ccLateralStart;
+					ccLast.ccLateralStart.pathFromStart.add(ccToAdd);
+					ConnectionEdge edge=new ConnectionEdge(ccLast.x*0.5+ccToAdd.x*0.5, ccLast.y*0.5+ccToAdd.y*0.5, 0, ccLast, ccToAdd,0 ,0 );
+					edge.activated=true;
+					edge.hidden=true;
+					graph.addEdge(ccLast, ccToAdd,edge);
+				}
+			}
+		}
+	}
+	
+	
+	public static void detectSubtleOutliersBasedOnStatistics(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus sampleImgForDims,PipelineParamHandler pph,int indexBox) {
+		for(int i=0;i<5;i++)System.out.println();
+		System.out.println("\n-------------------------------------------------------\nStarting outlier detection based on statistics\n-------------------------------------------------------");
+
+		double[]hours=pph.getHours(indexBox);		
+		int Xmax=sampleImgForDims.getWidth()-1;
+		int Ymax=sampleImgForDims.getHeight()-1;
+		double nbMADforOutlierRejection=25;//Number of median absolute deviation around the median that is considered outlying
+		int dMax=getDayMax(graph);
+		int deltaTimeMax=dMax;
+		int []nEach=new int[deltaTimeMax];//This tab will count organs lying in cases by apparition timestep
+		int []iter=new int[deltaTimeMax];
+		double ratioMinVisible=0.4;//If a root is visible less than 40 % of its path, we reject it
+		
+		int nLateral=0;
+		int nAccepted=1;//Tf ? 0 ?
+		int nRejected=1;
+		int nTmpTot=0;
+		int nTmpKo=0;
+		int nTmpOk=0;
+		int []warns=new int[] {0,0,0};
+		ArrayList<CC>listStart=new ArrayList<CC>();
+		for (CC ccStart:graph.vertexSet()) if(ccStart.isLatStart && (!ccStart.nonValidLatStart)) listStart.add(ccStart);
+
+		
+		//Collect data for computing statistics over nodes, binned according to time latence from lateral initiation
+		System.out.println("\n\n-- Outliers Part3 collect statistics over nodes" );
+		//Prepare data structures to collect population values
+		for(CC ccStart : listStart ) {				
+			for(CC cc : ccStart.pathFromStart ) {				
+				int nCur=(int) (cc.deltaTimeFromStart);
+				nEach[nCur]++;
+			}
+		}
+		for(int i=0;i<deltaTimeMax;i++) iter[i]=nEach[i];
+		double[][][]data=new double[6][deltaTimeMax+1][];//collected data for every node : lenbefore,lentotal,speedbef,speedtot,surfthis,surftot
+		double[][][]stats=new double[6][deltaTimeMax+1][3];//lenbef,lentot,speedbef,speedtot,surfthis,surftot
+		for(int i=0;i<6;i++)for(int j=0;j<deltaTimeMax;j++)data[i][j]=new double[nEach[j]];		
+
+		
+		//Effectively read data along the root path
+		for(CC ccStart : listStart ) {				
+			for(CC cc : ccStart.pathFromStart ) {				
+				int nCur=(int) (cc.deltaTimeFromStart);
+				data[0][nCur][iter[nCur]-1]=cc.lengthBefore;
+				data[1][nCur][iter[nCur]-1]=cc.lengthFromStart;
+				data[2][nCur][iter[nCur]-1]=cc.lengthBefore/(Math.max(0.7*pph.typicalHourDelay,cc.deltaTimeHoursBefore));
+				data[3][nCur][iter[nCur]-1]=cc.lengthFromStart/(Math.max(0.7*pph.typicalHourDelay,cc.deltaTimeHoursFromStart));//Security in case there is no delta (=0)
+				data[4][nCur][iter[nCur]-1]=cc.nPixels;
+				data[5][nCur][iter[nCur]-1]=cc.surfaceFromStart;
+				iter[nCur]--;
+			}
+		}
+			
+		//Compute the Mad-e statistics
+		for(int i=0;i<6;i++)for(int j=0;j<deltaTimeMax;j++) {
+			if(nEach[j]==0)continue;//No object in this bin
 			stats[i][j]=VitimageUtils.MADeStatsDoubleSided(data[i][j], null);	
 			if(stats[i][j][1]==stats[i][j][0])stats[i][j][1]=stats[i][j][0]-VitimageUtils.EPSILON;
 			if(stats[i][j][2]==stats[i][j][0])stats[i][j][2]=stats[i][j][0]+VitimageUtils.EPSILON;
-			//System.out.println("STATS "+i+" - "+j+" : "+"["+stats[i][j][0]+","+stats[i][j][1]+","+stats[i][j][2]);
 		}
 		double[]tempVals=new double[6];
 		double[]tempStd=new double[6];
 		for (CC ccStart:listStart) {
-			if(true) {
-				boolean debug=ccStart.day==11 && ccStart.n==20;
-				String rejectionCause="";
-				rejectionCause+="\n\n ** Computing outlier exclusion on lateral starting at "+ccStart+"\n";
+			CC ccLast=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1);				
+			nTmpTot++;
+			boolean debug=false && ccStart.day==11 && ccStart.n==20;
+			String rejectionCause="";
+			rejectionCause+="\n\n ** Computing outlier exclusion on lateral starting at "+ccStart+"\n";
+			
+			//Testing statistics
+			for(CC cc : ccStart.pathFromStart ) {				
+				tempVals=new double[] {
+						cc.lengthBefore,
+						cc.lengthFromStart,
+						cc.lengthBefore/(Math.max(0.7*pph.typicalHourDelay,cc.deltaTimeHoursBefore)),
+						cc.lengthFromStart/(Math.max(0.7*pph.typicalHourDelay,cc.deltaTimeHoursFromStart)),
+						cc.nPixels,
+						cc.surfaceFromStart};
 				
-				//Testing a potential lonely node
-				if(ccStart.pathFromStart.size()==1)ccStart.nonValidLatStart=true;
-
-				//Testing a potential weird root at top of tissue that goes to the top
-				if(ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).y<300 && (ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).y<ccStart.y))ccStart.nonValidLatStart=true;
-
-				
-				//Testing a potential false start of lateral
-				for(CC ccs:listStart) {
-					if(ccs==ccStart || ccStart.nonValidLatStart)continue;
-					if(ccs.goesToTheLeft<2 && ccStart.goesToTheLeft<2 && ccs.goesToTheLeft!=ccStart.goesToTheLeft)continue;
-					if(ccs.euclidianDistanceToCC(ccStart)<=pph.getMinDistanceBetweenLateralInitiation()) {
-						int curSurf=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1).surfaceFromStart;
-						int otherSurf=ccs.pathFromStart.get(ccs.pathFromStart.size()-1).surfaceFromStart;
-						if(otherSurf>=curSurf && curSurf<pph.getMinLateralStuckedToOtherLateral()) {
-							ccStart.nonValidLatStart=true;
-							
-							rejectionCause+=" this goes "+ccStart.goesToTheLeft+" is starting at proximity of a bigger root that is \n"+ccs+" with goes="+ccs.goesToTheLeft;
-						}
+				int nCur= (cc.deltaTimeFromStart);
+			
+				rejectionCause+="Stats at node "+nCur+" "+cc.x+","+cc.y+" : ";
+				for(int i=0;i<6;i++) {
+					if(nCur<2 || cc==ccLast || i==0 || i==2) {//TODO  check these exclusion cases. Could be good to make some statistics over
+						tempStd[i]=-1;
+						continue;
+					}
+					if(stats[i][nCur][0]>tempVals[i])tempStd[i]=-1;
+					else tempStd[i]= (tempVals[i]-stats[i][nCur][0])/(stats[i][nCur][2]-stats[i][nCur][0]);//Compute the number of median average dev. upon the median
+				}
+				for(int i=0;i<6;i++)rejectionCause+=(" ["+tempStd[i]+"] ");
+				rejectionCause+="\n";
+				for(int i=0;i<6;i++) {
+					if(tempStd[i]>=nbMADforOutlierRejection) {
+						rejectionCause+=("\n Rejection at node "+nCur+" for criterion "+i+" with nb MADe= "+tempStd[i]);
+						ccStart.nonValidLatStart=true;
 					}
 				}
-							
-				CC ccs=ccStart;
-				if(ccs.nonValidLatStart==false) {
-					CC ccLast=ccs.pathFromStart.get(ccs.pathFromStart.size()-1);
-					if(ccLast.day<(dMax)) {
-	//					System.out.println("\nDebug : tracking lateral false stop from"+ccLast);
-						
-						if(ccStart.pathFromStart.size()<2) {
-							rejectionCause+="Ending too early, and too small";
-							ccStart.nonValidLatStart=true;
-	//						System.out.println("B REJECT Concluding too small");
-							continue;
-						}
-
-						
-						//Lateral does not grow until end of observation sequence. Is it hidden below another lateral ?
-						//Is this root incident to another lateral ?
-						boolean incident=false;
-						if(debug)System.out.println("Debug : setting false incidence");
-						
-						ArrayList<CC>incidencialCC=new ArrayList<CC>();
-						ArrayList<Double>incidencialCost=new ArrayList<Double>();
-						ArrayList<CC>ccToTest=new ArrayList<CC>();
-						for(ConnectionEdge edge1 : graph.incomingEdgesOf(ccLast)) {
-							CC c1=edge1.source;
-							if(debug)System.out.println("N="+ccToTest.size());
-							if(debug)System.out.println("Processing 1 "+c1);
-							if(c1.isLateral && c1.lateralStamp==ccLast.lateralStamp)continue;
-							if(c1.isLateral && c1.lateralStamp != ccLast.lateralStamp) ccToTest.add(c1);
-							for(ConnectionEdge edge2 : graph.incomingEdgesOf(c1)) {
-								CC c2=edge2.source;
-								if(debug)System.out.println("N="+ccToTest.size());
-								if(debug)System.out.println("Processing 1-1 "+c2);
-								if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
-								if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
-							}
-							for(ConnectionEdge edge2 : graph.outgoingEdgesOf(c1)) {
-								CC c2=edge2.target;
-								if(debug)System.out.println("N="+ccToTest.size());
-								if(debug)System.out.println("Processing 1-1 "+c2);
-								if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
-								if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
-							}
-						}
-						for(ConnectionEdge edge1 : graph.outgoingEdgesOf(ccLast)) {
-							CC c1=edge1.target;
-							if(debug)System.out.println("N="+ccToTest.size());
-							if(debug)System.out.println("Processing 2 "+c1);
-							if(c1.isLateral && c1.lateralStamp==ccLast.lateralStamp)continue;
-							if(c1.isLateral && c1.lateralStamp != ccLast.lateralStamp) ccToTest.add(c1);
-							for(ConnectionEdge edge2 : graph.incomingEdgesOf(c1)) {
-								CC c2=edge2.source;
-								if(debug)System.out.println("N="+ccToTest.size());
-								if(debug)System.out.println("Processing 2-2 "+c2);
-								if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
-								if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
-							}
-							for(ConnectionEdge edge2 : graph.outgoingEdgesOf(c1)) {
-								CC c2=edge2.target;
-								if(debug)System.out.println("N="+ccToTest.size());
-								if(debug)System.out.println("Processing 2-2 "+c2);
-								if(c2.isLateral && c2.lateralStamp==ccLast.lateralStamp)continue;
-								if(c2.isLateral && c2.lateralStamp != ccLast.lateralStamp) ccToTest.add(c2);
-							}
-						}
-						for(CC cc : ccToTest) {
-							double cost=-prodScal(ccLast.bestIncomingActivatedCC(), ccLast, ccLast, cc);
-							if(ccLast.euclidianDistanceToCC(cc)>2*pph.getMaxSpeedLateral())continue; //TODO : here it is hot toooooooo
-							incidencialCC.add(cc);
-							incidencialCost.add(cost);
-						}
-						incident=incidencialCC.size()>0;
-	//					System.out.println("Incidence ? "+incident);
-						
-						//No incidence
-						int minLenForBranchThatStop=30;//TODO : makes it depend on geomtry
-						if(! incident) {
-							CC ccl=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1);
-							if(ccl.lengthFromStart<minLenForBranchThatStop) {
-								rejectionCause+="Ending too early, and too small";
-								ccStart.nonValidLatStart=true;
-								rejectionCause+="A REJECT Concluding too small";
-							}
-						}
-						else {//Incidence
-							//Find the best possible incidence
-		//					System.out.println("Concluding incidence");
-							CC bestIncidenceCC=null;
-							double lowerCost=1000000;
-							for(int i=0;i<incidencialCost.size();i++) {
-								if(incidencialCost.get(i)<lowerCost) {
-									bestIncidenceCC=incidencialCC.get(i);
-									lowerCost=incidencialCost.get(i);
-								}
-							}
-						
-							//Locate if at left or right side of growing incidence
-							double []v1=new double[] {bestIncidenceCC.x-bestIncidenceCC.bestIncomingActivatedCC().x, -bestIncidenceCC.y+bestIncidenceCC.bestIncomingActivatedCC().y, 0};
-							double []v2=new double[] {bestIncidenceCC.x-ccLast.x,-bestIncidenceCC.y+ccLast.y,0};
-							double []z=new double[] {0,0,1};
-							double []toLeft=TransformUtils.vectorialProduct(z, v1);
-							toLeft=TransformUtils.normalize(toLeft);
-							double sign=TransformUtils.scalarProduct(toLeft,v2);
-							boolean arrivesFromLeft=(sign<0);//Inverted because y axis points to the bottom
-
-							//Make best estimation possible of speed
-							double dt=ccLast.hour-ccLast.bestIncomingActivatedCC().bestIncomingActivatedCC().hour;
-							if(dt<=0)dt=0.7*pph.typicalHourDelay;
-							double dl=(ccLast.lengthBefore+ccLast.bestIncomingActivatedCC().lengthBefore);
-							double speed=dl/dt;
-							
-							//Estimate expected length in more
-							double additionalLenExpected=speed*(hours[dMax-1]-hours[ccLast.day]+0.5*(pph.typicalHourDelay));
-							double wayStill=additionalLenExpected;
-							CC lastIncidenceCC=bestIncidenceCC.ccLateralStart.pathFromStart.get(bestIncidenceCC.ccLateralStart.pathFromStart.size()-1);
-							CC ccToAdd=null;
-							
-							
-							//Estimate position
-							if(wayStill<=ccLast.euclidianDistanceToCC(bestIncidenceCC)){
-								//If before join
-								double []v=new double[] {bestIncidenceCC.x-ccLast.x,bestIncidenceCC.y-ccLast.y,0};
-								v=TransformUtils.normalize(v);
-								if(debug)System.out.println("Vect directeur="+v[0]+" "+v[1]);
-								v=TransformUtils.multiplyVector(v, wayStill);
-								Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (ccLast.x+v[0]))),(int)Math.min(Ymax,Math.max(0, (ccLast.y+v[1]))),1,1);
-								ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
-							}
-							else if(wayStill>=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+lastIncidenceCC.lengthFromStart){
-								wayStill-=(ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+lastIncidenceCC.lengthFromStart);
-								//If longer than incidence one
-								double[]vectDir=new double[] {lastIncidenceCC.x-lastIncidenceCC.bestIncomingActivatedCC().x,lastIncidenceCC.y-lastIncidenceCC.bestIncomingActivatedCC().y,0};
-								vectDir=TransformUtils.normalize(vectDir);
-								double []vectRab=TransformUtils.multiplyVector(vectDir, wayStill);
-								double[]vectToNewLat;
-								if(arrivesFromLeft)vectToNewLat=toLeft;
-								else vectToNewLat=TransformUtils.multiplyVector(toLeft, -1);
-								vectToNewLat[1]=-vectToNewLat[1];
-								double estimateRay=lastIncidenceCC.nPixels*2.0/lastIncidenceCC.lengthBefore;
-								if(estimateRay>3 || estimateRay<=0)estimateRay=3;
-								vectToNewLat=TransformUtils.multiplyVector(vectToNewLat, estimateRay);
-								vectToNewLat=TransformUtils.vectorialAddition(vectToNewLat, vectRab);
-								Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (lastIncidenceCC.x+vectToNewLat[0]))),(int)Math.min(Ymax,Math.max(0, (lastIncidenceCC.y+vectToNewLat[1]))),1,1);
-								ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
-							}
-							else {
-								//A point somewhere between bestIncidenceCC and lastIncidenceCC
-								//Determine before and after
-								CC ccBef=null;CC ccAft=null;
-								CC ccTmp=bestIncidenceCC;
-								CC ccOld=bestIncidenceCC;
-								while(ccBef==null) {
-									ccOld=ccTmp;
-									ccTmp=ccTmp.bestOutgoingActivatedCC();
-									double lenBef=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccOld.lengthFromStart;
-									double lenAft=ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccTmp.lengthFromStart;
-									if(wayStill<lenAft && wayStill>lenBef) {
-										ccBef=ccOld;
-										ccAft=ccTmp;
-									}
-								}
-								wayStill-=(ccLast.euclidianDistanceToCC(bestIncidenceCC)-bestIncidenceCC.lengthFromStart+ccBef.lengthFromStart);
-								double[]vectDir=new double[] {ccAft.x-ccBef.x,ccAft.y-ccBef.y,0};
-								vectDir=TransformUtils.normalize(vectDir);
-								double[]vectPos=TransformUtils.multiplyVector(vectDir, wayStill);
-								vectPos=TransformUtils.vectorialAddition(vectPos,new double[] {ccBef.x,ccBef.y,0});
-								double[]vectToNewLat;
-								if(arrivesFromLeft)vectToNewLat=toLeft;
-								else vectToNewLat=TransformUtils.multiplyVector(toLeft, -1);
-								vectToNewLat[1]=-vectToNewLat[1];
-								double estimateRay=ccBef.nPixels/(2.0*ccBef.lengthBefore);
-								if(estimateRay>3 || estimateRay<=0)estimateRay=3;
-								vectToNewLat=TransformUtils.multiplyVector(vectToNewLat, estimateRay);
-								vectPos=TransformUtils.vectorialAddition(vectPos, vectToNewLat);
-								Rectangle r=new Rectangle((int)Math.min(Xmax,Math.max(0, (vectPos[0]))),(int)Math.min(Ymax,Math.max(0, (vectPos[1]))),1,1);
-								ccToAdd=new CC(dMax,hours[dMax-1],maxCCIndexOfDay(graph, dMax),new Roi(r),graph);
-							}
-							//Actualize it.
-							graph.addVertex(ccToAdd);
-							ccToAdd.ccLateralStart=ccLast.ccLateralStart;
-							ccLast.ccLateralStart.pathFromStart.add(ccToAdd);
-							ConnectionEdge edge=new ConnectionEdge(ccLast.x*0.5+ccToAdd.x*0.5, ccLast.y*0.5+ccToAdd.y*0.5, 0, ccLast, ccToAdd,0 ,0 );
-							edge.activated=true;
-							edge.hidden=true;
-							graph.addEdge(ccLast, ccToAdd,edge);
-						}
-					}
-				}
-
-				
-				
-				
-				
-				
-				//Testing statistics
-				for(CC cc : ccStart.pathFromStart ) {				
-					tempVals=new double[] {
-							cc.lengthBefore,cc.lengthFromStart,cc. lengthBefore/(Math.max(0.7,cc.deltaTimeHoursBefore)),
-							cc.lengthFromStart/(Math.max(0.7,cc.deltaTimeHoursFromStart)),cc.nPixels,cc.surfaceFromStart};
-					
-					int nCur=(int) (cc.deltaTimeHoursFromStart/pph.typicalHourDelay);
-					if(nCur>data.length-1)nCur=data.length-1;
-				
-					boolean fillDebug=(ccStart.day==7 && ccStart.n==4);
-					rejectionCause+="Stats at node "+nCur+" "+cc.x+","+cc.y+" : ";
-					for(int i=0;i<6;i++) {
-						if(nCur<2 || i==0 || i==2) {
-							tempStd[i]=-1;
-							continue;
-						}
-						if(stats[i][nCur][0]>tempVals[i])tempStd[i]=-1;
-						else tempStd[i]= (tempVals[i]-stats[i][nCur][0])/(stats[i][nCur][2]-stats[i][nCur][0]);
-						if(fillDebug)rejectionCause+=("DEBUG "+i+" : "+tempVals[i]+" vers "+stats[i][nCur][0]+" - "+stats[i][nCur][1]+" - "+stats[i][nCur][2]);
-					}
-					for(int i=0;i<6;i++)rejectionCause+=(" ["+tempStd[i]+"] ");
-					rejectionCause+="\n";
-					if(cc !=ccStart.pathFromStart.get(ccStart.pathFromStart.size()-1 ) )for(int i=0;i<6;i++) {
-						if(tempStd[i]>=nbMADforOutlierRejection) {
-							rejectionCause+=("\n Rejection at node "+nCur+" for cause "+i+" = "+tempStd[i]);
-							ccStart.nonValidLatStart=true;
-						}
-					}
-				}					
-				if(ccStart.nonValidLatStart) {
-					nRejected++;
-					System.out.println(rejectionCause);
-				}
-				else nAccepted++;
+			}					
+			if(ccStart.nonValidLatStart) {
+				nRejected++;
+				System.out.println(rejectionCause);
 			}
+			else nAccepted++;
 		}
-		//tabDel=new ArrayList<CC>();
 		for (CC ccStart:graph.vertexSet()) {
 			if(ccStart.isLatStart) {
 				if(ccStart.nonValidLatStart)for(CC c:ccStart.pathFromStart)c.setOut();// tabDel.add(ccStart);
 			}
 		}
-//		for(CC cc:tabDel)cc.lightOffLateralRoot();
+		System.out.println("\n\nEnd of statistics MADE.");
 		System.out.println("Accepted="+nAccepted);
-		System.out.println("Rejected="+nRejected);
+		System.out.println("Rejected="+nRejected+"\n\n");
 	}
 						
 
@@ -2113,10 +2187,6 @@ public class RegionAdjacencyGraphPipeline {
 
 	
 	
-	public static int MIN_SIZE_CC=5;
-	static double PENALTY_COST=0.5;
-	public static final boolean DO_DISTANCE=true;
-	public static final boolean DO_TIME=false;
 	
 	public static int maxCCIndexOfDay(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,int d) {
 		int max=0;
@@ -2177,8 +2247,7 @@ public class RegionAdjacencyGraphPipeline {
 		reconnectDisconnectedBranches_v2(imgDatesTmp,graph,pph,1,true,false);
 
 		if(doDebugImages) writeGraphToFile(graph,new File(outputDataDir,"50_graph_step_5.ser").getAbsolutePath());
-		postProcessOutliers(graph,imgDatesTmp,pph,indexBox);
-
+		postProcessTopology(graph,imgDatesTmp,pph,indexBox);
 		if(doDebugImages) writeGraphToFile(graph,new File(outputDataDir,"50_graph_step_6.ser").getAbsolutePath());
 		if(doDebugImages) writeGraphToFile(graph,new File(outputDataDir,"50_graph.ser").getAbsolutePath());
 
@@ -2282,8 +2351,10 @@ public class RegionAdjacencyGraphPipeline {
 		return max;
 	}
 		
-	public static void postProcessOutliers(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus img,PipelineParamHandler pph,int indexBox) {
-		establishDataFromStartForEachNodeAndExcludeBasedOnStatistics(graph,img,pph,indexBox);
+	public static void postProcessTopology(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,ImagePlus img,PipelineParamHandler pph,int indexBox) {
+		reconnectLateralThatWereThereFromTheStart(graph,img,pph,indexBox);
+		detectObviouslyOutlierOrganAndProlongateIncidentStopped(graph,img,pph,indexBox);
+		detectSubtleOutliersBasedOnStatistics(graph,img,pph,indexBox);
 	}
 		
 	public static SpanningTree<ConnectionEdge> computeMinimumSpanningTreeGraph(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph) {		
@@ -2504,276 +2575,4 @@ public class RegionAdjacencyGraphPipeline {
 	
 	
 	
-	
-
-/*
-	public static double weightingOfPossibleHiddenEdge(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug,PipelineParamHandler pph) {
-		if(debug)System.out.println("\nH021 weighting with "+ccStop);
-		if(ccStop.day>ccStart.day)return PENALTY_COST;
-		CC ccStartNext=ccStart.bestOutgoingActivatedCC();
-		if(ccStartNext !=null && ccStartNext.trunk)ccStartNext=null;
-		CC ccStopPrevious=ccStop.bestIncomingActivatedCC();
-		if(ccStopPrevious !=null && ccStopPrevious.trunk)ccStopPrevious=null;
-
-		//CONNECTED
-		double connectedWeight=0;
-		//if a way does not exist
-		int way=areConnectedByPathOfCC(graph,ccStop,ccStart,debug);
-		if(way<0)connectedWeight=PENALTY_COST;
-		else connectedWeight=way*2;
-		if(debug)System.out.println("H022 establishing connexity weight="+connectedWeight);
-
-		
-		//ESTIMATE SPEED AND ANGULAR CONFORMATION
-		double speed=pph.getTypicalSpeed();
-		double angularWeight=0;
-		if(ccStartNext!=null && ccStopPrevious !=null) {
-			double speedStop=ccStop.euclidianDistanceToCC(ccStopPrevious)/(Math.min (1,ccStop.day-ccStopPrevious.day));
-			double speedStart=ccStart.euclidianDistanceToCC(ccStartNext)/(Math.min (1,ccStartNext.day-ccStart.day));
-			speed=0.5*(speedStart+speedStop);
-			angularWeight-=prodScal(ccStopPrevious,ccStop,ccStart,ccStartNext);
-			angularWeight-=prodScal(ccStopPrevious,ccStartNext,ccStop,ccStart);
-			angularWeight-=prodScal(ccStopPrevious,ccStop,ccStop,ccStart);
-			angularWeight-=prodScal(ccStop,ccStart,ccStart,ccStartNext);
-		}
-		else if(ccStartNext!=null){
-			double speedStart=ccStart.euclidianDistanceToCC(ccStartNext)/(Math.min (1,ccStartNext.day-ccStart.day));
-			speed=0.5*(speedStart+pph.getTypicalSpeed());
-			angularWeight-=prodScal(ccStop,ccStart,ccStart,ccStartNext)*4;
-		}
-		else if(ccStopPrevious!=null){
-			double speedStop=ccStop.euclidianDistanceToCC(ccStopPrevious)/(Math.min (1,ccStop.day-ccStopPrevious.day));
-			speed=0.5*(speedStop+pph.getTypicalSpeed());
-			angularWeight-=prodScal(ccStopPrevious,ccStop,ccStop,ccStart)*4;
-		}
-		angularWeight*=4;
-		if(debug)System.out.println("Estimated speed="+speed+" and angweight="+angularWeight);
-		
-
-		//DISTANCE Is the pathway length likely ?
-		double deltaDay=ccStart.day-ccStop.day;
-		if (deltaDay<=0)deltaDay=0.75;
-		double expectedDistance=speed*(deltaDay);//TODO : here is a delta day
-		double actualDistance=ccStop.euclidianDistanceToCC(ccStart);
-		if(debug)System.out.println("H026 actualDist="+actualDistance);
-		if(debug)System.out.println("H026 expectedDist="+expectedDistance);
-		double distanceWeight=3*((1-VitimageUtils.similarity(expectedDistance, actualDistance))*deltaDay+Math.abs(actualDistance-expectedDistance)/(deltaDay*expectedDistance));
-		if(debug)System.out.println("H026 distweight="+distanceWeight);
-
-		
-		//OVERALL ORIENTATION Is it pointing downwards ?
-		double[]vectStart=new double[] {ccStart.x(),ccStart.y(),0};
-		double[]vectStop=new double[] {ccStop.x(),ccStop.y(),0};
-		double[]vectStopToStart=TransformUtils.vectorialSubstraction(vectStart, vectStop);
-		vectStopToStart=TransformUtils.normalize(vectStopToStart);
-		double orientationWeight=-vectStopToStart[1];
-		if(debug)System.out.println("H027 orientweight="+orientationWeight);
-		double finalWeight=connectedWeight + angularWeight + distanceWeight + orientationWeight;
-		if(debug)System.out.println("H028 finalWeight="+finalWeight);
-		return finalWeight;
 	}
-	*/
-
-	
-	/** 
-	 * Various helpers ----------------------------------------------------------------------------------------------------------------------------------------
-	 //Determine if ccStop and ccStart are connected in the undirected region adjacency graph limited to ccStop, ccStart and older CC
-	public static int areConnectedByPathOfCC(SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,boolean debug) {
-		int Nmax=10000;//ccStart.day-1;
-		for(CC cc: graph.vertexSet()) cc.stamp2=0;			
-		ccStop.stamp2=1;
-		ArrayList<CC>visited=new ArrayList<CC>();
-		ArrayList<CC>toVisit=new ArrayList<CC>();
-		visited.add(ccStop);
-		if(ccStop.bestIncomingActivatedCC()!=null)ccStop.bestIncomingActivatedCC().stamp=1;
-		boolean finished=false;
-		int iter=-1;
-		while(!finished) {
-			iter++;
-			if(debug)System.out.print("iter="+iter+" : "+visited.size());
-			for(int i=0;i<visited.size();i++) {				
-				CC ccTemp=visited.get(i);
-				for(ConnectionEdge edge : graph.outgoingEdgesOf(ccTemp)) {
-					CC ccTrial=edge.target;
-					if( ccTrial.stamp2>0)continue;
-					if (ccTrial.day<1)continue; 
-					if( (ccTrial.day<=Nmax) || (ccTrial==ccStart) ) {
-						toVisit.add(ccTrial);
-						ccTrial.ccPrev=ccTemp;
-						ccTrial.stamp2=1;
-					}
-				}
-				for(ConnectionEdge edge : graph.incomingEdgesOf(ccTemp)) {
-					CC ccTrial=edge.source;
-					if( ccTrial.stamp2>0)continue;
-					if (ccTrial.day<1)continue; 
-					if( (ccTrial.day<=Nmax) || (ccTrial==ccStart) ) {
-						toVisit.add(ccTrial);
-						ccTrial.stamp2=1;
-						ccTrial.ccPrev=ccTemp;
-					}
-				}			
-			}
-			if(toVisit.size()==0)finished=true;
-			if(ccStart.stamp2==1)finished=true;
-			visited=toVisit;
-			toVisit=new ArrayList<CC>();
-		}
-		if(debug) {
-			if(ccStart.stamp2==0)System.out.println("\nPath not found !");
-			else {
-				System.out.println("\nPath found");
-				CC ccT=ccStart;
-				while(ccT!=ccStop) {ccT=ccT.ccPrev;System.out.println(ccT);}
-			}
-		}
-		if(ccStart.stamp2>0)return iter;
-		else return -1;
-	}
-
-	*/
-	
-	/*
-	//Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
-	public static double weightingOfPossibleHiddenEdge_v3(ImagePlus img,SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph,CC ccStop,CC ccStart,PipelineParamHandler pph,boolean debug) {
-		//if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
-		if(ccStop.day>ccStart.day)return PENALTY_COST;
-		if(ccStop==ccStart)return PENALTY_COST;
-		if(ccStop.bestIncomingActivatedCC()==ccStart)return PENALTY_COST;
-		if(ccStart.bestIncomingActivatedCC()==ccStop)return PENALTY_COST;
-		int nStop=1;
-		int nStart=1;
-		CC ccPrec=null;
-		CC ccSuiv=null;
-		
-		if(ccStart.bestOutgoingActivatedCC()==null) {}
-		else {
-			ccSuiv=ccStart.bestOutgoingActivatedCC();
-			nStart=2;
-			if(ccSuiv.bestOutgoingActivatedCC()==null) {}
-			else {
-				ccSuiv=ccSuiv.bestOutgoingActivatedCC();
-				nStart=3;
-			}
-		}
-		if(debug)System.out.println("Nstart="+nStart);
-
-		if(ccStop.bestIncomingActivatedCC()==null) {}
-		else {
-			ccPrec=ccStop.bestIncomingActivatedCC();
-			nStop=2;
-			if(ccPrec.bestIncomingActivatedCC()==null) {}
-			else {
-				ccPrec=ccPrec.bestIncomingActivatedCC();
-				nStop=3;
-			}
-		}
-		if(debug)System.out.println("Nstop="+nStop);
-
-		double valWstop=(nStop==3 ? 1 : (nStop==2 ? 0.5 : 1));
-		double valWstart=(nStart==3 ? 1 : (nStart==2 ? 0.5 : 1));
-		double[]tabW=new double[] {valWstop,valWstart,valWstop,valWstart,1,1,1,1,1,1};
-		double[]tabGamma=new double[10];
-		
-
-		//Angle score
-		if(nStop>1)  tabGamma[0]=(1-prodScal(ccPrec, ccStop, ccStop, ccStart));
-		else tabGamma[0]=0.5;
-		if(nStart>1)tabGamma[1]=(1-prodScal(ccStop, ccStart, ccStart, ccSuiv));
-		else tabGamma[1]=0.5;
-		if(Double.isNaN(tabGamma[0]))tabGamma[0]=0.5;
-		if(Double.isNaN(tabGamma[1]))tabGamma[1]=0.5;
-		
-		
-		
-		//Speed score
-		double dtCross=ccStart.day-ccStop.day;
-		if(dtCross==0)dtCross=0.7;
-		double crossSpeed=ccStop.euclidianDistanceToCC(ccStart)/dtCross;
-		double dtStop=0;
-		double stopSpeed=0;
-		double dtStart=0;
-		double startSpeed=0;
-		if(nStop>1) {
-			dtStop=ccStop.day-ccPrec.day;
-			if(dtStop==0)dtStop=0.7;
-			stopSpeed=ccStop.euclidianDistanceToCC(ccPrec)/dtStop;
-			tabGamma[2]=1-VitimageUtils.similarity(stopSpeed,crossSpeed);
-		}
-		else tabGamma[2]=0.5;
-		
-		if(nStart>1) {
-			dtStart=ccSuiv.day-ccStart.day;
-			if(dtStart==0)dtStart=0.7;
-			startSpeed=ccStart.euclidianDistanceToCC(ccSuiv)/dtStart;
-			tabGamma[3]=1-VitimageUtils.similarity(startSpeed,crossSpeed);
-		}
-		else tabGamma[3]=0.5;
-		
-		
-		//Orientation score
-		tabGamma[4]=(1-orientationDownwards(ccStop, ccStart));
-		if(Double.isNaN(tabGamma[4]))tabGamma[4]=1;
-		
-		//Connection score
-		int nbSteps=areConnectedByPathOfCC_v2(graph,ccStop,ccStart,pph,debug);
-		int lNorm=3;
-		tabGamma[5]=(1.0/lNorm)*Math.abs(nbSteps-dtCross-2.5);
-		
-		//Glob Orientation score
-		if(nStop==1 || nStart==1) {tabGamma[6]=0.5;tabGamma[7]=0.5;tabW[6]=0.5;tabW[7]=0.5;}
-		else {
-			if(nStop==3 && nStart==3) {tabW[6]=1.0;tabW[7]=1.0;}
-			else {tabW[6]=0.75;tabW[7]=0.75;}
-			tabGamma[6]= (1-prodScal(ccPrec, ccStop, ccStart, ccSuiv));
-			tabGamma[7]=1-VitimageUtils.similarity(startSpeed,stopSpeed);
-		}
-
-		tabGamma[8]=costDistanceOfPathToObject(img,ccStop.x ,ccStop.y,ccStart.x,ccStart.y);
-		tabGamma[9]=0.5;
-		double maxSpeedLat=pph.getMaxSpeedLateral();
-		if(  ((ccStop.euclidianDistanceToCC(ccStart))/(Math.max(0.7, ccStart.day-ccStop.day))) >maxSpeedLat) {
-			tabGamma[9]=5*(  ((ccStop.euclidianDistanceToCC(ccStart))/(Math.max(0.7, ccStart.day-ccStop.day)))-maxSpeedLat)/maxSpeedLat;
-		}
-		
-		
-		double globScore=0;
-		double globWeight=0;
-
-		for(int i=0;i<10;i++) {
-			if(debug)System.out.println("Score "+i+"="+tabGamma[i]+" weight="+tabW[i]);
-			if(Double.isNaN( tabGamma[i]))tabGamma[i]=1;
-			globScore+=(tabGamma[i]*tabW[i]);
-			globWeight+=tabW[i];
-		}
-		if(debug)System.out.println("Result="+(globScore/globWeight));
-		return globScore/globWeight;
-	}
-
-*/
-	/**
-	 * Backtracing algorithm. Compute the best prolongation of the primary and the laterals
-	
-	public static void upstreamProlongation(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,ImagePlus imgTimeSeries) {
-		//process primaries
-			//For each primary
-			int p=-1;//primary index
-			for(CC cc:graph.vertexSet())
-				if(!cc.trunk || cc.day!=1) continue;
-				p++;
-				//look for the surface target height
-				//look for the shortest path from upper lateral to the surface
-				double lPath=0;
-				//Inform about what was done
-				System.out.println("Plant "+p+" was extended of "+lPath+" pixels to the surface");
-				
-		
-		
-		
-		
-		//process laterals
-		
-	}
-	 */
-
-}
