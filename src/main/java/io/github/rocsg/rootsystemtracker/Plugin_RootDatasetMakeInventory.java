@@ -176,6 +176,11 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		//Process not found
 		if(nNot>0) {
 			IJ.showMessage("Some QR codes have not been read.");
+			IJ.log("DebCici Debug phase starts for Cici (in rootsystemtracker/Pluging_RootDatasetMakeInventory.java, Line ~179");
+			IJ.log("DebCici Here are additional information");
+			IJ.log("DebCici The total number of detected image files is "+NP);
+			IJ.log("DebCici Over these images, "+nNot+" images were too messy that the QR code could be read");
+			IJ.log("DebCici For the images that have been read, I read the patterns of box names, and detected "+N+" different boxes");
 			IJ.showMessage("Now I will display the list of codes detected, as a reference for cleaning");
 			for(int i=0;i<spec.length;i++)IJ.log(spec[i]);
 			IJ.selectWindow("Log");
@@ -183,11 +188,21 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			IJ.showMessage("I will show you all the images with QR code not found. With each image come a popup.");
 			IJ.showMessage("For each image, find the corresponding code in the list (see log window), and copy it into the prompt popup.");
 			for(int i=0;i<code.length;i++) if(code[i].equals(codeNotFound)){
+				IJ.log("DebCici Now reading the image number "+i+" whose code was not found");
 				int subFactor=(int)paramsQRcode[0];
-				String guessedCode=guessCode(spec,new File(inputDir,allImgsPath[i]).getName());
+				IJ.log("DebCici the subsampling for reading the QR was "+subFactor);
+				String guessedCode=guessCode(spec,new File(inputDir,allImgsPath[i]).getName().replace("\\","/"));
+				IJ.log("DebCici the guessedCode based on filename patterns and box names patterns is "+guessedCode);
 
-				if(inputDir.contains("230403-SR-split")){code[i]=guessedCode;continue;}//Hack for the first split serie that had perfect robot run but incorrect QR positioning
+				if(inputDir.contains("230403-SR-split")){
+					IJ.log("DebCici activating the exp quick hack, and force-applying this code as the robot went OK. It s over for this image.");
+					code[i]=guessedCode;continue;
+				}//Hack for the first split serie that had perfect robot run but incorrect QR positioning
+				else {
+					IJ.log("DebCici no force-apply of code. If you are Cici working on split, that should not happen, you should make a claim");
+				}
 				
+				IJ.log("DebCici Cici, if you go to there and this message happens, we have a problem. You should check if you kept the naming of the input dir. It have to contain 230403-SR-split");
 				ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[i]).getAbsolutePath().replace("\\","/"));				
 				img=VitimageUtils.resize(img, img.getWidth()/subFactor, img.getHeight()/subFactor, 1);
 				if(reverse) IJ.run(img, "Flip Horizontally", "");
@@ -199,6 +214,8 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 				code[i]=newCode;
 			}
 			
+			IJ.log("DebCici Cici, all codes are now known");
+					
 			setNames = new HashSet<String>(Arrays.asList(code));
 			spec=setNames.toArray(new String[setNames.size()]);
 			IJ.log("N specimens = "+spec.length);
@@ -206,6 +223,8 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			N=spec.length;
 		}
 		
+		IJ.log("DebCici now I will write the CSV files in order to finish the inventory. The A_Main_inventory CSV will be a CSV with size "+(N+7)+" x "+(3));
+
 		
 		
 		
@@ -220,39 +239,50 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		mainCSV[4]=new String[] {"Data dir",inputDir,"NA"};
 		mainCSV[5]=new String[] {"Inventory dir",outputDir,"NA"};
 		mainCSV[6]=new String[] {"Misc ","NA","NA"};
+		IJ.log("DebCici main info is collected. Now processing box after box. Nboxes="+N);
 		
 		for(int n=0;n<N;n++) {
+			IJ.log("DebCici processing box "+n);
 			System.out.println(n);
 			mainCSV[7+n]=new String[] {"Object",""+n,spec[n]};
 			//Get the list of all images reporting this QR code. They will come by acquisition order, according to the original order of the list
 			ArrayList<String>liObs=new ArrayList<String>();
 			for(int i=0;i<NP;i++)if(code[i].equals(spec[n]))liObs.add(allImgsPath[i]);
 			String[]obs= liObs.toArray(new String[liObs.size()]); 
+			IJ.log("DebCici a little up");
 			
 			int Nobj=obs.length;
 			String [][]objCSV=new String[Nobj+1][4];
 			String pathDir=new File(inputDir).getAbsolutePath().replace("\\","/");
 			String path0=new File(pathDir,obs[0]).getAbsolutePath().replace("\\","/");
 			objCSV[0]=new String[] {"Num_obs","DateThour(24h-format)","Hours_since_series_start","Relative_path_to_the_img"};
+			IJ.log("DebCici a little up again");
 			for(int no=0;no<Nobj;no++) {
+				IJ.log("DebCici proceeding this box' image number "+no);
 				String path=new File(pathDir,obs[no]).getAbsolutePath().replace("\\","/");
 				FileTime ft=getTime(path);
 				String rtd=new File(inputDir).getAbsolutePath().replace("\\","/");
+				IJ.log("DebCici tiny up");
 				objCSV[no+1]=new String[] {""+no,ft.toString(),""+VitimageUtils.dou(hoursBetween(path0, path)),path.replace(rtd,"").substring(1).replace("\\","/")};				
 				if(first==null)first=getTime(path);
 				if(last==null)last=getTime(path);
 				if(first.compareTo(ft)==1)first=getTime(path);
 				if(last.compareTo(ft)==-1)last=getTime(path);
+				IJ.log("DebCici last up for this image, it is finished");
 			}
+			IJ.log("DebCici writing this box CSV");
 			VitimageUtils.writeStringTabInCsv2(objCSV, new File(outputDir,spec[n]+".csv").getAbsolutePath().replace("\\","/"));
 			System.out.println("Written : "+new File(outputDir,spec[n]+".csv").getAbsolutePath().replace("\\","/"));
+			IJ.log("DebCici ok");
 		}
+		IJ.log("DebCici writing the main CSV");
 		mainCSV[2][1]=""+N;
 		mainCSV[3][1]=""+NP;
 		mainCSV[0]=new String[] {"First observation time",first.toString(),"NA"};
 		mainCSV[1]=new String[] {"Last observation time",last.toString(),"NA"};			
 		VitimageUtils.writeStringTabInCsv2(mainCSV, new File(outputDir,"A_main_inventory.csv").getAbsolutePath().replace("\\","/"));
 		System.out.println("Written : "+new File(outputDir,"A_main_inventory.csv").getAbsolutePath());
+		IJ.log("DebCici Ok. Inventory should be finished.");
 	}
 
 	public static String commonSubStringAtTheBeginning(String s1, String s2) {
