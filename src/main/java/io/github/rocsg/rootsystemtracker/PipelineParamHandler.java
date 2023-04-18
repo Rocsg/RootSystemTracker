@@ -39,6 +39,7 @@ public class PipelineParamHandler {
 	int dxCrop=1348;
 	int dyCrop=1166;
 	int maxLinear=4;
+	String typeExp="Simple";
 	public int subsamplingFactor=4;
 	int marginRegisterLeft=12;
 	int marginRegisterUp=135;
@@ -102,6 +103,10 @@ public class PipelineParamHandler {
 		readParameters();
 	}
 
+	public boolean isSplit() {
+		return typeExp.contains("Split_V01");
+	}
+	
 	
 	public String[]getImgNames(){
 		return imgNames;
@@ -116,6 +121,7 @@ public class PipelineParamHandler {
 		yMinCrop=getInt("yMinCrop");
 		dxCrop=getInt("dxCrop");
 		dyCrop=getInt("dyCrop");
+		typeExp=getString("typeExp");
 		outputDir=getString("outputDir");
 		numberPlantsInBox=getInt("numberPlantsInBox");
 		minSizeCC=getInt("minSizeCC");
@@ -145,10 +151,10 @@ public class PipelineParamHandler {
 			imgSteps[i]=getInt("Img_"+i+"_step");
 			IJ.log("We have inventoryDir="+inventoryDir);
 			IJ.log("We have outputDir="+outputDir);
-			System.out.println("And making inventory of |"+new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()+"|");
-			IJ.log("Did inventory of "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()));
-			IJ.log("Testing "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath()));
-			String[][]paramsImg=VitimageUtils.readStringTabFromCsv(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath());
+			System.out.println("And making inventory of |"+new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath().replace("\\","/")+"|");
+			IJ.log("Did inventory of "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath().replace("\\","/")));
+			IJ.log("Testing "+(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath().replace("\\","/")));
+			String[][]paramsImg=VitimageUtils.readStringTabFromCsv(new File(inventoryDir,imgNames[i]+".csv").getAbsolutePath().replace("\\","/") );
 			IJ.log("And the String tab initialized is null ? "+(paramsImg==null));
 			IJ.log("Or it has a number of lines = "+(paramsImg.length));
 			IJ.log("Or imgSerieSize is null ? "+(imgSerieSize==null));
@@ -249,7 +255,7 @@ public class PipelineParamHandler {
 		addParam("originalPixelSize",originalPixelSize,"");
 		addParam("unit",unit,"");
 		addParam("typicalHourDelay",typicalHourDelay,"");
-		addParam("-","-","-");
+		addParam("typeExp",typeExp,"-");
 		addParam("-","-","-");
 	}
 	
@@ -273,7 +279,7 @@ public class PipelineParamHandler {
 			Arrays.sort(listImgs);
 			
 			for(int i=0;i<nbData;i++) {
-				imgNames[i]=listImgs[i].replace(".csv", "");
+				imgNames[i]=listImgs[i].replace(".csv", "").replace("\\","/");
 				imgSteps[i]=0;
 			}
 		}
@@ -281,14 +287,14 @@ public class PipelineParamHandler {
 			addParam("Img_"+i+"_name",imgNames[i],"");
 			addParam("Img_"+i+"_step",imgSteps[i],"");
 		}
-		VitimageUtils.writeStringTabInCsv2(params,new File(outputDir,mainNameCsv).getAbsolutePath());		
+		VitimageUtils.writeStringTabInCsv2(params,new File(outputDir,mainNameCsv).getAbsolutePath().replace("\\","/"));		
 	}
 	
 	
 	public String getString(String tit) {
 		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return params[i][1].replace("\\", "/");
-		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
-		return null;
+//		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
+		return "";
 	}
 	
 	public double getDouble(String tit) {

@@ -188,7 +188,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 
 				if(inputDir.contains("230403-SR-split")){code[i]=guessedCode;continue;}//Hack for the first split serie that had perfect robot run but incorrect QR positioning
 				
-				ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[i]).getAbsolutePath());				
+				ImagePlus img=IJ.openImage(new File(inputDir,allImgsPath[i]).getAbsolutePath().replace("\\","/"));				
 				img=VitimageUtils.resize(img, img.getWidth()/subFactor, img.getHeight()/subFactor, 1);
 				if(reverse) IJ.run(img, "Flip Horizontally", "");
 				img.show();
@@ -231,27 +231,27 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			
 			int Nobj=obs.length;
 			String [][]objCSV=new String[Nobj+1][4];
-			String pathDir=new File(inputDir).getAbsolutePath();
-			String path0=new File(pathDir,obs[0]).getAbsolutePath();
+			String pathDir=new File(inputDir).getAbsolutePath().replace("\\","/");
+			String path0=new File(pathDir,obs[0]).getAbsolutePath().replace("\\","/");
 			objCSV[0]=new String[] {"Num_obs","DateThour(24h-format)","Hours_since_series_start","Relative_path_to_the_img"};
 			for(int no=0;no<Nobj;no++) {
-				String path=new File(pathDir,obs[no]).getAbsolutePath();
+				String path=new File(pathDir,obs[no]).getAbsolutePath().replace("\\","/");
 				FileTime ft=getTime(path);
-				String rtd=new File(inputDir).getAbsolutePath();
-				objCSV[no+1]=new String[] {""+no,ft.toString(),""+VitimageUtils.dou(hoursBetween(path0, path)),path.replace(rtd,"").substring(1)};				
+				String rtd=new File(inputDir).getAbsolutePath().replace("\\","/");
+				objCSV[no+1]=new String[] {""+no,ft.toString(),""+VitimageUtils.dou(hoursBetween(path0, path)),path.replace(rtd,"").substring(1).replace("\\","/")};				
 				if(first==null)first=getTime(path);
 				if(last==null)last=getTime(path);
 				if(first.compareTo(ft)==1)first=getTime(path);
 				if(last.compareTo(ft)==-1)last=getTime(path);
 			}
-			VitimageUtils.writeStringTabInCsv2(objCSV, new File(outputDir,spec[n]+".csv").getAbsolutePath());
-			System.out.println("Written : "+new File(outputDir,spec[n]+".csv").getAbsolutePath());
+			VitimageUtils.writeStringTabInCsv2(objCSV, new File(outputDir,spec[n]+".csv").getAbsolutePath().replace("\\","/"));
+			System.out.println("Written : "+new File(outputDir,spec[n]+".csv").getAbsolutePath().replace("\\","/"));
 		}
 		mainCSV[2][1]=""+N;
 		mainCSV[3][1]=""+NP;
 		mainCSV[0]=new String[] {"First observation time",first.toString(),"NA"};
 		mainCSV[1]=new String[] {"Last observation time",last.toString(),"NA"};			
-		VitimageUtils.writeStringTabInCsv2(mainCSV, new File(outputDir,"A_main_inventory.csv").getAbsolutePath());
+		VitimageUtils.writeStringTabInCsv2(mainCSV, new File(outputDir,"A_main_inventory.csv").getAbsolutePath().replace("\\","/"));
 		System.out.println("Written : "+new File(outputDir,"A_main_inventory.csv").getAbsolutePath());
 	}
 
@@ -363,13 +363,13 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 				if(first.compareTo(ft)==1)first=getTime(path);
 				if(last.compareTo(ft)==-1)last=getTime(path);
 			}
-			VitimageUtils.writeStringTabInCsv2(objCSV, new File(outputDir,spec[n]+".csv").getAbsolutePath());
+			VitimageUtils.writeStringTabInCsv2(objCSV, new File(outputDir,spec[n]+".csv").getAbsolutePath().replace("\\","/"));
 		}
 		mainCSV[0]=new String[] {"First observation time",first.toString(),"NA"};
 		mainCSV[1]=new String[] {"Last observation time",last.toString(),"NA"};			
 		mainCSV[2][1]=""+N;
 		mainCSV[3][1]=""+incrImg;
-		VitimageUtils.writeStringTabInCsv2(mainCSV, new File(outputDir,"A_main_inventory.csv").getAbsolutePath());
+		VitimageUtils.writeStringTabInCsv2(mainCSV, new File(outputDir,"A_main_inventory.csv").getAbsolutePath().replace("\\","/"));
 		System.out.println("Inventory of tidy dir ok");
 	}
 

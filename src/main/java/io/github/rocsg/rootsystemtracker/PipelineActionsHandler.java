@@ -1,9 +1,12 @@
 package io.github.rocsg.rootsystemtracker;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.jgrapht.GraphPath;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
@@ -323,14 +326,34 @@ public class PipelineActionsHandler {
 		ImagePlus []imgsOut=removeLeavesFromSequence(imgReg, imgMask1, imgMask2);
 
 		imgsOut[0].setDisplayRange(0, 255);//TODO give an adaptative threshold
+		if(pph.isSplit()) {
+			imgsOut[0]=removeSplitCentralLine(imgsOut[0]);
+		}
 		IJ.saveAsTiff(imgsOut[0],new File(outputDataDir,"34_leaves_removed").getAbsolutePath());
-		
 		imgsOut[1].setDisplayRange(0, 1);//TODO give an adaptative threshold
 		IJ.saveAsTiff(imgsOut[1],new File(outputDataDir,"35_mask_of_removed_leaves").getAbsolutePath());
-
+		
 		return true;
 	}	
 
+	public static ImagePlus removeSplitCentralLine(ImagePlus img){
+		ImagePlus[] imgs=VitimageUtils.stackToSlices(img);
+		int N=imgs.length;
+		IJ.log(""+N);
+		ImagePlus img2=MorphoUtils.dilationCircle2D(imgs[N-1], 2);
+		ImagePlus img3=MorphoUtils.dilationLine2D(img2, 15, true);
+		ImagePlus img4=VitimageUtils.thresholdImage(img3, 152, 256);
+		ImagePlus imgTrench=VitimageUtils.getBinaryMaskUnary(img4, 127);
+		ImagePlus imgRest=VitimageUtils.invertBinaryMask(imgTrench);
+		ImagePlus trench=VitimageUtils.makeOperationBetweenTwoImages(img3, imgTrench, 2, false);
+
+		for(int i=0;i<N;i++) {
+			ImagePlus rest=VitimageUtils.makeOperationBetweenTwoImages(imgs[i], imgRest, 2, false);
+			imgs[i]=VitimageUtils.makeOperationBetweenTwoImages(rest, trench, 1, false);
+		}
+		return VitimageUtils.slicesToStack(imgs);
+	}
+	
 	public static boolean spaceTimeMeanShiftSegmentation(int indexImg,String outputDataDir,PipelineParamHandler pph) {
 		ImagePlus imgIn=IJ.openImage(new File(outputDataDir,"34_leaves_removed.tif").getAbsolutePath());
 		ImagePlus imgMask1=IJ.openImage(new File(outputDataDir,"31_mask_at_t1.tif").getAbsolutePath());
@@ -377,8 +400,12 @@ public class PipelineActionsHandler {
 		rm.resampleFlyingRoots();
 		rm.cleanNegativeTh();
 		rm.writeRSML3D(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(), "",true,false);
-		//TODO : define target height
+		if(!pph.isSplit()) {
 		backTrackPrimaries(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(),new File(outputDataDir,"61_graph.rsml").getAbsolutePath(),mask,reg,pph.toleranceDistanceForBeuckerSimplification);
+		}
+		else {
+			try {FileUtils.copyFile(new File(outputDataDir,"60_graph_no_backtrack.rsml"),new File(outputDataDir,"61_graph.rsml"));} catch (IOException e) {e.printStackTrace();}
+		}
 		rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
 		ImagePlus skeletonTime=RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates,graph,false,true,3);
 		ImagePlus skeletonDay=RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates,graph,false,true,2);
