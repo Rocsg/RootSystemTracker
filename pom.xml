@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<description>Root system tracker plugin</description>
  	<packaging>jar</packaging>
-    <version>1.6.0</version>
+    <version>1.6.1</version>
     <name>rootsystemtracker</name>
  	<url>https://imagej.net/plugins/rootsystemtracker</url>
 	<inceptionYear>2022</inceptionYear>
