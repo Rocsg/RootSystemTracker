@@ -16,7 +16,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import ij.IJ;
-import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
 import ij.plugin.frame.PlugInFrame;
@@ -51,6 +50,9 @@ import io.github.rocsg.rstutils.QRcodeReader;
 
 
 public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
+	public final static String codeNotFound="NOT_FOUND";
+	public final static String codeTrash="TRASH";
+	
 	private static final long serialVersionUID = 1L;
 	public boolean developerMode=false;
 	public String currentRstFlag="1.0";
@@ -128,7 +130,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		String[]code=new String[NP];
 		boolean reverse=VitiDialogs.getYesNoUI("Are the image mirrored ?", "Is mirrored ?");
 		//double[]paramsQRcode=new double[] {4.0,472.0,2916,668,15.8,142.2};
-		double[]paramsQRcode=askQRcodeParams(new File(inputDir,allImgsPath[0]).getAbsolutePath(),reverse);
+		double[]paramsQRcode=askQRcodeParams(new File(inputDir,allImgsPath[0+(Math.min(allImgsPath.length, 6)) ]).getAbsolutePath(),reverse);
 		IJ.log("02 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 
 		//Initialize aggregator with original value
@@ -140,7 +142,6 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 		IJ.log("Got QR params from user : ");
 		for(double d:paramsQRcode)System.out.println(d);
 		//decode the qr code of each image
-		String codeNotFound="NOT_FOUND";
 		IJ.log("04 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 		for(int n=0;n<NP;n++) {
 			for(int i=0;i<paramsQRcode.length;i++)paramsQRcode[i]=sumParams[i]/did;
@@ -161,7 +162,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 			else {
 				for(int i=0;i<params.length;i++)sumParams[i]+=params[i];
 				did++;
-			}
+			}  
 		}
 
 		//extract the set of these qr codes by alphanumeric order
@@ -286,7 +287,7 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	}
 
 	public static String commonSubStringAtTheBeginning(String s1, String s2) {
-		 int maxLength = Math.min(s1.length(), s2.length());
+		int maxLength = Math.min(s1.length(), s2.length());
         StringBuilder commonSubstring = new StringBuilder();
         for (int i = 0; i < maxLength; i++) {
             if (s1.charAt(i) == s2.charAt(i)) {
@@ -301,13 +302,20 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	
 	
 	public static String commonSubStringAtTheBeginning(String[]tab,boolean ignoreLastOne) {
-		if((tab==null)||tab.length<1)return "";
+		if((tab==null)||tab.length<1) {IJ.log("Tab null or not long enough. Return void"); return "";}
+		if(tab.length<(1+(ignoreLastOne ? 1 : 0))) {IJ.log("Tab not long enough. Return weird pattern"); return tab[0].substring(0, tab[0].length()-3);}
 		String ret=tab[0];
-		for(int i=1;i<tab.length+(ignoreLastOne ? -1 : 0);i++)ret=commonSubStringAtTheBeginning(ret, tab[i]);
+		for(int i=1;i<tab.length+(ignoreLastOne ? -1 : 0);i++) {
+			IJ.log("Processing "+i+" : "+ret+" against "+tab[i]);
+			if((!tab[i].contains(codeTrash)) && (!tab[i].contains(codeNotFound)))ret=commonSubStringAtTheBeginning(ret, tab[i]);
+		}
+		IJ.log("Found chain "+ret);
 		return ret;
 	}
 
 	public static int nbOccurences(String substring, String mainString) {
+		if(mainString==null ||mainString.length()<1)return 0;
+		if(substring==null ||substring.length()<1)return 0;
 		int count = 0;
         int index = 0;
         boolean found = true;
@@ -330,22 +338,22 @@ public class Plugin_RootDatasetMakeInventory  extends PlugInFrame{
 	}
 	
 	public static String guessCode(String[]specs,String name) {
-		System.out.println("Guessing code for name="+name);
+		IJ.log("Guessing code for name="+name);
 		if(specs==null || specs.length<1)return "";
 		String common=commonSubStringAtTheBeginning(specs,true);
-		System.out.println("Common="+common);
+		IJ.log("Common="+common);
 		String[]vals=new String[specs.length];
 		for(int i=0;i<specs.length;i++)vals[i]=specs[i].replace(common,"");		
 		int countMax=0;
 		int indMax=0;
 		for(int i=0;i<vals.length;i++) {
-			System.out.println("Testing "+i);
-			System.out.println("Vals="+vals[i]);
-			System.out.println("nbOcc="+nbOccurences(vals[i], name));
+			IJ.log("Testing "+i);
+			IJ.log("Vals="+vals[i]);
+			IJ.log("nbOcc="+nbOccurences(vals[i], name));
 			if(nbOccurences(vals[i], name)>countMax) {countMax=nbOccurences(vals[i], name);indMax=i;}
 		}
-		System.out.println("ind="+indMax);
-		System.out.println("Thus"+specs[indMax]);
+		IJ.log("ind="+indMax);
+		IJ.log("Thus"+specs[indMax]);
 		if(countMax>0)return specs[indMax];
 		else {
 			//Guess from some pattern

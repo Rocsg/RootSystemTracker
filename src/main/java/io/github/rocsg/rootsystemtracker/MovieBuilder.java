@@ -9,6 +9,7 @@ import java.util.Arrays;
 
 import io.github.rocsg.fijiyama.rsml.Node;
 import io.github.rocsg.fijiyama.common.Timer;
+import io.github.rocsg.fijiyama.common.VitiDialogs;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.rsml.Root;
 import io.github.rocsg.fijiyama.rsml.RootModel;
@@ -34,7 +35,7 @@ public class MovieBuilder {
 	static double vMaxInUse=35/8.0;//TODO : depends on parameters
 	static double startingBlockRatio=0.10;//time for a new root to appear, expressed as a ratio of the sequence length  //TODO : depends on parameters
 	static boolean smartHandyStart=true;// Make a progressive start to make the movie more friendly
-	static double timeStep=0.5;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph.nTypicalHours
+	static double timeStep=1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph.nTypicalHours
 	static int nTimeStepVirtualEnd=4; //Make a progressive end to make the movie more friendly //TODO : depends on parameters
 	static double deltaPixelsSpeedInterpolation=4;// Compute the speed vectors over the interval [curPix-delta ; curPix + delta] //TODO : depends on parameters
 	static PipelineParamHandler pph;
@@ -62,14 +63,16 @@ public class MovieBuilder {
 	static Timer tim;
 
 	
-	
 	//SAFE
 	/*public static void main(String[]args) {
 		ImageJ ij=new ImageJ();	
 	}*/
 		
+	
+	
 	public static boolean buildMovie(int indexImg,String outputDataDir,PipelineParamHandler pph) {
 		tim=new Timer();
+		//timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a timestep (hours per keyframe, standard is 0.5)",0.5);
 		//Prepare params
 		primaryRadius*=sizeFactor;
 		secondaryRadius*=sizeFactor;
@@ -77,7 +80,7 @@ public class MovieBuilder {
 		tim.print("Starting data importation");
 		hoursExtremities=pph.getHoursExtremities(indexImg);
 		TN=pph.imgSerieSize[indexImg];
-		setSamplesT();
+		setSamplesT(pph);
 
 		//Prepare input image
 		ImagePlus imgReg=IJ.openImage(new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath()) ;
@@ -106,7 +109,13 @@ public class MovieBuilder {
 		//Generate grid and fire TODO : and skeleton
 		tim.print("Starting generating grid and fire");
 		ImagePlus imgMaskRootInit=new Duplicator().run(maskFgBgGauss,1,1,1,1,1,1);
-		RootModel rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
+		RootModel rm=null;
+		if(new File(outputDataDir,"61_graph_expertized.rsml").exists()) {
+			rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"));
+		}
+		else {
+			rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath().replace("\\", "/"));
+		}
 		rm.computeSpeedVectors(deltaPixelsSpeedInterpolation);
 		ImagePlus[]imgGridAndFire=generateGridAndFireFromRootModel(rm,imgTimes,imgMaskRootInit);//TODO should be here
 		ImagePlus imgSkeleton=generateModelRGBFromRootModel(rm, imgMaskRootInit);
@@ -979,7 +988,10 @@ public class MovieBuilder {
 		return coords;
 	}	
 
-	public static void setSamplesT(){
+	public static void setSamplesT(PipelineParamHandler pph){
+		timeStep=pph.getMovieTimeStep();
+		//VitimageUtils.getSystemNeededMemory()
+		//timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a timestep (hours per keyframe, standard is 0.5)",0.5);
 		ArrayList<double[]>ar=new ArrayList<double[]>();
 		ArrayList<double[]>arT=new ArrayList<double[]>();
 		int curFrame=0;	

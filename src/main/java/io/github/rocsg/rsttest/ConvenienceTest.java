@@ -8,8 +8,12 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.rstutils.MorphoUtils;
 
 public class ConvenienceTest {
-	
 	public static void main(String[]args) {
+		String s="dsdhsiqdhqsjkhsqjk044";
+		System.out.println(s.substring(0,s.length()-3));
+	}
+	
+	public static void main3(String[]args) {
 		ImageJ ij=new ImageJ();
 		int i=55;
 		ImagePlus img=IJ.openImage("/home/rfernandez/Bureau/A_Test/RootSystemTracker/TestSplit/Processing_of_TEST1230403-SR-split/230403SR0"+i+"/11_stack.tif");

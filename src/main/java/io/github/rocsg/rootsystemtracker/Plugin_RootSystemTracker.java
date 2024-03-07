@@ -19,7 +19,8 @@ public class Plugin_RootSystemTracker extends PlugInFrame{
 	private static final long serialVersionUID = 1L;
 	public boolean developerMode=false;
 	public String currentRstFlag="1.0";
-	public static String versionFlag="Handsome honeysuckle v1.5.1  2023-04-18 16:49 Split-root-04-debugCici";
+	public static String versionNumber="v1.6.0";
+	public static String versionFlag="Handsome honeysuckle "+versionNumber+"  2023-04-24 16:27 Ordered RSML";
 	
 	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();

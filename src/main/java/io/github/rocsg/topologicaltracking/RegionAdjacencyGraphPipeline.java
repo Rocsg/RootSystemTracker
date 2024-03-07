@@ -732,6 +732,7 @@ public class RegionAdjacencyGraphPipeline {
 			rLat.attachParent(myRprim);
 			rm.rootList.add(rLat);
 		}
+		rm.standardOrderingOfRoots();
 		return rm;
 	}
 	

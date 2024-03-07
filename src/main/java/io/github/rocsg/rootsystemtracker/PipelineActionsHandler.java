@@ -35,7 +35,7 @@ import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
 
 public class PipelineActionsHandler {
-	public static final int flagFinished=7;
+	public static final int flagFinished=8;
 	public static final int flagLastImage=200;
 	public static final boolean proceedFullPipelineImageAfterImage=true;
 	public static final int firstStepToDo=0;
@@ -52,7 +52,7 @@ public class PipelineActionsHandler {
 		else{
 			String[]actions=new String[] {"Step 0: setup part 1","Step 1:image stacking","Step 2: stack registration",
 					"Step 3 : mask computation, leaves removal","Step 4: spatio-temporal segmentation",
-					"Step 5 : graph computation","Step 6: RSML building", "Step 7: Movie building"}; 
+					"Step 5 : graph computation","Step 6: RSML building until expertize","Step 7: RSML building after expertize", "Step 8: Movie building"}; 
 			String[]order=new String[] {"Box after box","Step after step"};
 			int[]vals=new int[5];
 			GenericDialog gd= new GenericDialog("Expert mode for RootSystemTracker");
@@ -93,11 +93,11 @@ public class PipelineActionsHandler {
 		int indLastStepToDo=vals[1];
 		int order=vals[4];
 		IJ.showMessage("Params of processing=imgs "+indFirstImageToDo+"-"+indLastImageToDo+", Steps "+indFirstStepToDo+"-"+indLastStepToDo+", order "+order);
-		t=new Timer();		
+		t=new Timer();
 		boolean rewriteNeeded=false;
 		for(int in=indFirstImageToDo;in<=indLastImageToDo;in++)if(pph.imgSteps[in]>indFirstStepToDo)rewriteNeeded=true;
 		if(rewriteNeeded) {
-			if(VitiDialogs.getYesNoUI("Rewrinting current step ?", "Some box to process are more advanced than step "+indFirstStepToDo+".\n Yes: recompute all the steps from step "+indFirstStepToDo+"  or   No: only compute missing steps")) {
+			if(VitiDialogs.getYesNoUI("Rewriting current step ?", "Some box to process are more advanced than step "+indFirstStepToDo+".\n Yes: recompute all the steps from step "+indFirstStepToDo+"  or   No: only compute missing steps")) {
 				for(int in=indFirstImageToDo;in<=indLastImageToDo;in++)if(pph.imgSteps[in]>indFirstStepToDo)pph.imgSteps[in]=indFirstStepToDo;
 				pph.writeParameters(false);				
 			}
@@ -107,7 +107,7 @@ public class PipelineActionsHandler {
 				while(((pph.imgSteps[i]+1)>=indFirstStepToDo && pph.imgSteps[i]<=indLastStepToDo)) {
 					doNextStep(i,pph);
 				}				
-			}			
+			}
 		}
 		else {
 			for(int s=indFirstStepToDo ; s<=indLastStepToDo; s++) {
@@ -122,7 +122,8 @@ public class PipelineActionsHandler {
 	public static void doNextStep(int indexImg,PipelineParamHandler pph) {
 		System.out.println("Doing next step of img index "+indexImg);
 		int stepToDo=pph.imgSteps[indexImg];
-		if(doStepOnImg(stepToDo,indexImg,pph))pph.imgSteps[indexImg]++;
+		if(pph.imgNames[indexImg].contains(Plugin_RootDatasetMakeInventory.codeTrash) && (stepToDo>1))pph.imgSteps[indexImg]++;
+		else if(doStepOnImg(stepToDo,indexImg,pph))pph.imgSteps[indexImg]++;
 		pph.writeParameters(false);
 	}
 
@@ -153,12 +154,22 @@ public class PipelineActionsHandler {
 		}
 		if(step==6) {//RSML building
 			t.print("Starting step 6 -  on img "+pph.imgNames[indexImg]);
-			executed=PipelineActionsHandler.computeRSML(indexImg,outputDataDir,pph);
+			executed=PipelineActionsHandler.computeRSMLUntilExpertize(indexImg,outputDataDir,pph);
 		}
-		if(step==7) {//MovieBuilding -O-
-			t.print("Starting step 7  -  on img "+pph.imgNames[indexImg]);
+		if(step==7) {//RSML building
+			t.print("Starting step 7 -  on img "+pph.imgNames[indexImg]);
+			executed=PipelineActionsHandler.computeRSMLAfterExpertize(indexImg,outputDataDir,pph);
+		}
+		if(step==8) {//MovieBuilding -O-
+			t.print("Starting step 8  -  on img "+pph.imgNames[indexImg]);
 			executed=MovieBuilder.buildMovie(indexImg,outputDataDir,pph);
 		}
+		/*
+		if(step==9) {//Phene extraction
+			t.print("Starting step 9  -  on img "+pph.imgNames[indexImg]);
+			executed=extractPhenes(indexImg,outputDataDir,pph);
+		}
+		*/
 		return executed;
 	}
 
@@ -329,6 +340,9 @@ public class PipelineActionsHandler {
 		if(pph.isSplit()) {
 			imgsOut[0]=removeSplitCentralLine(imgsOut[0]);
 		}
+		if(pph.isGaps()) {
+			//TODO
+		}
 		IJ.saveAsTiff(imgsOut[0],new File(outputDataDir,"34_leaves_removed").getAbsolutePath());
 		imgsOut[1].setDisplayRange(0, 1);//TODO give an adaptative threshold
 		IJ.saveAsTiff(imgsOut[1],new File(outputDataDir,"35_mask_of_removed_leaves").getAbsolutePath());
@@ -387,7 +401,7 @@ public class PipelineActionsHandler {
 		return true;
 	}
 
-	public static boolean computeRSML(int indexImg,String outputDataDir,PipelineParamHandler pph) {
+	public static boolean computeRSMLUntilExpertize(int indexImg,String outputDataDir,PipelineParamHandler pph) {
 		ImagePlus mask=IJ.openImage(new File(outputDataDir,"31_mask_at_t1.tif").getAbsolutePath());
 		mask=MorphoUtils.dilationCircle2D(mask, 9);
 		ImagePlus dates=IJ.openImage(new File(outputDataDir,"40_date_map.tif").getAbsolutePath());
@@ -399,6 +413,7 @@ public class PipelineActionsHandler {
 		rm.cleanWildRsml();
 		rm.resampleFlyingRoots();
 		rm.cleanNegativeTh();
+		
 		rm.writeRSML3D(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(), "",true,false);
 		if(!pph.isSplit()) {
 		backTrackPrimaries(new File(outputDataDir,"60_graph_no_backtrack.rsml").getAbsolutePath(),new File(outputDataDir,"61_graph.rsml").getAbsolutePath(),mask,reg,pph.toleranceDistanceForBeuckerSimplification);
@@ -406,7 +421,23 @@ public class PipelineActionsHandler {
 		else {
 			try {FileUtils.copyFile(new File(outputDataDir,"60_graph_no_backtrack.rsml"),new File(outputDataDir,"61_graph.rsml"));} catch (IOException e) {e.printStackTrace();}
 		}
-		rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
+		return true;
+	}
+		
+	public static boolean computeRSMLAfterExpertize(int indexImg,String outputDataDir,PipelineParamHandler pph) {
+		ImagePlus mask=IJ.openImage(new File(outputDataDir,"31_mask_at_t1.tif").getAbsolutePath());
+		mask=MorphoUtils.dilationCircle2D(mask, 9);
+		ImagePlus dates=IJ.openImage(new File(outputDataDir,"40_date_map.tif").getAbsolutePath());
+		SimpleDirectedWeightedGraph<CC,ConnectionEdge> graph=RegionAdjacencyGraphPipeline.readGraphFromFile(new File(outputDataDir,"50_graph.ser").getAbsolutePath());
+		ImagePlus reg=IJ.openImage(new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath());
+
+		RootModel rm=null;
+		if(new File(outputDataDir,"61_graph_expertized.rsml").exists()) {
+			rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph_expertized.rsml").getAbsolutePath());
+		}
+		else {
+			rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
+		}
 		ImagePlus skeletonTime=RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates,graph,false,true,3);
 		ImagePlus skeletonDay=RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates,graph,false,true,2);
 		ImagePlus allTimes=RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates,graph,false,false,1);
@@ -429,6 +460,16 @@ public class PipelineActionsHandler {
 		return true;
 	}
 
+	
+	public static boolean extractPhenes(int indexImg,String outputDataDir,PipelineParamHandler pph) {
+		
+		
+		return true;
+	}
+	
+	
+	
+	
 	public static ImagePlus createTimeSequenceSuperposition(ImagePlus imgReg,RootModel rm){
 		ImagePlus[]tabRes=VitimageUtils.stackToSlices(imgReg);
 		for(int i=0;i<tabRes.length;i++) {

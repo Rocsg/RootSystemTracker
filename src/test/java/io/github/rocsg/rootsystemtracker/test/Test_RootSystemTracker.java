@@ -175,7 +175,8 @@ public class Test_RootSystemTracker {
 		for(int i=0;i<tab.length;i++) {
 			System.out.println(i+" : "+tab[i]);
 		}
-		PipelineActionsHandler.computeRSML(indexImg,outputDataDir,pph);
+		PipelineActionsHandler.computeRSMLUntilExpertize(indexImg,outputDataDir,pph);
+		PipelineActionsHandler.computeRSMLAfterExpertize(indexImg,outputDataDir,pph);
 		RootModel rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
 
 		//Verify RSML parameters

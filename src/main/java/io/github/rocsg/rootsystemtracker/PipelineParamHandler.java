@@ -11,6 +11,7 @@ import ij.IJ;
 public class PipelineParamHandler {
 	String currentVersion="1.0";
 	String pathToParameterFile="";
+	double movieTimeStep=1;//hours per keyframe
 	String inventoryDir="";
 	String outputDir="";
 	int MAX_NUMBER_IMAGES=100000;
@@ -107,6 +108,9 @@ public class PipelineParamHandler {
 		return typeExp.contains("Split_V01");
 	}
 	
+	public boolean isGaps() {
+		return typeExp.contains("Gaps_V01");
+	}
 	
 	public String[]getImgNames(){
 		return imgNames;
@@ -123,6 +127,7 @@ public class PipelineParamHandler {
 		dyCrop=getInt("dyCrop");
 		typeExp=getString("typeExp");
 		outputDir=getString("outputDir");
+		movieTimeStep=getDouble("movieTimeStep");
 		numberPlantsInBox=getInt("numberPlantsInBox");
 		minSizeCC=getInt("minSizeCC");
 		originalPixelSize=getInt("originalPixelSize");
@@ -224,6 +229,12 @@ public class PipelineParamHandler {
 		return getDouble("meanSpeedLateral");
 	}
 	
+	public double getMovieTimeStep() {
+		double d= getDouble("movieTimeStep");
+		if (d<0)return 1;
+		return d;
+	}
+	
 	public void addAllParametersToTab() {
 		params=new String[40+2*nbData][3];
 		nParams=0;
@@ -256,7 +267,7 @@ public class PipelineParamHandler {
 		addParam("unit",unit,"");
 		addParam("typicalHourDelay",typicalHourDelay,"");
 		addParam("typeExp",typeExp,"-");
-		addParam("-","-","-");
+		addParam("movieTimeStep",movieTimeStep,"-");
 	}
 	
 	public void writeParameters(boolean firstWrite) {
@@ -292,7 +303,7 @@ public class PipelineParamHandler {
 	
 	
 	public String getString(String tit) {
-		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return params[i][1].replace("\\", "/");
+		for(int i=0;i<params.length;i++)if(params[i][0].equals(tit))return params[i][1].replace("\\", "/");
 //		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
 		return "";
 	}
@@ -304,7 +315,7 @@ public class PipelineParamHandler {
 	}
 
 	public int getInt(String tit) {
-		for(int i=0;i<nMaxParams;i++)if(params[i][0].equals(tit))return Integer.parseInt( params[i][1] );
+		for(int i=0;i<params.length;i++)if(params[i][0].equals(tit))return Integer.parseInt( params[i][1] );
 		IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
 		return NO_PARAM_INT;
 	}
