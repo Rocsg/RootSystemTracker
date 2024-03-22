@@ -4,8 +4,8 @@ import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.fijiyama.rsml.Root;
-import io.github.rocsg.fijiyama.rsml.RootModel;
+import io.github.rocsg.rsml.Root;
+import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rootsystemtracker.MovieBuilder;
 import io.github.rocsg.rootsystemtracker.PipelineActionsHandler;
 import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
@@ -30,7 +30,7 @@ public class TestRootSystemTracker {
     public static void main(String[] args) throws Exception {
         ImageJ ij = new ImageJ();
         TestRootSystemTracker te = new TestRootSystemTracker();
-        te.test_00_loadTestData();
+        //te.test_00_loadTestData();
         te.test_01_inventory();
         te.test_02_b_registerStack();
         te.test_03_computeMasks2();

@@ -6,9 +6,9 @@ import ij.ImagePlus;
 import ij.plugin.RGBStackMerge;
 import io.github.rocsg.fijiyama.common.VitiDialogs;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.fijiyama.rsml.FSR;
-import io.github.rocsg.fijiyama.rsml.Root;
-import io.github.rocsg.fijiyama.rsml.RootModel;
+import io.github.rocsg.rsml.RootModel;
+import io.github.rocsg.rsml.FSR;
+import io.github.rocsg.rsml.Root;
 
 import java.io.File;
 

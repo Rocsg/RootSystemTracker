@@ -10,9 +10,9 @@ import ij.plugin.filter.AVI_Writer;
 import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.Timer;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.fijiyama.rsml.Node;
-import io.github.rocsg.fijiyama.rsml.Root;
-import io.github.rocsg.fijiyama.rsml.RootModel;
+import io.github.rocsg.rsml.RootModel;
+import io.github.rocsg.rsml.Node;
+import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rstutils.MorphoUtils;
 
 import java.awt.*;

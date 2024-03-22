@@ -1,8 +1,8 @@
 package io.github.rocsg.rstutils;
 
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.fijiyama.rsml.FSR;
-import io.github.rocsg.fijiyama.rsml.RootModel;
+import io.github.rocsg.rsml.RootModel;
+import io.github.rocsg.rsml.FSR;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
