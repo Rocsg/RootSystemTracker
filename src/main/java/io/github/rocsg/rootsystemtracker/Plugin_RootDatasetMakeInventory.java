@@ -581,15 +581,15 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      * |__Image2
      * |__Image3
      *
-     * @param inputDir  The directory to create an inventory of.
-     * @param outputDir The directory where the inventory will be stored.
+     * @param inputDir0  The directory to create an inventory of.
+     * @param outputDir0 The directory where the inventory will be stored.
      */
     public static void startInventoryOfAlreadyTidyDir(String inputDir0, String outputDir0) {
         String inputDir = inputDir0.replace("\\", "/");
         String outputDir = outputDir0.replace("\\", "/");
         // List the data
         String[] spec = new File(inputDir).list(); // List of subdirectories
-        Arrays.sort(spec); // Sort the list of subdirectories
+        Arrays.sort(Objects.requireNonNull(spec)); // Sort the list of subdirectories
         int N = spec.length; // Count the number of subdirectories
         int header = 7; // Header size for the main CSV file
         FileTime first = null; // First observation time
@@ -602,11 +602,16 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         mainCSV[6] = new String[]{"Misc ", "NA", "NA"}; // Miscellaneous
         int incrImg = 0; // Incremental image count
         // For each subdirectory (referred to as an "object"), create a separate CSV
+
+        System.out.println("Recap : " + spec.length + " objects" + " in " + inputDir + " to be processed");
         // file
         for (int n = 0; n < N; n++) {
             // Registered in the old csv
             mainCSV[7 + n] = new String[]{"Object", "" + n, spec[n]};
             String[] obs = new File(inputDir, spec[n]).list();
+            System.out.println("File " + new File(inputDir, spec[n]).getAbsolutePath());
+            System.out.println("Processing " + spec[n] + " with " + Objects.requireNonNull(obs).length + " images");
+
             obs = sortFilesByModificationOrder(new File(inputDir, spec[n]).getAbsolutePath(), obs);
             int Nobj = obs.length;
             incrImg += Nobj;

@@ -346,12 +346,20 @@ public class Root implements Comparable<Root> {
         }
     }
 
+    /**
+     * This method updates the timing of the nodes in the root.
+     * It first creates a list of all nodes in the root.
+     * Then it identifies nodes that fall exactly on an observation timepoint.
+     * It calculates the distance to the previous and next exact nodes for each non-exact node.
+     * Finally, it estimates the birth time and birth time in hours for each non-exact node based on its distances to the previous and next exact nodes.
+     */
     public void updateTiming() {
         boolean debug = false;
         Node nStart = this.firstNode;
         Node nStop = this.lastNode;
         Node curNode = nStart;
         ArrayList<Node> listNode = new ArrayList<Node>();
+        // Loop through all nodes in the root and add them to the list
         while (curNode != null) {
             listNode.add(curNode);
             curNode = curNode.child;
@@ -365,15 +373,15 @@ public class Root implements Comparable<Root> {
         double[] distToPrev = new double[N];
         double[] distToNext = new double[N];
 
-        //1 Identify nodes falling exactly on an observation timepoint
+        // Identify nodes that fall exactly on an observation timepoint
         for (int i = 0; i < N; i++) {
             tabExact[i] = (Math.abs(tabNode[i].birthTime - Math.round(tabNode[i].birthTime)) < VitimageUtils.EPSILON);
             if (debug) System.out.println(" i=" + i + " isExact ?" + tabExact[i] + " " + tabNode[i]);
         }
 
-
         Node prev = null;
         double dist = 0;
+        // Calculate the distance to the previous exact node for each non-exact node
         for (int i = 0; i < N; i++) {
             if (!tabExact[i]) {
                 if (i > 0) dist += Node.distanceBetween(tabNode[i], tabNode[i - 1]);
@@ -388,6 +396,7 @@ public class Root implements Comparable<Root> {
         if (debug) System.out.println("\n\nTHIRD STEP, ESTABLISH BACKWARD");
         dist = 0;
         Node next = null;
+        // Calculate the distance to the next exact node for each non-exact node
         for (int i = N - 1; i >= 0; i--) {
             if (debug) System.out.println("  Processing node " + i + " : " + tabNode[i]);
             if (!tabExact[i]) {
@@ -404,6 +413,7 @@ public class Root implements Comparable<Root> {
         }
 
         if (debug) System.out.println("\n\nFOURTH STEP, RE ESTIMATE TIME");
+        // Estimate the birth time and birth time in hours for each non-exact node
         for (int i = 0; i < N; i++) {
             if (!tabExact[i]) {
                 double estTime = 0;

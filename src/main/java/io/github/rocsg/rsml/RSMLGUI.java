@@ -14,7 +14,6 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.measure.ResultsTable;
 
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -29,25 +28,45 @@ import java.io.FilenameFilter;
  */
 public class RSMLGUI extends JFrame implements ActionListener {
 
-    /** The Constant serialVersionUID. */
+    /**
+     * The Constant serialVersionUID.
+     */
     private static final long serialVersionUID = 1L;
-    /** The instance. */
+    /**
+     * The instance.
+     */
     private static RSMLGUI instance = null;
-    /** The font. */
-    Font font = new Font("Dialog", Font.PLAIN, 12);
-    /** The img source. */
+    /**
+     * The img source.
+     */
     private final ImagePlus imgSource = null;
-    /** The batch save. */
-    private JCheckBox batchExport, batchResults, batchImage, batchRealWidth, batchConvex, batchSave;
-    /** The batch line width. */
-    private JTextField batchSourceFolder, batchLineWidth;
-    /** The batch color JCB. */
-    private JComboBox batchJCB, batchColorJCB;
-    /** The batch button. */
-    private JButton batchSourceButton, batchButton;
-    /** The tp. */
+    /**
+     * The tp.
+     */
     private final JTabbedPane tp;
-    /** The batch label 1. */
+    /**
+     * The font.
+     */
+    Font font = new Font("Dialog", Font.PLAIN, 12);
+    /**
+     * The batch save.
+     */
+    private JCheckBox batchExport, batchResults, batchImage, batchRealWidth, batchConvex, batchSave;
+    /**
+     * The batch line width.
+     */
+    private JTextField batchSourceFolder, batchLineWidth;
+    /**
+     * The batch color JCB.
+     */
+    private JComboBox batchJCB, batchColorJCB;
+    /**
+     * The batch button.
+     */
+    private JButton batchSourceButton, batchButton;
+    /**
+     * The batch label 1.
+     */
     private JLabel batchLabel1;
 
     /**

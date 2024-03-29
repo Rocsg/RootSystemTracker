@@ -1,7 +1,6 @@
 package io.github.rocsg.rootsystemtracker;
 
 import ij.IJ;
-import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.GenericDialog;
 import ij.plugin.Duplicator;
@@ -12,8 +11,8 @@ import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.Transform3DType;
 import io.github.rocsg.rsml.Node;
-import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rsml.Root;
+import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
@@ -460,7 +459,7 @@ public class PipelineActionsHandler {
         // that everything is 8-bit
         // ?
         stack = VitimageUtils.resize(stack, stack.getWidth() / pph.subsamplingFactor,
-        	stack.getHeight() / pph.subsamplingFactor, stack.getStackSize());
+                stack.getHeight() / pph.subsamplingFactor, stack.getStackSize());
 
         // Get the width and height of the first image in the stack
         int originalWidth = tabImg[0].getWidth();
@@ -757,26 +756,50 @@ public class PipelineActionsHandler {
         return true;
     }
 
+    /**
+     * This method computes the Root System Markup Language (RSML) until expertize for a given image.
+     * It performs several operations such as opening the image, applying masks, reading the graph from a file,
+     * refining the graph, cleaning the RSML, resampling flying roots, cleaning negative thresholds, and writing the RSML.
+     * If the split option is not enabled, it backtracks the primaries. Otherwise, it copies the file.
+     *
+     * @param indexImg      The index of the image in the imgNames array in the PipelineParamHandler object.
+     * @param outputDataDir The directory where the output data will be stored.
+     * @param pph           An instance of the PipelineParamHandler class containing various parameters.
+     * @return A boolean indicating whether the operation was successful.
+     */
     public static boolean computeRSMLUntilExpertize(int indexImg, String outputDataDir, PipelineParamHandler pph) {
+        // Open the mask image
         ImagePlus mask = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
+        // Dilate the mask image
         mask = MorphoUtils.dilationCircle2D(mask, 9);
+        // Open the dates image
         ImagePlus dates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+        // Read the graph from a file
         SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipeline
                 .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
+        // Compute the distance transform of the dates image
         ImagePlus distOut = MorphoUtils.getDistOut(dates, false);
+        // Open the registered image
         ImagePlus reg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
 
+        // Refine the graph
         RootModel rm = RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(graph, distOut, pph, indexImg);
+        // Clean the RSML
         rm.cleanWildRsml();
+        // Resample flying roots
         rm.resampleFlyingRoots();
+        // Clean negative thresholds
         rm.cleanNegativeTh();
 
+        // Write the RSML
         rm.writeRSML3D(new File(outputDataDir, "60_graph_no_backtrack.rsml").getAbsolutePath(), "", true, false);
+        // If the split option is not enabled, backtrack the primaries
         if (!pph.isSplit()) {
             backTrackPrimaries(new File(outputDataDir, "60_graph_no_backtrack.rsml").getAbsolutePath(),
                     new File(outputDataDir, "61_graph.rsml").getAbsolutePath(), mask, reg,
                     pph.toleranceDistanceForBeuckerSimplification);
         } else {
+            // If the split option is enabled, copy the file
             try {
                 FileUtils.copyFile(new File(outputDataDir, "60_graph_no_backtrack.rsml"),
                         new File(outputDataDir, "61_graph.rsml"));
@@ -787,35 +810,52 @@ public class PipelineActionsHandler {
         return true;
     }
 
+    /**
+     * This method computes the Root System Markup Language (RSML) after expertize for a given image.
+     * It performs several operations such as opening the image, applying masks, reading the graph from a file,
+     * checking if the RSML file exists, drawing distance or time, creating time sequence superposition, and saving the images.
+     *
+     * @param indexImg      The index of the image in the imgNames array in the PipelineParamHandler object.
+     * @param outputDataDir The directory where the output data will be stored.
+     * @param pph           An instance of the PipelineParamHandler class containing various parameters.
+     * @return A boolean indicating whether the operation was successful.
+     */
     public static boolean computeRSMLAfterExpertize(int indexImg, String outputDataDir, PipelineParamHandler pph) {
+        // Open the mask image
         ImagePlus mask = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
+        // Dilate the mask image
         mask = MorphoUtils.dilationCircle2D(mask, 9);
+        // Open the dates image
         ImagePlus dates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+        // Read the graph from a file
         SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipeline
                 .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
+        // Open the registered image
         ImagePlus reg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
 
+        // Initialize RootModel
         RootModel rm = null;
+        // Check if the RSML file exists
         if (new File(outputDataDir, "61_graph_expertized.rsml").exists()) {
             rm = RootModel
                     .RootModelWildReadFromRsml(new File(outputDataDir, "61_graph_expertized.rsml").getAbsolutePath());
         } else {
             rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath());
         }
+        // Draw distance or time
         ImagePlus skeletonTime = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 3);
         ImagePlus skeletonDay = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 2);
         ImagePlus allTimes = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, false, 1);
 
+        // Check if memory saving is disabled
         if (pph.memorySaving == 0) {
+            // Create time sequence superposition
             ImagePlus timeRSMLimg = createTimeSequenceSuperposition(reg, rm);
+            // Save the image
             IJ.saveAsTiff(timeRSMLimg,
                     new File(outputDataDir, "62_rsml_2dt_rendered_over_image_sequence.tif").getAbsolutePath());
         }
-        System.out.println(skeletonDay);
-        System.out.println(pph == null ? "PPH Null" : "PPH not null");
-        System.out.println(pph.imgSerieSize == null ? "TAB Null" : "Tab not null");
-        System.out.println(pph.imgSerieSize.length);
-        System.out.println(indexImg);
+        // Set display range and save the images
         skeletonDay.setDisplayRange(0, pph.imgSerieSize[indexImg] + 1);
         skeletonTime.setDisplayRange(0, pph.imgSerieSize[indexImg] + 1);
         allTimes.setDisplayRange(0, pph.imgSerieSize[indexImg] + 1);
@@ -843,6 +883,20 @@ public class PipelineActionsHandler {
         return res;
     }
 
+    /**
+     * This method backtracks the primary roots in a Root System Markup Language (RSML) file.
+     * It reads the RSML file, identifies the primary roots, and for each root, it identifies the first coordinates.
+     * It then identifies the mean height of the region to attain in this area and extracts a rectangle around the first coordinate at time 0.
+     * It extracts a minimum Djikstra path to this region and finds in this path the last point that is not in the interest area.
+     * It then subsamples the new path and inserts the corresponding coordinates, updating the time value along the root.
+     * Finally, it writes the updated RSML file.
+     *
+     * @param pathToInputRsml The path to the input RSML file.
+     * @param pathToOutputRsml The path to the output RSML file.
+     * @param mask The mask image used to identify the region of interest.
+     * @param imgRegT0 The registered image at time 0.
+     * @param toleranceDistToCentralLine The tolerance distance to the central line used in the Djikstra path extraction.
+     */
     public static void backTrackPrimaries(String pathToInputRsml, String pathToOutputRsml, ImagePlus mask,
                                           ImagePlus imgRegT0, double toleranceDistToCentralLine) {
         RootModel rmInit = RootModel.RootModelWildReadFromRsml(pathToInputRsml);
@@ -852,12 +906,12 @@ public class PipelineActionsHandler {
         int xTolerance = X / 20;
 
         for (Root r : prRoots) {
-            System.out.println("\nDebugging Root ");
-            System.out.println(r);
+            // System.out.println("\nDebugging Root ");
+            // System.out.println(r);
             // Identify the first coordinates
             Node oldFirst = r.firstNode;
-            int xMid = (int) oldFirst.x;
-            int yMid = (int) oldFirst.y;
+            int xMid = (int) oldFirst.x; // x coordinate of the first node
+            int yMid = (int) oldFirst.y; // y coordinate of the first node
             System.out.println("Identified coordinates start=" + xMid + "," + yMid);
 
             // Identify the mean height of region to attain in this area

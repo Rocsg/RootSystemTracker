@@ -39,9 +39,10 @@ import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * @author Xavier Draye and Guillaume Lobet - Universit� catholique de Louvain
+ * @author Xavier Draye and Guillaume Lobet - Université catholique de Louvain
  */
 
 
@@ -163,6 +164,10 @@ public class RootModel extends WindowAdapter {
      */
     static final int LATERAL_TRACING_ONE = 8;
     /**
+     * The datafile filter RSML.
+     */
+    static private final DataFileFilterRSML datafileFilterRSML = new DataFileFilterRSML();
+    /**
      * The version.
      */
 //	static int nextRootKey;
@@ -171,10 +176,6 @@ public class RootModel extends WindowAdapter {
      * The datafile key.
      */
     static String datafileKey = "default";
-    /**
-     * The datafile filter RSML.
-     */
-    static private final DataFileFilterRSML datafileFilterRSML = new DataFileFilterRSML();
     /**
      * The root list.
      */
@@ -201,7 +202,9 @@ public class RootModel extends WindowAdapter {
      distance to the root border (along the predicted direction) multiplied by the AUTOBUILD_STEP_FACTOR_BORDER */
     /** Putative distance 2 (from the current node) is equal to the
      root diameter at the current node multiplied by the AUTOBUILD_STEP_FACTOR_DIAMETER */
-    /** Minimum angle step for the automatic recentering of nodes in autoBuildFromNode() */
+    /**
+     * Minimum angle step for the automatic recentering of nodes in autoBuildFromNode()
+     */
     public double[] hoursCorrespondingToTimePoints;
     /**
      * The img.
@@ -537,8 +540,9 @@ public class RootModel extends WindowAdapter {
 
     /**
      * Root model wild read annotation from rsml.
-     *
+     * <p>
      * param rsmlFile the rsml file
+     *
      * @return the root model
      * <p>
      * public static RootModel RootModelWildReadAnnotationFromRsml (String rsmlFile) {//Wild read model for Fijiyama did Root model with time, diameter, vx and vy information
@@ -622,14 +626,15 @@ public class RootModel extends WindowAdapter {
         return null;
     }
 
-    public Root[] getLateralRootsOfPlant(int plant) {
-        ArrayList<Root> ar = new ArrayList<Root>();
-        for (Root r : rootList) {
-            if (r.order == 2 && r.plantNumber == plant) ar.add(r);
-        }
-        return (ar.toArray(new Root[ar.size()]));
-    }
-
+    /*  TODO : reactivate if needed or delete after release
+           public Root[] getLateralRootsOfPlant(int plant) {
+           ArrayList<Root> ar = new ArrayList<Root>();
+           for (Root r : rootList) {
+               if (r.order == 2 && r.plantNumber == plant) ar.add(r);
+           }
+           return (ar.toArray(new Root[ar.size()]));
+       }
+   */
     public double[][] getTipDepthAndRootLengthOverTimesteps(Root r) {
         Node n = r.firstNode;
         Node nPar = n;
@@ -1869,7 +1874,7 @@ public class RootModel extends WindowAdapter {
      *
      * @param pt the pt
      * @return the closest node in primary
-     */
+     *
     public Object[] getClosestNodeInPrimary(Point3d pt) {
 
         double x = pt.x;
@@ -1878,7 +1883,8 @@ public class RootModel extends WindowAdapter {
         Node nodeMin = null;
         Root rootMin = null;
         for (Root r : rootList) {
-            if (r.childList == null || r.childList.size() == 0) continue;
+            //if (r.childList == null || r.childList.isEmpty()) continue;
+            if (r.order > 1) continue;
             Node n = r.firstNode;
             while (n != null) {
                 double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
@@ -1891,6 +1897,31 @@ public class RootModel extends WindowAdapter {
             }
         }
         return new Object[]{nodeMin, rootMin};
+    }*/
+    public Object[] getClosestNodeInPrimary(Point3d pt) {
+        double x = pt.x;
+        double y = pt.y;
+        AtomicReference<Double> distMin = new AtomicReference<>(1E18);
+        AtomicReference<Node> nodeMin = new AtomicReference<>();
+        AtomicReference<Root> rootMin = new AtomicReference<>();
+
+        rootList.parallelStream().forEach(r -> {
+            //if (r.childList == null || r.childList.isEmpty()) continue;
+            if (r.order <= 1) {
+                Node n = r.firstNode;
+                while (n != null) {
+                    double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+                    if (dist < distMin.get() && n.birthTime <= pt.z) {
+                        distMin.set(dist);
+                        rootMin.set(r);
+                        nodeMin.set(n);
+                    }
+                    n = n.child;
+                }
+            }
+        });
+
+        return new Object[]{nodeMin.get(), rootMin.get()};
     }
 
     /**

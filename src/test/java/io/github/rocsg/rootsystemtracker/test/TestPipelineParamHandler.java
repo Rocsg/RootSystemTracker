@@ -16,10 +16,8 @@ public class TestPipelineParamHandler {
         prev_test.globalTestNoRun();
 
         // Define the path to the output folder
-        String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
-                "\\RootSystemTracker\\data\\ordered_input\\output_inv";
-        String outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
-                "\\RootSystemTracker\\data\\ordered_input\\OUT";
+        String inputFolderPath = "..\\data\\Output\\Inventory\\";
+        String outputFolderPath = "..\\data\\Output\\Process\\";
 
         PipelineParamHandler handler = new PipelineParamHandler(inputFolderPath, outputFolderPath);
         assertDoesNotThrow(() -> handler.runCleaningAssistant(inputFolderPath));

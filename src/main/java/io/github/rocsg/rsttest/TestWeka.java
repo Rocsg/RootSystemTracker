@@ -1,13 +1,5 @@
 package io.github.rocsg.rsttest;
-import java.util.ArrayList;
-import java.util.Random;
 
-import io.github.rocsg.fijiyama.common.Timer;
-import io.github.rocsg.fijiyama.common.VitimageUtils;
-import ij.IJ;
-import ij.ImageJ;
-import ij.ImagePlus;
-import ij.plugin.Duplicator;
 //import trainableSegmentation.*;
 public class TestWeka {
 /*

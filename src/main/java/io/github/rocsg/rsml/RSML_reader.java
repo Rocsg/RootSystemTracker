@@ -22,16 +22,24 @@ import java.awt.*;
  */
 public class RSML_reader extends PlugInFrame {
 
-    /** The Constant serialVersionUID. */
+    /**
+     * The Constant serialVersionUID.
+     */
     private static final long serialVersionUID = 1L;
 
-    /** The sr. */
+    /**
+     * The sr.
+     */
     public static FSR sr;
 
-    /** The rsml gui. */
+    /**
+     * The rsml gui.
+     */
     public static RSMLGUI rsmlGui;
 
-    /** The instance. */
+    /**
+     * The instance.
+     */
     private static RSML_reader instance;
 
     /**

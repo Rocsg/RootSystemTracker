@@ -255,7 +255,6 @@
             <artifactId>core</artifactId>
             <version>3.5.1</version>
         </dependency>
-
         <!-- https://mvnrepository.com/artifact/sc.fiji/Trainable_Segmentation -->
         <!--<dependency>
             <groupId>sc.fiji</groupId>
@@ -272,10 +271,23 @@
         <!-- https://mvnrepository.com/artifact/org.scijava/scijava-java3d -->
     </dependencies>
 
-
     <!--<dependencyManagement>
                 <dependencies>
     </dependencies>
 
     </dependencyManagement>-->
+    <!--<build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                    <configuration>
+                        <argLine>-Xmx8G</argLine>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>-->
 </project>

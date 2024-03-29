@@ -30,7 +30,7 @@ public class TestRootSystemTracker {
     public static void main(String[] args) throws Exception {
         ImageJ ij = new ImageJ();
         TestRootSystemTracker te = new TestRootSystemTracker();
-        //te.test_00_loadTestData();
+        te.test_00_loadTestData();
         te.test_01_inventory();
         te.test_02_b_registerStack();
         te.test_03_computeMasks2();
@@ -48,7 +48,7 @@ public class TestRootSystemTracker {
     public void test_00_loadTestData() throws Exception {
         System.out.println("\n\n\nRoot System Tracker\n -- RUNNING TEST 00 Test loading data from resource dir");
         try {
-            String s = new File("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker\\RootSystemTracker\\data\\ordered_input\\input\\BPMP\\230629-PN-pip_1_Seq 1_Boite 00006_IdentificationFailed.jpg").getAbsolutePath();
+            String s = new File("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker\\data\\ordered_input\\input\\BPMP\\230629-PN-pip_1_Seq 1_Boite 00006_IdentificationFailed.jpg").getAbsolutePath();
             ImagePlus img = IJ.openImage(s);
             String res = VitimageUtils.imageResume(img);
             int lenPos = !res.isEmpty() ? 1 : 0;

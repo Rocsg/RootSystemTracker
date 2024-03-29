@@ -19,11 +19,12 @@ public class TestRootDatasetMakeInventory {
 
     @Test
     void globalTestNoRun() {
+        // print current directory
+        System.out.println("Current directory: " + System.getProperty("user.dir"));
+
         // Define the path to the output folder
-        String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
-                "\\RootSystemTracker\\data\\ordered_input\\input";
-        String outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
-                "\\RootSystemTracker\\data\\ordered_input\\output_inv";
+        String inputFolderPath = "..\\data\\Input";
+        String outputFolderPath = "..\\data\\Output\\Inventory";
 
         // Create a File object for the output folder
         File outputFolder = new File(outputFolderPath);

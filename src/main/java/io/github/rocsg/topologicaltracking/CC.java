@@ -849,8 +849,19 @@ public class CC implements Serializable {
         }
     }
 
+    /**
+     * Determines the shortest path between two points in a graph using Dijkstra's algorithm.
+     * The graph is represented by pixels and the shortest path is determined based on the distance to the exterior.
+     * The method also handles the case where the path determination is for a lateral root connected to the trunk.
+     *
+     * @param coordStart An array of two integers representing the x and y coordinates of the start point.
+     * @param coordStop An array of two integers representing the x and y coordinates of the stop point.
+     * @param connexity An integer representing the connexity of the graph.
+     * @param setHereNextCCIfItIsLatDeterminationForTrunk A CC object representing the next connected component if the path determination is for a lateral root. If it's null, the path determination is for the main trunk.
+     * @return A list of Pix objects representing the shortest path from the start point to the stop point.
+     */
     public List<Pix> determineVoxelShortestPath(int[] coordStart, int[] coordStop, int connexity,
-												CC setHereNextCCIfItIsLatDeterminationForTrunk) {
+                                                CC setHereNextCCIfItIsLatDeterminationForTrunk) {
         Pix pixStart = this.getPix(coordStart[0], coordStart[1]);
         Pix pixStop = this.getPix(coordStop[0], coordStop[1]);
         setWeightsToDistExt();

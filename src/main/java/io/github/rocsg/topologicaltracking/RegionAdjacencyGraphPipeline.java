@@ -5,10 +5,10 @@ import ij.ImagePlus;
 import ij.gui.Roi;
 import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
-import io.github.rocsg.rsml.RootModel;
+import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
 import io.github.rocsg.rsml.FSR;
 import io.github.rocsg.rsml.Root;
-import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
+import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstutils.HungarianAlgorithm;
 import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.rstutils.SplineAndPolyLineUtils;
@@ -43,8 +43,8 @@ public class RegionAdjacencyGraphPipeline {
      * -------------------------------------------------------------------------------------------------------------------------------------------
      */
     public static ImagePlus drawDistanceOrTime(ImagePlus source,
-     SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, boolean trueDoDistFalseDoTime, boolean onlyDoSkeleton,
-int mode_1Total_2OutsideDistOrIntTime_3SourceDist) {
+                                               SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, boolean trueDoDistFalseDoTime, boolean onlyDoSkeleton,
+                                               int mode_1Total_2OutsideDistOrIntTime_3SourceDist) {
         ImagePlus imgDist = VitimageUtils.convertToFloat(VitimageUtils.nullImage(source));
         imgDist = VitimageUtils.makeOperationOnOneImage(imgDist, 1, -VitimageUtils.EPSILON, true);
         int X = imgDist.getWidth();
@@ -57,7 +57,7 @@ int mode_1Total_2OutsideDistOrIntTime_3SourceDist) {
                 if (onlyDoSkeleton && (!p.isSkeleton)) continue;
                 if (mode_1Total_2OutsideDistOrIntTime_3SourceDist == 1)
                     valDist[index] = (trueDoDistFalseDoTime) ? ((float) (p.wayFromPrim + p.distOut)) :
- (float) p.timeOutHours;
+                            (float) p.timeOutHours;
                 else if (mode_1Total_2OutsideDistOrIntTime_3SourceDist == 2)
                     valDist[index] = (trueDoDistFalseDoTime) ? ((float) (p.distOut)) : (float) (cc.hour);
                 else valDist[index] = (trueDoDistFalseDoTime) ? ((float) (p.wayFromPrim)) : (float) (p.timeHours);
@@ -68,7 +68,7 @@ int mode_1Total_2OutsideDistOrIntTime_3SourceDist) {
     }
 
     public static ImagePlus drawDistanceTime(ImagePlus source, SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-int mode_1Skel_2All_3AllWithTipDistance) {
+                                             int mode_1Skel_2All_3AllWithTipDistance) {
         ImagePlus imgDist = VitimageUtils.convertToFloat(VitimageUtils.nullImage(source));
         ImagePlus imgTime = imgDist.duplicate();
         ImagePlus imgTimeOut = imgDist.duplicate();
@@ -110,7 +110,7 @@ int mode_1Skel_2All_3AllWithTipDistance) {
     }
 
     public static ImagePlus drawGraph(ImagePlus imgDates, SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-     double circleRadius, int lineThickness, int sizeFactor) {
+                                      double circleRadius, int lineThickness, int sizeFactor) {
         System.out.println("Drawing graph");
 
         //Draw the silhouette
@@ -119,13 +119,13 @@ int mode_1Skel_2All_3AllWithTipDistance) {
         if (sizeFactor > 1) {
             ImagePlus bin = VitimageUtils.thresholdImage(imgDates, 0.5, 100000);
             ImagePlus binResize = VitimageUtils.resizeNearest(bin, imgDates.getWidth() * sizeFactor,
-             imgDates.getHeight() * sizeFactor, 1);
+                    imgDates.getHeight() * sizeFactor, 1);
             ImagePlus ero = MorphoUtils.erosionCircle2D(binResize, 1);
             ImagePlus dil = MorphoUtils.dilationCircle2D(binResize, 1);
             contour = VitimageUtils.makeOperationBetweenTwoImages(dil, ero, 4, false);
 
             ImagePlus nonBinResize = VitimageUtils.resizeNearest(imgDates, imgDates.getWidth() * sizeFactor,
-            imgDates.getHeight() * sizeFactor, 1);
+                    imgDates.getHeight() * sizeFactor, 1);
             ImagePlus ero2 = MorphoUtils.erosionCircle2D(nonBinResize, 1);
             //ImagePlus dil2=MorphoUtils.dilationCircle2D(nonBinResize, 1);
             ImagePlus contour2 = VitimageUtils.makeOperationBetweenTwoImages(nonBinResize, ero2, 4, false);
@@ -164,16 +164,16 @@ int mode_1Skel_2All_3AllWithTipDistance) {
             if (extremity) {
                 if (cc.nPixels >= 2)
                     VitimageUtils.drawCircleIntoImage(imgGraph, vx * (factor * circleRadius + 3 + (cc.trunk ? 2 : 0))
-                    , (int) Math.round(ccx * sizeFactor), (int) Math.round(ccy * sizeFactor), 0, 12);
+                            , (int) Math.round(ccx * sizeFactor), (int) Math.round(ccy * sizeFactor), 0, 12);
             } else {
                 VitimageUtils.drawCircleIntoImage(imgGraph, vx * (factor * circleRadius + 2 + (cc.trunk ? 2 : 0)),
-        (int) Math.round(ccx * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, 255);
+                        (int) Math.round(ccx * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, 255);
                 VitimageUtils.drawCircleIntoImage(imgGraph, vx * (factor * circleRadius + 1 + (cc.trunk ? 1 : 0)),
-        (int) Math.round(ccx * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, 0);
+                        (int) Math.round(ccx * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, 0);
             }
             if ((int) Math.round((ccx) * sizeFactor) > 0)
                 VitimageUtils.drawCircleIntoImage(imgGraph, vx * (factor * circleRadius),
-                 (int) Math.round((ccx) * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, cc.day);
+                        (int) Math.round((ccx) * sizeFactor), (int) Math.round((ccy) * sizeFactor), 0, cc.day);
         }
         System.out.println();
 
@@ -204,16 +204,16 @@ int mode_1Skel_2All_3AllWithTipDistance) {
             if (val > 255) val = 255;
             if (cc1.day > 0)
                 VitimageUtils.drawSegmentInto2DByteImage(imgGraph, lineThickness + (edge.trunk ? 8 : 0), val,
-(cc1x) * sizeFactor, (cc1y) * sizeFactor, xCon * sizeFactor, yCon * sizeFactor, edge.hidden);
+                        (cc1x) * sizeFactor, (cc1y) * sizeFactor, xCon * sizeFactor, yCon * sizeFactor, edge.hidden);
             if (cc1.day > 0)
                 VitimageUtils.drawSegmentInto2DByteImage(imgGraph, lineThickness + (edge.trunk ? 8 : 0), val,
-                 xCon * sizeFactor, yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
+                        xCon * sizeFactor, yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
             VitimageUtils.drawSegmentInto2DByteImage(imgGraph, 1 + (edge.trunk ? 3 : 0), 0, cc1x * sizeFactor,
-             cc1y * sizeFactor, xCon * sizeFactor, yCon * sizeFactor, edge.hidden);
+                    cc1y * sizeFactor, xCon * sizeFactor, yCon * sizeFactor, edge.hidden);
             VitimageUtils.drawSegmentInto2DByteImage(imgGraph, 1 + (edge.trunk ? 3 : 0), 0, xCon * sizeFactor,
-yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
+                    yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
             VitimageUtils.drawCircleIntoImage(imgGraph, 3, (int) Math.round(xCon * sizeFactor),
-             (int) Math.round(yCon * sizeFactor), 0, 12);
+                    (int) Math.round(yCon * sizeFactor), 0, 12);
         }
         System.out.println(incrAct + " activated and " + incrNonAct + " non-activated");
         //Draw the vertices
@@ -228,10 +228,10 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
             boolean extremity = isExtremity(cc, graph);
             if (cc.nPixels >= MIN_SIZE_CC || !extremity)
                 VitimageUtils.drawCircleIntoImage(imgGraph, vx * 3, (int) Math.round(ccx * sizeFactor),
-                 (int) Math.round(ccy * sizeFactor), 0, extremity ? 12 : 0);
+                        (int) Math.round(ccy * sizeFactor), 0, extremity ? 12 : 0);
             if (cc.nPixels >= MIN_SIZE_CC || !extremity)
                 VitimageUtils.drawCircleIntoImage(imgGraph, vx * 2, (int) Math.round(ccx * sizeFactor),
-                 (int) Math.round(ccy * sizeFactor), 0, extremity ? 12 : 255);
+                        (int) Math.round(ccy * sizeFactor), 0, extremity ? 12 : 255);
         }
 
         imgDates.setDisplayRange(0, N + 1);
@@ -265,7 +265,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
     ///// BELOW IS SAFE ZONE ////////
     /////////////////////////////////
     public static RootModel refinePlongementOfCCGraph(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-     ImagePlus distOut, PipelineParamHandler pph, int indexImg) {
+                                                      ImagePlus distOut, PipelineParamHandler pph, int indexImg) {
         System.out.println("Running the plongement");
 
         //Prepare output data storage
@@ -362,7 +362,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                 if (indl > 0) {//It is at least the second connected component
                     currentSource = nextSource;
                     cumulatedDistance += VitimageUtils.distance(previousTarget[0], previousTarget[1],
-                     currentSource[0] + ccFirst.xB, currentSource[1] + ccFirst.yB);
+                            currentSource[0] + ccFirst.xB, currentSource[1] + ccFirst.yB);
                 } else {
                     currentSource = ccFirst.getExpectedSource();
 
@@ -469,7 +469,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                     p.timeOut = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints, yPoints);
                     p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
                     p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
-                     yPointsHours);
+                            yPointsHours);
                 }
 
                 //Back copy to the initial CCs
@@ -495,9 +495,9 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                 List<Pix> list = null;
 
                 list = simplerSimplify ? DouglasPeuckerSimplify.simplifySimpler(ccF.mainDjikstraPath, toKeep.get(li),
-                 3) :
+                        3) :
                         DouglasPeuckerSimplify.simplify(ccF.mainDjikstraPath, toKeep.get(li),
-                         toleranceDistToCentralLine);
+                                toleranceDistToCentralLine);
                 //}
                 for (int i = 0; i < list.size() - 1; i++) {
                     Pix p = list.get(i);
@@ -527,7 +527,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
             for (int i = 0; i < listRprim.size(); i++) {
                 if (debugLat)
                     System.out.println("Looking for " + cc.bestIncomingActivatedEdge().source + "    testing a " +
-                     "Dprim-Nprim" + listDprim.get(i) + "-" + listNprim.get(i));
+                            "Dprim-Nprim" + listDprim.get(i) + "-" + listNprim.get(i));
                 if (listNprim.get(i) == cc.bestIncomingActivatedEdge().source.n && listDprim.get(i) == cc.bestIncomingActivatedEdge().source.day) {
                     myRprim = listRprim.get(i);
                     if (debugLat) System.out.println(" \n\nTHIS ONE ! ");
@@ -591,7 +591,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                 if (indl > 0) {//It is at least the second connected component
                     currentSource = nextSource;
                     cumulatedDistance += VitimageUtils.distance(previousTarget[0], previousTarget[1],
-                     currentSource[0] + ccFirst.xB, currentSource[1] + ccFirst.yB);
+                            currentSource[0] + ccFirst.xB, currentSource[1] + ccFirst.yB);
                 } else currentSource = ccFirst.getExpectedSource();
 
 
@@ -692,7 +692,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
 
             //Convert results of correspondance into double tabs
 //			int N=distInter.size();double[]xPoints=new double[N];double[]yPointsHours=new double[N];
-                //			double[]yPoints=new double[N];for(int i=0;i<N;i++) {xPoints[i]=distInter.get(i);yPoints[i]=timeInter.get
+            //			double[]yPoints=new double[N];for(int i=0;i<N;i++) {xPoints[i]=distInter.get(i);yPoints[i]=timeInter.get
 //			(i);yPointsHours[i]=hoursExtremities[(int)Math.round(timeInter.get(i))];}
 
 
@@ -714,7 +714,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                     p.timeOut = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints, yPoints);
                     p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
                     p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
-                        yPointsHours);
+                            yPointsHours);
                 }
 
                 //Back copy to the initial CCs
@@ -737,9 +737,9 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
 
                 //Subsample respective dijkstra path with beucker algorithm, and collect RSML points
                 List<Pix> list = simplerSimplify ? DouglasPeuckerSimplify.simplifySimpler(ccF.mainDjikstraPath,
-                 toKeep.get(li), 3) :
+                        toKeep.get(li), 3) :
                         DouglasPeuckerSimplify.simplify(ccF.mainDjikstraPath, toKeep.get(li),
-            toleranceDistToCentralLine);
+                                toleranceDistToCentralLine);
                 if (debugLat)
                     System.out.println("Simplifying a list of " + ccF.mainDjikstraPath.size() + " to list of " + list.size());
                 for (int i = 0; i < list.size() - 1; i++) {
@@ -762,7 +762,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
 
 
     public static void reconnectDisconnectedBranches_v2(ImagePlus img2, SimpleDirectedWeightedGraph<CC,
-        ConnectionEdge> graph, PipelineParamHandler pph, int formalism, boolean workAlsoBranches, boolean hack) {
+            ConnectionEdge> graph, PipelineParamHandler pph, int formalism, boolean workAlsoBranches, boolean hack) {
         ImagePlus img = getDistanceMapsToDateMaps(img2);
 
         System.out.println("\nReconnection of disconnected branches");
@@ -886,7 +886,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                                         debug = true;
                                     }
                                     costMatrix[i][j] = weightingOfPossibleHiddenEdge_v2(img, graph, listStop.get(i),
-                listStart.get(j), pph, debug);
+                                            listStart.get(j), pph, debug);
                                     if (Double.isNaN(costMatrix[i][j])) System.out.println("I=" + i + " J=" + j);
 
                                 }
@@ -1011,7 +1011,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
     }
 
     public static SimpleDirectedWeightedGraph<CC, ConnectionEdge> buildGraphFromDateMap(ImagePlus imgDates,
-     int connexity, double[] hours) {
+                                                                                        int connexity, double[] hours) {
         trickOnImgDates(imgDates);
         int maxSizeConnexion = 500000000;
         int nDays = 1 + Math.round(VitimageUtils.maxOfImage(imgDates));
@@ -1061,7 +1061,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
                         double y = tabConn[2];
                         if (n > 0 && n < maxSizeConnexion) {
                             graph.addEdge(tabCC[d1][n1], tabCC[d2][n2], new ConnectionEdge(x, y, n, tabCC[d1][n1],
-                             tabCC[d2][n2], tabConn[3], tabConn[4]));
+                                    tabCC[d2][n2], tabConn[3], tabConn[4]));
                         }
                     }
                 }
@@ -1111,7 +1111,7 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
     }
 
     public static void updateCostAndDisconnectNonOptimalLateralBranches_V2(SimpleDirectedWeightedGraph<CC,
-                    ConnectionEdge> graph) {
+            ConnectionEdge> graph) {
         //The idea : coming from N-1, for each CC that is no trunk, select the successor with the biggest number of
 // followers, counted in pixels
         CC cctest = getCC(graph, 371, 300);//To test : 2192 1820 7   2240 2010 7       2231 1494 9
@@ -1163,18 +1163,18 @@ yCon * sizeFactor, cc2x * sizeFactor, cc2y * sizeFactor, edge.hidden);
             if (cost <= -1) {
                 System.out.println("\nDEBUG FIRST CONNECTION SOURCE TRUNK");
                 System.out.println("A=" + 0.5 * (2 - 2 * VitimageUtils.similarity(source.nPixels / deltaHoursSource,
- target.nPixels / deltaHoursTarget)));
+                        target.nPixels / deltaHoursTarget)));
                 System.out.println("B=" + (nDays - 1));
                 System.out.println("C=" + (1 + VitimageUtils.EPSILON));
                 System.out.println("Sum=" + cost);
             }
         } else {
             cost += (1 - VitimageUtils.similarity(source.nPixels / deltaHoursSource,
-             target.nPixels / deltaHoursTarget)) + (dday < 2 ? 0 : dday - 1) - 0.5 * prodscal + VitimageUtils.EPSILON / 2;
+                    target.nPixels / deltaHoursTarget)) + (dday < 2 ? 0 : dday - 1) - 0.5 * prodscal + VitimageUtils.EPSILON / 2;
             if (cost <= -1) {
                 System.out.println("\nDEBUG FIRST CONNECTION OTHER");
                 System.out.println("A=" + 0.5 * (2 - 2 * VitimageUtils.similarity(source.nPixels / deltaHoursSource,
-target.nPixels / deltaHoursTarget)));
+                        target.nPixels / deltaHoursTarget)));
                 System.out.println("B=" + (dday < 2 ? 0 : dday - 1));
                 System.out.println("C=" + (-prodscal));
                 System.out.println("Sum=" + cost);
@@ -1197,10 +1197,10 @@ target.nPixels / deltaHoursTarget)));
         double deltaHoursTarget = hoursExtremities[target.day] - hoursExtremities[target.day - 1];
         if ((source.trunk) && (!target.trunk)) {
             cost += (1 - VitimageUtils.similarity(source.nPixels / deltaHoursSource,
-             target.nPixels / deltaHoursTarget)) + 0.5 + VitimageUtils.EPSILON;
+                    target.nPixels / deltaHoursTarget)) + 0.5 + VitimageUtils.EPSILON;
         } else {
             cost += (1 - VitimageUtils.similarity(source.nPixels / deltaHoursSource,
-             target.nPixels / deltaHoursTarget)) + (dday < 2 ? 0 : dday - 1) + VitimageUtils.EPSILON / 2/*-0
+                    target.nPixels / deltaHoursTarget)) + (dday < 2 ? 0 : dday - 1) + VitimageUtils.EPSILON / 2/*-0
              .5*/ - prodscal * 0.5;
         }
         return cost;
@@ -1209,8 +1209,8 @@ target.nPixels / deltaHoursTarget)));
 
     public static void reconnectLateralThatWereThereFromTheStart(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, ImagePlus sampleImgForDims, PipelineParamHandler pph, int indexBox) {
         System.out.println("\n-------------------------------------------------------\nStarting outlier detection, " +
-         "rebranching forgotten branches and that folks in " +
-          "RAG\n-------------------------------------------------------");
+                "rebranching forgotten branches and that folks in " +
+                "RAG\n-------------------------------------------------------");
         int nTimesSeries = pph.imgSerieSize[indexBox];
 
         //1) Identify forgotten axes.
@@ -1262,8 +1262,8 @@ target.nPixels / deltaHoursTarget)));
                     }
                     if (findOut == null) continue;
                     ConnectionEdge edd = new ConnectionEdge(findOut.x * 0.5 + ccStart.x * 0.5,
-     findOut.y * 0.5 + ccStart.y * 0.5, 0, findOut, ccStart, findOut.x > ccStart.x ? -1 : 1,
-                      findOut.y > ccStart.y ? -1 : 1);
+                            findOut.y * 0.5 + ccStart.y * 0.5, 0, findOut, ccStart, findOut.x > ccStart.x ? -1 : 1,
+                            findOut.y > ccStart.y ? -1 : 1);
                     edd.activated = true;
                     edd.hidden = true;
                     edd.trunk = false;
@@ -1279,17 +1279,17 @@ target.nPixels / deltaHoursTarget)));
      * <p>
      * Steps are :
      * 1) Identify forgotten axes. These are the roots already existing at start. If they went on growing, they are
- * now disconnected from the primary
+     * now disconnected from the primary
      * 2)
      * 3)
      * 4)
      */
     public static void detectObviouslyOutlierOrganAndProlongateIncidentStopped(SimpleDirectedWeightedGraph<CC,
-     ConnectionEdge> graph, ImagePlus sampleImgForDims, PipelineParamHandler pph, int indexBox) {
+            ConnectionEdge> graph, ImagePlus sampleImgForDims, PipelineParamHandler pph, int indexBox) {
         for (int i = 0; i < 5; i++) System.out.println();
         System.out.println("\n-------------------------------------------------------\nStarting outlier detection, " +
-         "rebranching forgotten branches and that folks in " +
-          "RAG\n-------------------------------------------------------");
+                "rebranching forgotten branches and that folks in " +
+                "RAG\n-------------------------------------------------------");
 
         double[] hours = pph.getHours(indexBox);
         int Xmax = sampleImgForDims.getWidth() - 1;
@@ -1399,7 +1399,7 @@ target.nPixels / deltaHoursTarget)));
                                 ccTmp.surfaceFromStart = surfaceFromStart;
 
                                 //							int tmp=(int) (deltaTimeHoursFromStart/pph
-                            //							.typicalHourDelay);
+                                //							.typicalHourDelay);
 //								if(tmp>nEach.length-1)tmp=nEach.length-1;
                                 //nEach[tmp]++;
 
@@ -1499,7 +1499,7 @@ target.nPixels / deltaHoursTarget)));
 			*/
 
             //			Is this lateral died, having no footprint on the last day and being only one component long
-                //			?
+            //			?
             if (ccLast.day < (dMax)) {
                 if (ccStart.pathFromStart.size() < 2) {
                     nExcludeCosDieEarlyAndIsShort++;
@@ -1519,7 +1519,7 @@ target.nPixels / deltaHoursTarget)));
                 int nAddSecond = 0;
 
                 //Step 3-1 : Test if it hides below a root that was there in first. Check neighbouring comp. before
- // (c1), if from another branch, and their parent and son (c2).
+                // (c1), if from another branch, and their parent and son (c2).
                 ArrayList<CC> incidencialCC = new ArrayList<CC>();
                 ArrayList<Double> incidencialCost = new ArrayList<Double>();
                 ArrayList<CC> ccToTest = new ArrayList<CC>();
@@ -1544,7 +1544,7 @@ target.nPixels / deltaHoursTarget)));
 
 
                 //Step 3-2 : Test if it hides below a root that arrived at the same time. Check neighbouring comp.
- // after (c1), if from another branch, and their parent and son (c2).
+                // after (c1), if from another branch, and their parent and son (c2).
                 for (ConnectionEdge edge1 : graph.outgoingEdgesOf(ccLast)) {
                     CC c1 = edge1.target;
                     if (c1.isLateral && c1.lateralStamp == ccLast.lateralStamp) continue;
@@ -1593,7 +1593,7 @@ target.nPixels / deltaHoursTarget)));
 
                     //Locate if at left or right side of growing incidence
                     double[] v1 = new double[]{bestIncidenceCC.x - bestIncidenceCC.bestIncomingActivatedCC().x,
--bestIncidenceCC.y + bestIncidenceCC.bestIncomingActivatedCC().y, 0};
+                            -bestIncidenceCC.y + bestIncidenceCC.bestIncomingActivatedCC().y, 0};
                     double[] v2 = new double[]{bestIncidenceCC.x - ccLast.x, -bestIncidenceCC.y + ccLast.y, 0};
                     double[] z = new double[]{0, 0, 1};
                     double[] toLeft = TransformUtils.vectorialProduct(z, v1);
@@ -1609,10 +1609,10 @@ target.nPixels / deltaHoursTarget)));
 
                     //Estimate expected length in more
                     double additionalLenExpected =
-                     speed * (hours[dMax - 1] - hours[ccLast.day] + 0.5 * (pph.typicalHourDelay));
+                            speed * (hours[dMax - 1] - hours[ccLast.day] + 0.5 * (pph.typicalHourDelay));
                     double wayStill = additionalLenExpected;
                     CC lastIncidenceCC =
-bestIncidenceCC.ccLateralStart.pathFromStart.get(bestIncidenceCC.ccLateralStart.pathFromStart.size() - 1);
+                            bestIncidenceCC.ccLateralStart.pathFromStart.get(bestIncidenceCC.ccLateralStart.pathFromStart.size() - 1);
                     CC ccToAdd = null;
 
 
@@ -1624,14 +1624,14 @@ bestIncidenceCC.ccLateralStart.pathFromStart.get(bestIncidenceCC.ccLateralStart.
                         if (debug) System.out.println("Vect directeur=" + v[0] + " " + v[1]);
                         v = TransformUtils.multiplyVector(v, wayStill);
                         Rectangle r = new Rectangle((int) Math.min(Xmax, Math.max(0, (ccLast.x + v[0]))),
-                         (int) Math.min(Ymax, Math.max(0, (ccLast.y + v[1]))), 1, 1);
+                                (int) Math.min(Ymax, Math.max(0, (ccLast.y + v[1]))), 1, 1);
                         ccToAdd = new CC(dMax, hours[dMax - 1], maxCCIndexOfDay(graph, dMax), new Roi(r), graph);
                     } else if (wayStill >= ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + lastIncidenceCC.lengthFromStart) {
                         wayStill -= (ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + lastIncidenceCC.lengthFromStart);
                         //If longer than incidence one
                         double[] vectDir =
-new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
-                          lastIncidenceCC.y - lastIncidenceCC.bestIncomingActivatedCC().y, 0};
+                                new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
+                                        lastIncidenceCC.y - lastIncidenceCC.bestIncomingActivatedCC().y, 0};
                         vectDir = TransformUtils.normalize(vectDir);
                         double[] vectRab = TransformUtils.multiplyVector(vectDir, wayStill);
                         double[] vectToNewLat;
@@ -1643,8 +1643,8 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
                         vectToNewLat = TransformUtils.multiplyVector(vectToNewLat, estimateRay);
                         vectToNewLat = TransformUtils.vectorialAddition(vectToNewLat, vectRab);
                         Rectangle r = new Rectangle((int) Math.min(Xmax, Math.max(0,
-                         (lastIncidenceCC.x + vectToNewLat[0]))), (int) Math.min(Ymax, Math.max(0,
-                                    (lastIncidenceCC.y + vectToNewLat[1]))), 1, 1);
+                                (lastIncidenceCC.x + vectToNewLat[0]))), (int) Math.min(Ymax, Math.max(0,
+                                (lastIncidenceCC.y + vectToNewLat[1]))), 1, 1);
                         ccToAdd = new CC(dMax, hours[dMax - 1], maxCCIndexOfDay(graph, dMax), new Roi(r), graph);
                     } else {
                         //A point somewhere between bestIncidenceCC and lastIncidenceCC
@@ -1657,9 +1657,9 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
                             ccOld = ccTmp;
                             ccTmp = ccTmp.bestOutgoingActivatedCC();
                             double lenBef =
- ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + ccOld.lengthFromStart;
+                                    ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + ccOld.lengthFromStart;
                             double lenAft =
-                        ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + ccTmp.lengthFromStart;
+                                    ccLast.euclidianDistanceToCC(bestIncidenceCC) - bestIncidenceCC.lengthFromStart + ccTmp.lengthFromStart;
                             if (wayStill < lenAft && wayStill > lenBef) {
                                 ccBef = ccOld;
                                 ccAft = ccTmp;
@@ -1679,7 +1679,7 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
                         vectToNewLat = TransformUtils.multiplyVector(vectToNewLat, estimateRay);
                         vectPos = TransformUtils.vectorialAddition(vectPos, vectToNewLat);
                         Rectangle r = new Rectangle((int) Math.min(Xmax, Math.max(0, (vectPos[0]))),
-    (int) Math.min(Ymax, Math.max(0, (vectPos[1]))), 1, 1);
+                                (int) Math.min(Ymax, Math.max(0, (vectPos[1]))), 1, 1);
                         ccToAdd = new CC(dMax, hours[dMax - 1], maxCCIndexOfDay(graph, dMax), new Roi(r), graph);
                     }
                     //Actualize it.
@@ -1687,7 +1687,7 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
                     ccToAdd.ccLateralStart = ccLast.ccLateralStart;
                     ccLast.ccLateralStart.pathFromStart.add(ccToAdd);
                     ConnectionEdge edge = new ConnectionEdge(ccLast.x * 0.5 + ccToAdd.x * 0.5,
-                     ccLast.y * 0.5 + ccToAdd.y * 0.5, 0, ccLast, ccToAdd, 0, 0);
+                            ccLast.y * 0.5 + ccToAdd.y * 0.5, 0, ccLast, ccToAdd, 0, 0);
                     edge.activated = true;
                     edge.hidden = true;
                     graph.addEdge(ccLast, ccToAdd, edge);
@@ -1698,10 +1698,10 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
 
 
     public static void detectSubtleOutliersBasedOnStatistics(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-     ImagePlus sampleImgForDims, PipelineParamHandler pph, int indexBox) {
+                                                             ImagePlus sampleImgForDims, PipelineParamHandler pph, int indexBox) {
         for (int i = 0; i < 5; i++) System.out.println();
         System.out.println("\n-------------------------------------------------------\nStarting outlier detection " +
-         "based on statistics\n-------------------------------------------------------");
+                "based on statistics\n-------------------------------------------------------");
 
         double[] hours = pph.getHours(indexBox);
         int Xmax = sampleImgForDims.getWidth() - 1;
@@ -1749,9 +1749,9 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
                 data[0][nCur][iter[nCur] - 1] = cc.lengthBefore;
                 data[1][nCur][iter[nCur] - 1] = cc.lengthFromStart;
                 data[2][nCur][iter[nCur] - 1] = cc.lengthBefore / (Math.max(0.7 * pph.typicalHourDelay,
-                 cc.deltaTimeHoursBefore));
+                        cc.deltaTimeHoursBefore));
                 data[3][nCur][iter[nCur] - 1] = cc.lengthFromStart / (Math.max(0.7 * pph.typicalHourDelay,
-            cc.deltaTimeHoursFromStart));//Security in case there is no delta (=0)
+                        cc.deltaTimeHoursFromStart));//Security in case there is no delta (=0)
                 data[4][nCur][iter[nCur] - 1] = cc.nPixels;
                 data[5][nCur][iter[nCur] - 1] = cc.surfaceFromStart;
                 iter[nCur]--;
@@ -1826,7 +1826,7 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
 
     //Evaluating the reconnexion of ccStop and ccStart, two secondary nodes
     public static double weightingOfPossibleHiddenEdge_v2(ImagePlus img, SimpleDirectedWeightedGraph<CC,
-        ConnectionEdge> graph, CC ccStop, CC ccStart, PipelineParamHandler pph, boolean debug) {
+            ConnectionEdge> graph, CC ccStop, CC ccStart, PipelineParamHandler pph, boolean debug) {
         //if(ccStop.day==17 && ccStart.day==17 && ccStop.n==54 && ccStart.n==66)debug=true;
         if (ccStop.day > ccStart.day) return PENALTY_COST;
         if (ccStop == ccStart) return PENALTY_COST;
@@ -1941,7 +1941,7 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
         int nbSteps = areConnectedByPathOfCC_v2(graph, ccStop, ccStart, pph, debug);
         int lNorm = 3;
         tabGamma[5] = (1.0 / lNorm) * Math.abs(nbSteps - dtCrossDay - 2.5) + (dtCrossDay < 2 ? 0 :
-0.15 * (dtCrossDay - 1));
+                0.15 * (dtCrossDay - 1));
 
         //Glob Orientation score
         if (nStop == 1 || nStart == 1) {
@@ -1990,7 +1990,7 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
         if (delta12Day == 0) delta12Day = 1;
         if (delta23Day == 0) delta23Day = 1;
         double[] vect12 = new double[]{cc2.r.getContourCentroid()[0] - cc1.r.getContourCentroid()[0],
-         cc2.r.getContourCentroid()[1] - cc1.r.getContourCentroid()[1], 0};
+                cc2.r.getContourCentroid()[1] - cc1.r.getContourCentroid()[1], 0};
         double[] vect12PerDay = TransformUtils.multiplyVector(vect12, 1 / delta12Day);
         double distPerDay = TransformUtils.norm(vect12PerDay);
         double xExpected = cc2.r.getContourCentroid()[0] + vect12PerDay[0] * delta23Day;
@@ -1998,8 +1998,8 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
         double xReel = cc3.r.getContourCentroid()[0];
         double yReel = cc3.r.getContourCentroid()[1];
         double relativeDistInDayPerDay =
-         VitimageUtils.distance(xReel, yReel, xExpected, yExpected) / (distPerDay * delta23Day);//TODO : using real
-         // time ?
+                VitimageUtils.distance(xReel, yReel, xExpected, yExpected) / (distPerDay * delta23Day);//TODO : using real
+        // time ?
         return relativeDistInDayPerDay;
     }
 
@@ -2101,9 +2101,9 @@ new double[]{lastIncidenceCC.x - lastIncidenceCC.bestIncomingActivatedCC().x,
 
 
     //Determine if ccStop and ccStart are connected in the undirected region adjacency graph limited to ccStop,
-                    // ccStart and older CC
+    // ccStart and older CC
     public static int areConnectedByPathOfCC_v2(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, CC ccStop,
-CC ccStart, PipelineParamHandler pph, boolean debug) {
+                                                CC ccStart, PipelineParamHandler pph, boolean debug) {
         int maxIter = 30;
         for (CC cc : graph.vertexSet()) cc.stampDist = 10000;
         ccStop.stampDist = 0;
@@ -2146,7 +2146,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
                     }
                     if (!ccTrial.trunk && ccTemp.trunk) {
                         double scoreAdd =
-                         ccTrial.euclidianDistanceToCC(ccTemp.lastCCinLat) / (pph.getMeanSpeedLateral() * (deltaT) / pph.typicalHourDelay);//TODO : make it depends to actual delay
+                                ccTrial.euclidianDistanceToCC(ccTemp.lastCCinLat) / (pph.getMeanSpeedLateral() * (deltaT) / pph.typicalHourDelay);//TODO : make it depends to actual delay
                         if (ccTrial.stampDist > (ccTemp.stampDist + scoreAdd)) {
                             toVisit.add(ccTrial);
                             ccTrial.stampDist = ccTemp.stampDist + scoreAdd;
@@ -2181,7 +2181,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
                     }
                     if (!ccTrial.trunk && ccTemp.trunk) {
                         double scoreAdd =
-            ccTrial.euclidianDistanceToCC(ccTemp.lastCCinLat) / (pph.getMeanSpeedLateral() * (deltaT) / pph.typicalHourDelay);//TODO : make it depends to actual delay
+                                ccTrial.euclidianDistanceToCC(ccTemp.lastCCinLat) / (pph.getMeanSpeedLateral() * (deltaT) / pph.typicalHourDelay);//TODO : make it depends to actual delay
                         if (ccTrial.stampDist > (ccTemp.stampDist + scoreAdd)) {
                             toVisit.add(ccTrial);
                             ccTrial.stampDist = ccTemp.stampDist + scoreAdd;
@@ -2217,10 +2217,10 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
                 if (toInt(tabData[y * X + x]) != 0) continue;
                 int[] vals = new int[]{
                         toInt(tabData[(y - 1) * X + (x - 1)]), toInt(tabData[(y - 1) * X + (x)]),
-                         toInt(tabData[(y - 1) * X + (x + 1)]),
+                        toInt(tabData[(y - 1) * X + (x + 1)]),
                         toInt(tabData[(y) * X + (x - 1)]), toInt(tabData[(y) * X + (x + 1)]),
                         toInt(tabData[(y + 1) * X + (x - 1)]), toInt(tabData[(y + 1) * X + (x)]),
-                         toInt(tabData[(y + 1) * X + (x + 1)])};
+                        toInt(tabData[(y + 1) * X + (x + 1)])};
                 int b = 1;
                 for (int i = 0; i < 8; i++) b = b * vals[i];
                 if (b == 0) continue;
@@ -2230,7 +2230,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
     }
 
     public static void pruneGraph(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, int nbTrees, int xMinTree,
-        int xMaxTree, boolean removeUnconnectedParts, double[] hours) {
+                                  int xMaxTree, boolean removeUnconnectedParts, double[] hours) {
         //* If nbTrees>=1, select nbTrees elements of day 1
         //* Build element of day 0, and connect all selected elements of day 1
         //* Remove all elements not connected
@@ -2295,7 +2295,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
         for (CC cc : list) {
             System.out.println("* Start CC : " + cc);
             graph.addEdge(source, cc, new ConnectionEdge(source.r.getContourCentroid()[0],
-                            source.r.getContourCentroid()[1], 1, source, cc, 0, 0));
+                    source.r.getContourCentroid()[1], 1, source, cc, 0, 0));
         }
         System.out.println();
 
@@ -2355,10 +2355,22 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
 
     /**
      * Methods for building and improving the graph
- * ------------------------------------------------------------------------------------------------------
+     * ------------------------------------------------------------------------------------------------------
+     */
+
+    /**
+     * This method is responsible for building and processing a graph in a straight manner.
+     * It takes an ImagePlus object, a directory path for output data, a PipelineParamHandler object, and an index box as inputs.
+     * It returns a boolean value indicating the success of the operation.
+     *
+     * @param imgDatesTmp The ImagePlus object that contains the image data to be processed.
+     * @param outputDataDir The directory path where the output data will be stored.
+     * @param pph The PipelineParamHandler object that contains the parameters for the pipeline.
+     * @param indexBox The index of the box in the pipeline.
+     * @return boolean Returns true if the operation is successful, false otherwise.
      */
     public static boolean buildAndProcessGraphStraight(ImagePlus imgDatesTmp, String outputDataDir,
-     PipelineParamHandler pph, int indexBox) {
+                                                       PipelineParamHandler pph, int indexBox) {
         double ray = 5;
         int thickness = 5;
         int sizeFactor = pph.sizeFactorForGraphRendering;
@@ -2420,14 +2432,14 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
             IJ.run(imgDatesHigh, "Fire", "");
             imgDatesHigh.setDisplayRange(0, nDays);
             imgDatesHigh = VitimageUtils.resizeNearest(imgDatesTmp, imgDatesTmp.getWidth() * sizeFactor,
-             imgDatesTmp.getHeight() * sizeFactor, 1);
+                    imgDatesTmp.getHeight() * sizeFactor, 1);
             ImagePlus dates;
             ImagePlus graphs;
             if (doDebugImages) {
                 ImagePlus[] graphsImgs = new ImagePlus[4];
                 ImagePlus[] backImgs = new ImagePlus[4];
                 SimpleDirectedWeightedGraph<CC, ConnectionEdge> gg = readGraphFromFile(new File(outputDataDir,
-                "50_graph_step_3.ser").getAbsolutePath());
+                        "50_graph_step_3.ser").getAbsolutePath());
                 graphsImgs[0] = drawGraph(imgDatesTmp, gg, ray, thickness, sizeFactor);
 
                 gg = readGraphFromFile(new File(outputDataDir, "50_graph_step_4.ser").getAbsolutePath());
@@ -2467,7 +2479,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
 
     //update costs and disactivateNonOptimalLateralBranches
     public static void updateCostAndDisconnectNonOptimalLateralBranches_V1(SimpleDirectedWeightedGraph<CC,
-     ConnectionEdge> graph) {
+            ConnectionEdge> graph) {
         for (CC cc : graph.vertexSet()) {
             if (cc.trunk) continue;
             ConnectionEdge bestEdge = cc.bestOutgoingEdge();
@@ -2514,7 +2526,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
     }
 
     public static void postProcessTopology(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph, ImagePlus img,
-        PipelineParamHandler pph, int indexBox) {
+                                           PipelineParamHandler pph, int indexBox) {
         reconnectLateralThatWereThereFromTheStart(graph, img, pph, indexBox);
         detectObviouslyOutlierOrganAndProlongateIncidentStopped(graph, img, pph, indexBox);
         detectSubtleOutliersBasedOnStatistics(graph, img, pph, indexBox);
@@ -2588,7 +2600,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
     }
 
     public static void setFirstOrderCosts_phase2(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-     double[] hoursExtremities) {
+                                                 double[] hoursExtremities) {
         int nDays = getMaxDay(graph);
         for (ConnectionEdge edge : graph.edgeSet()) {
             graph.setEdgeWeight(edge, getCostFirstOrderConnection_phase2(edge, nDays, hoursExtremities));
@@ -2596,7 +2608,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
     }
 
     public static void setFirstOrderCosts_phase1(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
-        double[] hoursExtremities) {
+                                                 double[] hoursExtremities) {
         int nDays = getMaxDay(graph);
         for (ConnectionEdge edge : graph.edgeSet()) {
             graph.setEdgeWeight(edge, getCostFirstOrderConnection(edge, nDays, hoursExtremities));
@@ -2687,7 +2699,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
             ObjectInputStream objectinputstream = new ObjectInputStream(streamIn);
             @SuppressWarnings("unchecked")
             SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph =
-            (SimpleDirectedWeightedGraph<CC, ConnectionEdge>) objectinputstream.readObject();
+                    (SimpleDirectedWeightedGraph<CC, ConnectionEdge>) objectinputstream.readObject();
             objectinputstream.close();
             streamIn.close();
             return graph;
@@ -2745,7 +2757,7 @@ CC ccStart, PipelineParamHandler pph, boolean debug) {
         double minDist = 1E8;
         for (CC cc : graph.vertexSet()) {
             double dist = VitimageUtils.distance(x / res, y / res, cc.r.getContourCentroid()[0],
-             cc.r.getContourCentroid()[1]);
+                    cc.r.getContourCentroid()[1]);
             if (dist < minDist) {
                 minDist = dist;
                 ret = cc;

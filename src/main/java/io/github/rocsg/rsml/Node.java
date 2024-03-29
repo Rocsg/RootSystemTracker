@@ -22,43 +22,61 @@ import java.awt.geom.Point2D;
 
 /**
  * Constructor
- * @author guillaumelobet
  *
+ * @author guillaumelobet
  */
 public class Node {
 
-    /** The birth time. */
+    /**
+     * The birth time.
+     */
     public float x, y, theta, length, cLength, diameter, birthTime, birthTimeHours;
 
-    /** The vy. */
+    /**
+     * The vy.
+     */
     public float vx, vy;
 
-    /** The child. */
+    /**
+     * The child.
+     */
     // length and cLength are in pixels
     public Node child;
-    /** The parent. */
+    /**
+     * The parent.
+     */
     public Node parent;
-    /** The distance. */
+    /**
+     * The distance.
+     */
     public double distance;
-    /** The hidden way to child. */
+    /**
+     * The hidden way to child.
+     */
     boolean hiddenWayToChild = false;
-    /** The needs refresh. */
+    /**
+     * The needs refresh.
+     */
     boolean needsRefresh;
 
-    /** The b cross 23. */
+    /**
+     * The b cross 23.
+     */
     boolean bCross01 = false, bCross23 = false;
 
-    /** The p cross 23. */
+    /**
+     * The p cross 23.
+     */
     boolean pCross01 = false, pCross23 = false;
 
 
     /**
      * Constructor.
      *
-     * @param x the x
-     * @param y the y
-     * @param d the d
-     * @param n the n
+     * @param x     the x
+     * @param y     the y
+     * @param d     the d
+     * @param n     the n
      * @param after the after
      */
     public Node(float x, float y, float d, Node n, boolean after) {
@@ -80,9 +98,9 @@ public class Node {
     /**
      * Instantiates a new node.
      *
-     * @param x the x
-     * @param y the y
-     * @param n the n
+     * @param x     the x
+     * @param y     the y
+     * @param n     the n
      * @param after the after
      */
     public Node(float x, float y, Node n, boolean after) {
@@ -257,8 +275,8 @@ public class Node {
      * Read the node information from and RSML file.
      *
      * @param parentDOM the xml elemnt containg the x/y coordinates
-     * @param diamDOM the xml element contining the diameter elements
-     * @param dpi digit per inch
+     * @param diamDOM   the xml element contining the diameter elements
+     * @param dpi       digit per inch
      */
     public void readRSML(org.w3c.dom.Node parentDOM, org.w3c.dom.Node diamDOM, float dpi) {
 
