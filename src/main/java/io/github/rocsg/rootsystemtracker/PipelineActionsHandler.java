@@ -20,6 +20,7 @@ import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
 import org.apache.commons.io.FileUtils;
 import org.jgrapht.GraphPath;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
+import org.scijava.vecmath.Point3d;
 
 import java.io.File;
 import java.io.IOException;
@@ -879,8 +880,7 @@ public class PipelineActionsHandler {
             tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabRes[i], imgRSML}, false);
             IJ.run(tabRes[i], "RGB Color", "");
         }
-        ImagePlus res = VitimageUtils.slicesToStack(tabRes);
-        return res;
+        return VitimageUtils.slicesToStack(tabRes);
     }
 
     /**
@@ -921,9 +921,6 @@ public class PipelineActionsHandler {
                     upperPix = i;
             }
             upperPix -= 10;// TODO
-
-            if (upperPix < 0)
-                upperPix = 0;
 
             // Extract a rectangle around the first coordinate at time 0
             ImagePlus imgExtractMask = VitimageUtils.cropImage(mask, Math.max(0, xMid - xTolerance),
@@ -966,8 +963,7 @@ public class PipelineActionsHandler {
             r.firstNode = n;
             for (int i = 1; i < list.size() - 1; i++) {
                 p = list.get(i);
-                Node n2 = new Node(p.x + x0, p.y + y0, 0.01f, n, true);
-                n = n2;
+                n = new Node(p.x + x0, p.y + y0, 0.01f, n, true);
             }
             n.child = oldFirst;
             oldFirst.parent = n;
@@ -977,6 +973,7 @@ public class PipelineActionsHandler {
         }
         rmInit.writeRSML3D(pathToOutputRsml, "", true, false);
     }
+
 
     //////////////////// HELPERS OF COMPUTEMASKS ////////////////////////
     public static ImagePlus computeMire(ImagePlus imgIn) {

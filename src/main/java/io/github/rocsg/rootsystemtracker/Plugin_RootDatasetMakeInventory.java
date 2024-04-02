@@ -248,8 +248,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
             IJ.log("DebCici For the images that have been read, I read the patterns of box names, and detected " + N
                     + " different boxes");
             IJ.showMessage("Now I will display the list of codes detected, as a reference for cleaning");
-            for (int i = 0; i < spec.length; i++)
-                IJ.log(spec[i]);
+            for (String s : spec) IJ.log(s);
             IJ.selectWindow("Log");
             IJ.showMessage(
                     "Please set the ImageJ log window somewhere on you screen in order to be able to inspect it.");

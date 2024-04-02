@@ -538,6 +538,10 @@ public class RootModel extends WindowAdapter {
         return res;
     }
 
+    public void increaseNbPlants() {
+        nPlants++;
+    }
+
     /**
      * Root model wild read annotation from rsml.
      * <p>
@@ -1874,30 +1878,31 @@ public class RootModel extends WindowAdapter {
      *
      * @param pt the pt
      * @return the closest node in primary
-     *
-    public Object[] getClosestNodeInPrimary(Point3d pt) {
-
-        double x = pt.x;
-        double y = pt.y;
-        double distMin = 1E18;
-        Node nodeMin = null;
-        Root rootMin = null;
-        for (Root r : rootList) {
-            //if (r.childList == null || r.childList.isEmpty()) continue;
-            if (r.order > 1) continue;
-            Node n = r.firstNode;
-            while (n != null) {
-                double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
-                if (dist < distMin && n.birthTime <= pt.z) {
-                    distMin = dist;
-                    rootMin = r;
-                    nodeMin = n;
-                }
-                n = n.child;
-            }
-        }
-        return new Object[]{nodeMin, rootMin};
-    }*/
+     * <p>
+     * public Object[] getClosestNodeInPrimary(Point3d pt) {
+     * <p>
+     * double x = pt.x;
+     * double y = pt.y;
+     * double distMin = 1E18;
+     * Node nodeMin = null;
+     * Root rootMin = null;
+     * for (Root r : rootList) {
+     * //if (r.childList == null || r.childList.isEmpty()) continue;
+     * if (r.order > 1) continue;
+     * Node n = r.firstNode;
+     * while (n != null) {
+     * double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+     * if (dist < distMin && n.birthTime <= pt.z) {
+     * distMin = dist;
+     * rootMin = r;
+     * nodeMin = n;
+     * }
+     * n = n.child;
+     * }
+     * }
+     * return new Object[]{nodeMin, rootMin};
+     * }
+     */
     public Object[] getClosestNodeInPrimary(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
