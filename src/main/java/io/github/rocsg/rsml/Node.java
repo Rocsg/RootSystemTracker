@@ -95,6 +95,7 @@ public class Node {
         needsRefresh = true;
     }
 
+
     /**
      * Instantiates a new node.
      *
@@ -154,6 +155,19 @@ public class Node {
         return (float) (dirY <= 0 ? Math.acos(dirX / norm)
                 : 2.0 * Math.PI - Math.acos(dirX / norm));
 
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        Node node = (Node) obj;
+        return Float.compare(node.x, x) == 0 &&
+                Float.compare(node.y, y) == 0 &&
+                Float.compare(node.birthTime, birthTime) == 0 &&
+                Float.compare(node.diameter, diameter) == 0;
     }
 
     /**
@@ -328,7 +342,7 @@ public class Node {
      * @return the string
      */
     public String toString() {
-        return ("Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child == null) + " hasparent ?" + (this.parent == null));
+        return ("Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null));
     }
 }
 
