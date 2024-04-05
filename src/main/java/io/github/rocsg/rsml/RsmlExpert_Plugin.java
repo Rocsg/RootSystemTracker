@@ -13,10 +13,13 @@ import ij.plugin.RGBStackMerge;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
+import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.common.Timer;
-import io.github.rocsg.fijiyama.common.VitiDialogs;
-import io.github.rocsg.fijiyama.common.VitimageUtils;
 import org.apache.commons.io.FileUtils;
+import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
+import org.jgrapht.graph.DefaultUndirectedGraph;
 import org.scijava.vecmath.Point3d;
 
 import javax.swing.*;
@@ -241,6 +244,23 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         plugin.run(testDir);//testDir);
     }
 
+    private static Map<Double, List<Boolean>> getTimeMap(TreeMap<Double, List<Point3d>> pointsByTime) {
+        Map<Double, List<Boolean>> extremity = new TreeMap<>();
+        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
+        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
+            List<Boolean> list = new ArrayList<>();
+            for (int i = 0; i < entry.getValue().size(); i++) {
+                if (i == entry.getValue().size() - 1) {// if (i == 0 || i == entry.getValue().size() - 1) {
+                    list.add(true);
+                } else {
+                    list.add(false);
+                }
+            }
+            extremity.put(entry.getKey(), list);
+        }
+        return extremity;
+    }
+
     public String getBoxName() {
         String[] tab;
         if (!this.stackPath.contains("\\")) {
@@ -259,7 +279,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public void run(String arg) {
         this.startPlugin(arg);
     }
-
 
     /**
      * Start plugin.
@@ -364,7 +383,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 });
     }
 
-
     public void setupFrameAndLogArea() {
         this.screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
         if (this.screenWidth > 1920) this.screenWidth /= 2;
@@ -411,7 +429,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         logArea.repaint();
 
     }
-
 
     /**
      * Setup buttons.
@@ -467,6 +484,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(buttonCreateLateral);
         buttonsPanel.add(buttonExtend);
         buttonsPanel.add(buttonBackExtend);
+        //buttonsPanel.add(buttonFit);
+        //buttonsPanel.add(new JLabel());
 
         buttonsPanel.add(createLabel("----Multi organ modif---------"));
         buttonsPanel.add(new JLabel());
@@ -486,6 +505,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         return label;
     }
 
+
+
+    /* Helpers of the Gui ************************************************************************************/
 
     /**
      * Setup image and rsml.
@@ -542,11 +564,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         addLog(s, -1);
         addLog(s2, -1);
     }
-
-
-
-    /* Helpers of the Gui ************************************************************************************/
-
 
     /**
      * Handle key press.
@@ -835,7 +852,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         else finishActionAborted();
     }
 
-
     /**
      * Action backextend branch.
      */
@@ -852,7 +868,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
         else finishActionAborted();
     }
-
 
     /**
      * Action create branch.
@@ -877,8 +892,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public void actionCreatePrimary() {
         boolean did = false;
         addLog("Running action \"Create a primary root\" ...", -1);
-        addLog("Click on the start point of the root at the emergence time, then draw the line for each following observations.", 1);
-        addLog("First, give all the initially points creating a root at time t=0, then click on one point for each following time.", 1);
+        addLog("First click on the root peak at the start time, then continue clicking on different parts of the root until you reach the bottom.", 1);
+        addLog("Then, draw the line for each following observations.", 1);
         enable(OK);
         String[] infos = null;
         waitOkClicked();
@@ -1037,7 +1052,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
         else finishActionAborted();
     }
-
 
     /**
      * Move point in model.
@@ -1319,23 +1333,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.clear();
 
         return formatInfos("CREATEPRIMARY", tabPt);
-    }
-
-    private static Map<Double, List<Boolean>> getTimeMap(TreeMap<Double, List<Point3d>> pointsByTime) {
-        Map<Double, List<Boolean>> extremity = new TreeMap<>();
-        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
-        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            List<Boolean> list = new ArrayList<>();
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                if (i == entry.getValue().size() - 1) {// if (i == 0 || i == entry.getValue().size() - 1) {
-                    list.add(true);
-                } else {
-                    list.add(false);
-                }
-            }
-            extremity.put(entry.getKey(), list);
-        }
-        return extremity;
     }
 
     /**
@@ -1872,9 +1869,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         System.out.println("Image size : " + img.getWidth() + "x" + img.getHeight());
 
-        PathOperations po = new PathOperations(rm, this.currentImage, points, Nt);
+        //PathOperations po = new PathOperations(rm, this.currentImage, points, Nt, zoomFactor);
 
-        po.extractStackOfImageFromPoints();
+        //po.extractStackOfImageFromPoints();
+        //po.shortestDarkestPath4branch();
 
         return null;
     }
@@ -2419,69 +2417,3 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 	}
 */
 }
-
-class PathOperations {
-
-    RootModel rm;
-    ImagePlus currentImage;
-    Point3d[] point3d;
-    int Nt;
-
-    public PathOperations(RootModel rm, ImagePlus currentImage, Point3d[] point3d, int Nt) {
-        this.rm = rm;
-        this.currentImage = currentImage;
-        this.point3d = point3d;
-        this.Nt = Nt;
-    }
-
-    /**
-     * Function to extract a part of the original image :
-     * A rectangle that contains all the points of the model
-     * The extracted image is made out of floats (pixels of the original image are copied)
-     */
-    /**
-     * Function to extract a part of the original image :
-     * A rectangle that contains all the points of the model
-     * The extracted image is made out of floats (pixels of the original image are copied)
-     */
-    public void extractStackOfImageFromPoints() {
-        // Find the bounding box that contains all the 3D points
-        double minX = Double.MAX_VALUE;
-        double minY = Double.MAX_VALUE;
-        double maxX = Double.MIN_VALUE;
-        double maxY = Double.MIN_VALUE;
-
-        for (Point3d point : this.point3d) {
-            if (point.x < minX) minX = point.x;
-            if (point.x > maxX) maxX = point.x;
-            if (point.y < minY) minY = point.y;
-            if (point.y > maxY) maxY = point.y;
-        }
-
-        // Create a rectangle based on the bounding box
-        int startX = (int) Math.floor(minX);
-        int startY = (int) Math.floor(minY);
-        int width = (int) Math.ceil(maxX) - startX;
-        int height = (int) Math.ceil(maxY) - startY;
-
-        System.out.println("Bounding box : " + startX + " " + startY + " " + width + " " + height);
-        // Extraction of slack of part images
-
-        ImagePlus[] tabImg = new ImagePlus[Nt];
-        // For each time
-        // Assuming continuity of the roots
-        for (int i = 0; i < Nt; i++) {
-            // Extract the part of the image
-            ImageProcessor ip = currentImage.getStack().getProcessor(i + 1).duplicate().convertToFloat();
-            // ip.setRoi(startX, startY, width, height); // not taking the right coordinates ???
-            ip.setRoi(startX, startY, width, height);
-            ip = ip.crop();
-            tabImg[i] = new ImagePlus("Extracted image", ip);
-        }
-        ImagePlus res = VitimageUtils.slicesToStack(tabImg);
-        res.show();
-    }
-
-
-}
-
