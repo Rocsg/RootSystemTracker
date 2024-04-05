@@ -18,6 +18,10 @@ import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
 import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
+import io.github.rocsg.fijiyama.registration.ItkTransform;
+import io.github.rocsg.fijiyama.registration.Transform3DType;
+import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
+import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
 
 			
 
@@ -32,6 +36,8 @@ public class Test_RootSystemTracker {
 	
 	public static void main(String[]args) throws Exception {
 		ImageJ ij=new ImageJ();
+		testFunction();
+		if(true)return;
 		Test_RootSystemTracker te=new Test_RootSystemTracker();		
 		te.test_00_loadTestData();
 		te.test_01_inventory();
@@ -41,7 +47,21 @@ public class Test_RootSystemTracker {
 	//	te.test_05_computeRsml();
 		te.test_06_computeMovie();
 	}
-	
+
+	public static void testFunction(){
+		String pathToImg="/home/rfernandez/Bureau/Releases/DOI_data/Fijiyama_DOI/Case_01_Two_images/Input_data/";
+		ImagePlus imgRef=IJ.openImage(pathToImg+"imgRef.tif");
+		ImagePlus imgMov=IJ.openImage(pathToImg+"imgMov.tif");
+
+		RegistrationAction regAct=new RegistrationAction();
+		regAct.defineSettingsFromTwoImages(imgRef, imgMov, null, false);
+		regAct.typeTrans=Transform3DType.RIGID;
+		BlockMatchingRegistration bm=BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef,imgMov,regAct);
+		ItkTransform trRes=bm.runBlockMatching(null,false);
+		bm.closeLastImages();
+	}
+
+
 
 	/**
 	 *  Test function for basic loading of data from the resource dir

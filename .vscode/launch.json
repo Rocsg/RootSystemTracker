@@ -1,0 +1,168 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "PipelineActionsHandler",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.PipelineActionsHandler",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "PipelineParamHandler",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.PipelineParamHandler",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Plugin_RootDatasetMakeInventory",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.Plugin_RootDatasetMakeInventory",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Plugin_RootSystemTracker",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.Plugin_RootSystemTracker",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "RstBox",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.RstBox",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Test_RootSystemTracker",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rootsystemtracker.test.Test_RootSystemTracker",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "ConvenienceTest",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.ConvenienceTest",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "DatasetUnmixer",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.DatasetUnmixer",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "DetectBoxCenter",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.DetectBoxCenter",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Figures",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.Figures",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "TestChangePoint",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.TestChangePoint",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "TestRT",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.TestRT",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Utils",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rsttest.Utils",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "HungarianAlgorithm",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.HungarianAlgorithm",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "PrepareData",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.PrepareData",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "QRcodeReader",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.QRcodeReader",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "RepairML1ML3",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.RepairML1ML3",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "SegmentToSegment",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.SegmentToSegment",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "SplineAndPolyLineUtils",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.SplineAndPolyLineUtils",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Tests",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.Tests",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "Validation",
+            "request": "launch",
+            "mainClass": "io.github.rocsg.rstutils.Validation",
+            "projectName": "rootsystemtracker"
+        },
+        {
+            "type": "java",
+            "name": "TestGaps",
+            "request": "launch",
+            "mainClass": "rstdev.TestGaps",
+            "projectName": "rootsystemtracker"
+        }
+    ]
+}
