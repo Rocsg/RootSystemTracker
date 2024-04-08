@@ -307,10 +307,8 @@ public class Root implements Comparable<Root> {
             if (n.birthTime < 1) n.birthTime = 0;
             n = n.child;
         }
-        if (n != null) {
-            if (n.birthTimeHours < 0) n.birthTimeHours = 0;
-            if (n.birthTime < 1) n.birthTime = 0;
-        }
+        if (n.birthTimeHours < 0) n.birthTimeHours = 0;
+        if (n.birthTime < 1) n.birthTime = 0;
     }
 
     public void interpolateTime() {
@@ -322,14 +320,14 @@ public class Root implements Comparable<Root> {
         ArrayList<Double> timesHours = new ArrayList<Double>();
         ArrayList<Double> dists = new ArrayList<Double>();
         dists.add(n.distance);
-        times.add(Double.valueOf(n.birthTime));
-        timesHours.add(Double.valueOf(n.birthTimeHours));
+        times.add((double) n.birthTime);
+        timesHours.add((double) n.birthTimeHours);
         while (n.child != null) {
             n = n.child;
             if (n.birthTime >= 0) {
                 dists.add(n.distance);
-                times.add(Double.valueOf(n.birthTime));
-                timesHours.add(Double.valueOf(n.birthTimeHours));
+                times.add((double) n.birthTime);
+                timesHours.add((double) n.birthTimeHours);
             }
         }
         Double[] distsTab = dists.toArray(new Double[dists.size()]);
@@ -542,15 +540,13 @@ public class Root implements Comparable<Root> {
                     if (n1 == firstNode) {//it is the first node but not the last node
                         //  System.out.println("     First node");
                         firstNode = n2;
-                        n1 = n2;
-                        n2 = n1.child;
                     } else {//not first node, nor last node
                         //System.out.println("     Not first node");
                         n1.parent.child = n2;
                         n2.parent = n1.parent;
-                        n1 = n2;
-                        n2 = n1.child;
                     }
+                    n1 = n2;
+                    n2 = n1.child;
                 }
             } else {//no need to suppress this node
                 //System.out.println("  Exact");
@@ -1331,11 +1327,10 @@ public class Root implements Comparable<Root> {
      * Update the children information.
      */
     public void updateChildren() {
-        for (int i = 0; i < childList.size(); i++) {
-            Root c = childList.get(i);
+        for (Root c : childList) {
             c.updateRoot();
         }
-        if (childList.size() > 0) {
+        if (!childList.isEmpty()) {
             setFirstChild();
             setLastChild();
             setChildDensity();
