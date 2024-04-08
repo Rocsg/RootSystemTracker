@@ -1048,8 +1048,7 @@ public class RootModel extends WindowAdapter {
         if (header)
             pw.println("image, source, root, root_name, mark_type, position_from_base, diameter, angle, x, y, root_order, root_ontology, value");
         String stmt;
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
+        for (Root r : rootList) {
             // Root origin information
             stmt = name + ", ";
             stmt = stmt.concat(imgName + ", ");  // XD 20110629

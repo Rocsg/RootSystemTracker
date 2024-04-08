@@ -476,8 +476,7 @@ public class Root implements Comparable<Root> {
         int N = nodes.size();
 
         //For each node,
-        for (int n = 0; n < N; n++) {
-            Node nono = nodes.get(n);
+        for (Node nono : nodes) {
             double[] coordsBef = getCoordsAtDistance(nono.distance - deltaBackward);
             double[] coordsAft = getCoordsAtDistance(nono.distance + deltaForward);
             if (coordsBef[2] < 1) coordsBef = new double[]{nono.x, nono.y, nono.birthTime, nono.birthTimeHours};
@@ -685,15 +684,14 @@ public class Root implements Comparable<Root> {
             tab[incr++] = new double[]{dist, node.diameter};
         }
         int n = 0;
-        for (int i = 0; i < tab.length; i++) if (tab[i][0] > 0 && tab[i][0] >= rangeMinL && tab[i][0] <= rangeMaxL) n++;
+        for (double[] doubles : tab) if (doubles[0] > 0 && doubles[0] >= rangeMinL && doubles[0] <= rangeMaxL) n++;
         double[] tabFinal = new double[n];
         if (n == 0) return 0;
         n = 0;
-        for (int i = 0; i < tab.length; i++)
-            if (tab[i][0] > 0 && tab[i][0] >= rangeMinL && tab[i][0] <= rangeMaxL) tabFinal[n++] = tab[i][1];
+        for (double[] doubles : tab)
+            if (doubles[0] > 0 && doubles[0] >= rangeMinL && doubles[0] <= rangeMaxL) tabFinal[n++] = doubles[1];
 
-        double median = VitimageUtils.MADeStatsDoubleSided(tabFinal, null)[0];
-        return median;
+        return VitimageUtils.MADeStatsDoubleSided(tabFinal, null)[0];
 
     }
 

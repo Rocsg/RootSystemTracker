@@ -323,17 +323,17 @@ public class Node {
      */
     public void readRSML(org.w3c.dom.Node parentDOM, boolean timeLapse) {
         org.w3c.dom.Node nn = parentDOM.getAttributes().getNamedItem("coord_t");
-        if (nn != null) birthTime = Float.valueOf(nn.getNodeValue());
+        if (nn != null) birthTime = Float.parseFloat(nn.getNodeValue());
         nn = parentDOM.getAttributes().getNamedItem("coord_x");
-        if (nn != null) x = Float.valueOf(nn.getNodeValue()).floatValue();
+        if (nn != null) x = Float.parseFloat(nn.getNodeValue());
         nn = parentDOM.getAttributes().getNamedItem("coord_y");
-        if (nn != null) y = Float.valueOf(nn.getNodeValue()).floatValue();
+        if (nn != null) y = Float.parseFloat(nn.getNodeValue());
         nn = parentDOM.getAttributes().getNamedItem("diameter");
-        if (nn != null) diameter = Float.valueOf(nn.getNodeValue()).floatValue();
+        if (nn != null) diameter = Float.parseFloat(nn.getNodeValue());
         nn = parentDOM.getAttributes().getNamedItem("vx");
-        if (nn != null) vx = Float.valueOf(nn.getNodeValue()).floatValue();
+        if (nn != null) vx = Float.parseFloat(nn.getNodeValue());
         nn = parentDOM.getAttributes().getNamedItem("vy");
-        if (nn != null) vy = Float.valueOf(nn.getNodeValue()).floatValue();
+        if (nn != null) vy = Float.parseFloat(nn.getNodeValue());
     }
 
     /**

@@ -13,18 +13,16 @@ import ij.plugin.RGBStackMerge;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
-import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.common.Timer;
+import io.github.rocsg.fijiyama.common.*;
 import org.apache.commons.io.FileUtils;
-import org.jgrapht.Graph;
 import org.jgrapht.GraphPath;
-import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
-import org.jgrapht.graph.DefaultUndirectedGraph;
 import org.scijava.vecmath.Point3d;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.Line2D;
 import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -32,6 +30,7 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -186,10 +185,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     private JFrame frame;
     /**
-     * The screen width.
-     */
-    private int screenWidth;
-    /**
      * The buttons panel.
      */
     private JPanel buttonsPanel;
@@ -210,6 +205,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private String stackPath;
 
     private String rsmlPath;
+
+    private boolean toResize = true;
 
     private String version = "v1.6.0 patch Cici";
 
@@ -251,6 +248,23 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             List<Boolean> list = new ArrayList<>();
             for (int i = 0; i < entry.getValue().size(); i++) {
                 if (i == entry.getValue().size() - 1) {// if (i == 0 || i == entry.getValue().size() - 1) {
+                    list.add(true);
+                } else {
+                    list.add(false);
+                }
+            }
+            extremity.put(entry.getKey(), list);
+        }
+        return extremity;
+    }
+
+    private static Map<Double, List<Boolean>> getDoubleListMap(TreeMap<Double, List<Point3d>> pointsByTime) {
+        Map<Double, List<Boolean>> extremity = new TreeMap<>();
+        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
+        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
+            List<Boolean> list = new ArrayList<>();
+            for (int i = 0; i < entry.getValue().size(); i++) {
+                if ((i == (entry.getValue().size() - 1))) {
                     list.add(true);
                 } else {
                     list.add(false);
@@ -384,8 +398,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     }
 
     public void setupFrameAndLogArea() {
-        this.screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
-        if (this.screenWidth > 1920) this.screenWidth /= 2;
+        /**
+         * The screen width.
+         */
+        int screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
+        if (screenWidth > 1920) screenWidth /= 2;
         frame = new JFrame();
         JPanel consolePanel = new JPanel();
         consolePanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -484,8 +501,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(buttonCreateLateral);
         buttonsPanel.add(buttonExtend);
         buttonsPanel.add(buttonBackExtend);
-        //buttonsPanel.add(buttonFit);
-        //buttonsPanel.add(new JLabel());
+        buttonsPanel.add(buttonFit);
+        buttonsPanel.add(new JLabel());
 
         buttonsPanel.add(createLabel("----Multi organ modif---------"));
         buttonsPanel.add(new JLabel());
@@ -498,16 +515,16 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(buttonSave);
     }
 
+
+
+    /* Helpers of the Gui ************************************************************************************/
+
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
         label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setVerticalAlignment(SwingConstants.CENTER);
         return label;
     }
-
-
-
-    /* Helpers of the Gui ************************************************************************************/
 
     /**
      * Setup image and rsml.
@@ -533,12 +550,13 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         System.out.println(currentModel.cleanWildRsml());
         System.out.println(currentModel.resampleFlyingRoots());
 
-        int j = 1;
 
         // Apply any modifications that have been made to the model
-        while (!tabModifs[j][0].isEmpty()) {
-            readLineAndExecuteActionOnModel(tabModifs[j], currentModel);
-            j++;
+        for (String[] modif : tabModifs) {
+            if (modif[0].isEmpty()) break;
+            // Skip first line
+            if (tabModifs[0][0].equals(modif[0])) continue;
+            readLineAndExecuteActionOnModel(modif, currentModel);
             nModifs++;
         }
 
@@ -547,22 +565,49 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         imgInitSize = tabReg[0].duplicate();
         Nt = tabReg.length;
         tabRes = new ImagePlus[Nt];
-        for (int i = 0; i < tabReg.length; i++)
-            tabReg[i] = VitimageUtils.resize(tabReg[i], tabReg[i].getWidth() * zoomFactor,
-                    tabReg[i].getHeight() * zoomFactor, 1);
+
+        if (toResize) {
+            // Determine the number of available processors
+            int numProcessors = Runtime.getRuntime().availableProcessors();
+
+            // Create an ExecutorService with a fixed thread pool
+            ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+
+            // Submit tasks to the ExecutorService
+            for (int i = 0; i < tabReg.length; i++) {
+                final int index = i;
+                executorService.submit(() ->
+                        tabReg[index] = VitimageUtils.resize(tabReg[index], tabReg[index].getWidth() * zoomFactor,
+                                tabReg[index].getHeight() * zoomFactor, 1));
+            }
+
+            // Shut down the ExecutorService
+            executorService.shutdown();
+
+            try {
+                // Wait for all tasks to complete
+                executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                // Handle interruption
+                e.printStackTrace();
+            }
+            toResize = false;
+        }
 
         // Project the RSML model onto the current image
         currentImage = projectRsmlOnImage(currentModel);
         currentImage.show();
-
         // Log the steps/hours and mean timestep information
         double[] tabHours = currentModel.hoursCorrespondingToTimePoints;
-        String s = "Steps/hours : ";
-        for (int i = 0; i < tabHours.length; i++) s += " | " + i + " -> " + VitimageUtils.dou(tabHours[i]);
-        String s2 = "Mean timestep = " + VitimageUtils.dou(tabHours[tabHours.length - 1] / (tabHours.length - 1));
-        IJ.log(s + "\n" + s2);
-        addLog(s, -1);
-        addLog(s2, -1);
+        StringBuilder stepsAndHours = new StringBuilder("Steps/hours : ");
+        for (int i = 0; i < tabHours.length; i++) {
+            stepsAndHours.append(" | ").append(i).append(" -> ").append(VitimageUtils.dou(tabHours[i]));
+        }
+        String meanTimestep = "Mean timestep = " + VitimageUtils.dou(tabHours[tabHours.length - 1] / (tabHours.length - 1));
+        String logInfo = stepsAndHours + "\n" + meanTimestep;
+        IJ.log(logInfo);
+        addLog(stepsAndHours.toString(), -1);
+        addLog(meanTimestep, -1);
     }
 
     /**
@@ -1224,7 +1269,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         //boolean[] extremity = new boolean[tabPt.length];
 
 
-        boolean timeOrder = tabPt[1].z >= tabPt[0].z;
+        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
@@ -1285,39 +1330,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                // Create a new Node for the current point and link it to the previous node
-                Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
-
-                nn.parent = nPar;
-
-                // If the current point is an extremity, set its birth time and birth time in hours
-                if (extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z;
-                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                } else {
-                    // If the current point is not an extremity, calculate its birth time and birth time in hours
-                    nn.birthTime = (float) (pt.z - 0.5);
-                    nn.birthTimeHours =
-                            (float) (0.5 * rm.hoursCorrespondingToTimePoints[(int) pt.z] + 0.5 * nPar.birthTime);
-                }
-
-                // Avoid repeating the same node
-                if (recordedNodes.contains(nn))
-                    continue;
-
-                nPar.child = nn;
-
-                // Set the current node as the parent for the next iteration
-                nPar = nn;
-
-                recordedNodes.add(nn);
-            }
-        }
+        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
 
         // Add the new primary root to the RootModel
         Root rNew = new Root(null, rm, "", 1);
@@ -1358,7 +1371,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Root r = (Root) obj[1];
         System.out.println("Creating branch from :\n --> Node " + n + "\n --> Of root " + r);
 
-        boolean timeOrder = tabPt[1].z >= tabPt[0].z;
+        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
@@ -1386,19 +1399,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
         }
 
-        Map<Double, java.util.List<Boolean>> extremity = new TreeMap<>();
-        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
-        for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            java.util.List<Boolean> list = new ArrayList<>();
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                if ((i == (entry.getValue().size() - 1))) {
-                    list.add(true);
-                } else {
-                    list.add(false);
-                }
-            }
-            extremity.put(entry.getKey(), list);
-        }
+        Map<Double, List<Boolean>> extremity = getDoubleListMap(pointsByTime);
 
         // Print each time, number of points and points
         /*for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
@@ -1432,39 +1433,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                // Create a new Node for the current point and link it to the previous node
-                Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
-
-                nn.parent = nPar;
-
-                // If the current point is an extremity, set its birth time and birth time in hours
-                if (extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z;
-                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                } else {
-                    // If the current point is not an extremity, calculate its birth time and birth time in hours
-                    nn.birthTime = (float) (pt.z - 0.5);
-                    nn.birthTimeHours =
-                            (float) (0.5 * rm.hoursCorrespondingToTimePoints[(int) pt.z] + 0.5 * nPar.birthTime);
-                }
-
-                // Avoid repeating the same node
-                if (recordedNodes.contains(nn))
-                    continue;
-
-                nPar.child = nn;
-
-                // Set the current node as the parent for the next iteration
-                nPar = nn;
-
-                recordedNodes.add(nn);
-            }
-        }
+        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
 
         Root rNew = new Root(null, rm, "", 2);
         rNew.firstNode = n;
@@ -1481,7 +1450,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         return infos;
     }
-
 
     /**
      * This method extends a branch in the RootModel.
@@ -1512,7 +1480,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        boolean timeOrder = tabPt[1].z >= tabPt[0].z;
+        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
@@ -1563,39 +1531,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                // Create a new Node for the current point and link it to the previous node
-                Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
-
-                nn.parent = nPar;
-
-                // If the current point is an extremity, set its birth time and birth time in hours
-                if (extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z;
-                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                } else {
-                    // If the current point is not an extremity, calculate its birth time and birth time in hours
-                    nn.birthTime = (float) (pt.z - 0.5);
-                    nn.birthTimeHours =
-                            (float) (0.5 * rm.hoursCorrespondingToTimePoints[(int) pt.z] + 0.5 * nPar.birthTime);
-                }
-
-                // Avoid repeating the same node
-                if (recordedNodes.contains(nn))
-                    continue;
-
-                nPar.child = nn;
-
-                // Set the current node as the parent for the next iteration
-                nPar = nn;
-
-                recordedNodes.add(nn);
-            }
-        }
+        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
 
         r.lastNode = nPar;
         r.updateTiming();
@@ -1675,24 +1611,31 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             tabPt[tabPt.length - 1 - i] = temp;
         }
 
-        Object[] obj = rm.getClosestNode(tabPt[0]);
+        Object[] obj = rm.getClosestNode(tabPt[tabPt.length - 1]);
 
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
         System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
 
-        if (n != r.lastNode) {
-            IJ.showMessage("Please select the last point of the branch you want to extend. Abort.");
+
+        if ((n != r.firstNode)) {
+            IJ.showMessage("Please select the first point of the branch you want to extend. Abort.");
             return null;
         }
 
-        boolean timeOrder = tabPt[1].z >= tabPt[0].z;
+
+        if (n.birthTime != tabPt[tabPt.length - 1].z) {
+            IJ.showMessage("Please select the first point of the branch you want to extend at the right time. Abort.");
+            return null;
+        }
+
+        boolean timeOrder = (tabPt[1].z <= tabPt[0].z);
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (timeOrder != (tabPt[l + 1].z >= tabPt[l].z)) {
+            if (timeOrder && (tabPt[l + 1].z <= tabPt[l].z)) {
                 IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
                 return null;
             }
@@ -1716,29 +1659,47 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
 
+        Object[] obj2 = rm.getClosestNode(tabPt[0]);
+
         // replace the first point of the list of the first time by n
-        pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
+        // Last point of last time slice gets the first point of the branch
+        //pointsByTime.get(pointsByTime.lastKey()).set(pointsByTime.get(pointsByTime.lastKey()).size() - 1, new Point3d(n.x, n.y, n.birthTime));
 
-        // Print each time, number of points and points
-        /*for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("Time : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                System.out.println(" --> " + extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt)));
-            }
-        }*/
-
-        // Create a new primary root from the points provided
-
-        // Link the points at time 0 (or 1) from the first one entered by the user to the last one
-        // Create a new Node for each point and link them together to form a branch
-        Node nPar = n;
+        // if the first point is the first node of a primary root and that it is defined at time 0, set the time of all the reccorded nodes to 0
+        Node nFirst = new Node((float) tabPt[0].x, (float) tabPt[0].y, null, true);
+        nFirst.birthTime = ((n.birthTime == 0) && (r.order == 1)) ? 0 : (float) tabPt[0].z;
 
         List<Node> recordedNodes = new ArrayList<Node>();
-        recordedNodes.add(n);
+        recordedNodes.add(nFirst);
+
+        Node nPar = nFirst;
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
+        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
+
+        nPar.child = r.firstNode;
+        r.firstNode.parent = nPar;
+        r.firstNode = nFirst;
+
+        if (nFirst.birthTime == 0) {
+            for (Node n0 : recordedNodes) {
+                n0.birthTime = 0;
+                n0.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[0];
+            }
+        }
+
+        r.updateTiming();
+
+        // free memory
+        pointsByTime.clear();
+        extremity.clear();
+        recordedNodes.clear();
+
+        return infos;
+    }
+
+    private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremity, List<Node> recordedNodes, Node nPar) {
+        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
             System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
 
             for (Point3d pt : entry.getValue()) {
@@ -1771,16 +1732,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 recordedNodes.add(nn);
             }
         }
-
-        r.lastNode = nPar;
-        r.updateTiming();
-
-        // free memory
-        pointsByTime.clear();
-        extremity.clear();
-        recordedNodes.clear();
-
-        return infos;
+        return nPar;
     }
 
 
@@ -1815,66 +1767,35 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         return infos;
     }
 
-    public String[] fitLastActionRootsInModel(RootModel rm) {
-        // Getting last action from the tabModifs
-        String[] lastAction;
-
-        // While the last action is empty, get the previous one
+    private String[] getLastAction() {
         int l = tabModifs.length - 1;
         while (tabModifs[l][0].isEmpty()) {
             l--;
         }
-        lastAction = tabModifs[l];
-        System.out.println("Last action : " + Arrays.toString(lastAction)); // [CREATEBRANCH, 5, Pt_0, 1235.0, 457.0, 25.0, Pt_1, 1239.0, 460.0, 26.0, Pt_2, 1242.0, 461.0, 27.0, Pt_3, 1242.0, 462.0, 28.0, Pt_4, 1243.0, 463.0, 29.0, , , , , , ,  ...
+        return tabModifs[l];
+    }
 
-        // Regular expressions for action type and 3D points array
+    private String getActionType(String[] lastAction) {
         Pattern actionPattern = Pattern.compile("\\[(\\w+)");
-        Pattern pointsPattern = Pattern.compile("(Pt_\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+)");
-
         Matcher actionMatcher = actionPattern.matcher(Arrays.toString(lastAction));
+        if (actionMatcher.find()) {
+            return actionMatcher.group(1);
+        }
+        return null;
+    }
+
+    private Point3d[] extractPoints(String[] lastAction) {
+        Pattern pointsPattern = Pattern.compile("(Pt_\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+)");
         Matcher pointsMatcher = pointsPattern.matcher(Arrays.toString(lastAction));
 
-        String actionType = null;
-        while (actionMatcher.find()) {
-            actionType = actionMatcher.group(1);
-        }
-
-        // Determine the size of the points array dynamically
-        int numPoints = 0;
-        while (pointsMatcher.find()) {
-            numPoints++;
-        }
-        Point3d[] points = new Point3d[numPoints];
-
-        // Reset matcher
-        pointsMatcher.reset();
-
-        int index = 0;
+        List<Point3d> pointsList = new ArrayList<>();
         while (pointsMatcher.find()) {
             double x = Double.parseDouble(pointsMatcher.group(2));
             double y = Double.parseDouble(pointsMatcher.group(3));
             double z = Double.parseDouble(pointsMatcher.group(4));
-            points[index] = new Point3d(x, y, z);
-            index++;
+            pointsList.add(new Point3d(x, y, z));
         }
-
-        System.out.println("Action type: " + actionType);
-        System.out.println("3D Points Array:");
-        for (Point3d point : points) {
-            System.out.println(point);
-        }
-
-        // getting the image
-        ImagePlus img = currentImage;
-
-        System.out.println("Image size : " + img.getWidth() + "x" + img.getHeight());
-
-        //PathOperations po = new PathOperations(rm, this.currentImage, points, Nt, zoomFactor);
-
-        //po.extractStackOfImageFromPoints();
-        //po.shortestDarkestPath4branch();
-
-        return null;
+        return pointsList.toArray(new Point3d[0]);
     }
 
     /**
@@ -2165,37 +2086,37 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Start a timer to measure the execution time of this method
         Timer t = new Timer();
 
+        // Create an array to store processed images
+        ImagePlus[] processedImages = new ImagePlus[Nt];
+
         // Loop over each time point in the model
-        for (int i = 0; i < Nt; i++) {
+        IntStream.range(0, Nt).parallel().forEach(i -> {
             // Create a grayscale image of the RSML model at this time point
             ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgInitSize, zoomFactor, false, (i + 1), true,
                     new boolean[]{true, true, true, false, true}, new double[]{2, 2});
-
-            // show the image
-            //imgRSML.show();
 
             // Set the display range of the image
             imgRSML.setDisplayRange(0, Nt + 3);
 
             // Merge the grayscale image with the registered stack image
-            tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
+            processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
 
             // Convert the image to RGB color
-            IJ.run(tabRes[i], "RGB Color", "");
-        }
+            IJ.run(processedImages[i], "RGB Color", "");
+        });
 
         // Print the execution time of this method
         t.print("Updating root model took : ");
 
         // Combine the images into a stack
-        ImagePlus res = VitimageUtils.slicesToStack(tabRes);
+        ImagePlus res = VitimageUtils.slicesToStack(processedImages);
 
         // Get the name of the box
         String chain = getBoxName();
 
         // Create a name for the image
         String nom =
-                "Model_of_box_" + chain + "_at_step_" + (nModifs < 1000 ? "0" : "") + (nModifs < 100 ? "0" : "") + (nModifs < 10 ? "0" : "") + nModifs;
+                "Model_of_box_" + chain + "_at_step_" + String.format("%04d", nModifs);
 
         // Set the title of the image
         res.setTitle(nom);
@@ -2203,6 +2124,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Return the image
         return res;
     }
+
+
 
     /**
      * Wait ok clicked.
@@ -2416,4 +2339,238 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 		return (  new File(modelDir,"4_2_Model_"+ (stepOfModel<1000 ? ("0") : "" ) + (stepOfModel<100 ? ("0") : "" ) + (stepOfModel<10 ? ("0") : "" ) + stepOfModel+".rsml" ).getAbsolutePath());
 	}
 */
+    public String[] fitLastActionRootsInModel(RootModel rm) {
+        String[] lastAction = getLastAction();
+        System.out.println("Last action: " + Arrays.toString(lastAction));
+
+        String actionType = getActionType(lastAction);
+        System.out.println("Action type: " + actionType);
+
+        Point3d[] points = extractPoints(lastAction);
+
+        System.out.println("Image size: " + currentImage.getWidth() + "x" + currentImage.getHeight());
+        System.exit(0);
+
+        extractedImageRepartition eir = new extractedImageRepartition(rm, currentImage, points, zoomFactor, Nt);
+
+        // Get the shortest and darkest path in the image
+        eir.applyDarkestShortestPath();
+
+        // Exit all program
+        //System.exit(0);
+
+        return null; // Placeholder return
+    }
 }
+
+
+class extractedImageRepartition {
+    private final int zoomFactor;
+    private final RootModel rm;
+    private final Point3d[] point3d;
+    private final int Nt;
+    private ImagePlus image;
+
+    public extractedImageRepartition(RootModel rm, ImagePlus image, Point3d[] point3d, int zoomFactor, int Nt) {
+        this.rm = rm;
+        this.point3d = point3d;
+        this.zoomFactor = zoomFactor;
+        this.Nt = Nt;
+        extractStackOfImageFromPoints(image);
+    }
+
+
+    /**
+     * Function to extract a part of the original image :
+     * A rectangle that contains all the points of the model
+     * The extracted image is made out of floats (pixels of the original image are copied)
+     */
+    public void extractStackOfImageFromPoints(ImagePlus currentImage) {
+        // Find the bounding box that contains all the 3D points
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = Double.MIN_VALUE;
+        double maxY = Double.MIN_VALUE;
+
+        for (Point3d point : this.point3d) {
+            if (point.x < minX) minX = point.x;
+            if (point.x > maxX) maxX = point.x;
+            if (point.y < minY) minY = point.y;
+            if (point.y > maxY) maxY = point.y;
+        }
+
+        // Adjust the bounding box according to the zoom factor
+        int startX = (int) Math.floor(minX * zoomFactor);
+        int startY = (int) Math.floor(minY * zoomFactor);
+        int width = (int) Math.ceil((maxX - minX) * zoomFactor);
+        int height = (int) Math.ceil((maxY - minY) * zoomFactor);
+
+        System.out.println("Bounding box : " + startX + " " + startY + " " + width + " " + height);
+
+        // Extraction of stack of part images
+        ImagePlus[] tabImg = new ImagePlus[Nt];
+
+        // For each time
+        // Assuming continuity of the roots
+        for (int i = 0; i < Nt; i++) {
+            // Extract the part of the image
+            ImageProcessor ip = currentImage.getStack().getProcessor(i + 1).duplicate().convertToFloat();
+            ip.setRoi(startX, startY, width, height);
+            ip = ip.crop();
+            tabImg[i] = new ImagePlus("Extracted image", ip);
+        }
+        this.image = VitimageUtils.slicesToStack(tabImg);
+        // Current image takes the value of the stack of images
+
+        // express the points in the new coordinate system
+        for (Point3d point : this.point3d) {
+            point.x = point.x - minX;
+            point.y = point.y - minY;
+        }
+
+        // free memory
+        for (ImagePlus img : tabImg) {
+            img.close();
+        }
+
+    }
+
+    public void applyDarkestShortestPath() {
+
+        // for each 2 points with corresponding times (3rd coordinate)
+        for (int i = 0; i < 5; i++) {// point3d.length - 1; i++) {
+            // Get the shortest and darkest path in the image
+            GraphPath<Pix, Bord> shortestPath = VitimageUtils.getShortestAndDarkestPathInImage(image, 8, new Pix((int) point3d[i].x, (int) point3d[i].y, 0), new Pix((int) point3d[i + 1].x, (int) point3d[i + 1].y, 0));
+
+            // print the result
+            System.out.println("Initial points : " + point3d[i] + " -> " + point3d[i + 1]);
+            System.out.println("Shortest path length: " + shortestPath.getLength());
+            for (Bord b : shortestPath.getEdgeList()) {
+                System.out.println(b);
+            }
+            for (Pix p : shortestPath.getVertexList()) {
+                System.out.println(p);
+            }
+
+            // plot the points with crosses on the image and show the image at right time of the stack
+//            ImagePlus ip = image.duplicate();
+//            ip.show();
+//            for (Pix p : shortestPath.getVertexList()) {
+//                ip.getStack().getProcessor((int) point3d[i].z + 1).drawDot(p.x, p.y);
+//            }
+
+            // exit program
+
+        }
+
+    }
+
+
+    public void plotPixelRepartitionFollowingLine() {
+        Pix pixStart = new Pix((int) point3d[0].x, (int) point3d[0].y, 0);
+        Pix pixEnd = new Pix((int) point3d[1].x, (int) point3d[1].y, 0);
+        int time = 0;
+        // Get the line between the 2 points
+        Line2D line = new Line2D.Double(pixStart.x, pixStart.y, pixEnd.x, pixEnd.y);
+
+        // get distance between the 2 points
+        double distance = Math.sqrt(Math.pow(pixEnd.x - pixStart.x, 2) + Math.pow(pixEnd.y - pixStart.y, 2));
+
+        // Get the pixels that are on the line - Bresenham
+        List<Pix> pixelsOnLine = new ArrayList<>();
+        int x1 = (int) line.getX1();
+        int y1 = (int) line.getY1();
+        int x2 = (int) line.getX2();
+        int y2 = (int) line.getY2();
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
+        int err = dx - dy;
+        int e2;
+        int x = x1;
+        int y = y1;
+        while (true) {
+            pixelsOnLine.add(new Pix(x, y, 0));
+            if (x == x2 && y == y2) break;
+            e2 = 2 * err;
+            if (e2 > -dy) {
+                err = err - dy;
+                x = x + sx;
+            }
+            if (e2 < dx) {
+                err = err + dx;
+                y = y + sy;
+            }
+        }
+
+        // Pixel repartition following that line :
+        // Step 1: Compute color distribution along the original line
+        Map<Color, Integer> colorDistributionOriginal = new HashMap<>();
+        for (Pix pixel : pixelsOnLine) {
+            Color color = new Color(image.getProcessor().getPixel(pixel.x, pixel.y));
+            colorDistributionOriginal.put(color, colorDistributionOriginal.getOrDefault(color, 0) + 1);
+        }
+
+        // Plot the repartition of the pixel along the orthogonal line of the previous one
+        // Get the orthogonal line
+        List<Pix> orthogonalPixelsOnLine = new ArrayList<>();
+        double angle = Math.atan2(y2 - y1, x2 - x1);
+        double orthogonalAngle = angle + Math.PI / 2; // Adding 90 degrees to get the orthogonal angle
+        double cosOrthogonalAngle = Math.cos(orthogonalAngle);
+        double sinOrthogonalAngle = Math.sin(orthogonalAngle);
+
+        // Determine the midpoint of the line segment
+        double midX = (pixStart.x + pixEnd.x) / 2.0;
+        double midY = (pixStart.y + pixEnd.y) / 2.0;
+
+        // Calculate the offset for the orthogonal line
+        double orthogonalOffsetX = cosOrthogonalAngle * distance / 2.0;
+        double orthogonalOffsetY = sinOrthogonalAngle * distance / 2.0;
+
+        // Determine the start and end points for the orthogonal line
+        int orthoStartX = (int) Math.round(midX - orthogonalOffsetX);
+        int orthoStartY = (int) Math.round(midY - orthogonalOffsetY);
+        int orthoEndX = (int) Math.round(midX + orthogonalOffsetX);
+        int orthoEndY = (int) Math.round(midY + orthogonalOffsetY);
+
+        // Apply Bresenham's algorithm to get the pixels on the orthogonal line
+        dx = Math.abs(orthoEndX - orthoStartX);
+        dy = Math.abs(orthoEndY - orthoStartY);
+        sx = orthoStartX < orthoEndX ? 1 : -1;
+        sy = orthoStartY < orthoEndY ? 1 : -1;
+        err = dx - dy;
+        x = orthoStartX;
+        y = orthoStartY;
+        while (true) {
+            orthogonalPixelsOnLine.add(new Pix(x, y, distance));
+            if (x == orthoEndX && y == orthoEndY) break;
+            e2 = 2 * err;
+            if (e2 > -dy) {
+                err = err - dy;
+                x = x + sx;
+            }
+            if (e2 < dx) {
+                err = err + dx;
+                y = y + sy;
+            }
+        }
+
+        // plot the two lines onto the image
+        ImagePlus ip = image.duplicate();
+        ip.show();
+        for (Pix p : pixelsOnLine) {
+            ip.getProcessor().drawDot(p.x, p.y);
+        }
+        for (Pix p : orthogonalPixelsOnLine) {
+            ip.getProcessor().drawDot(p.x, p.y);
+        }
+
+    }
+
+    public ImagePlus getImage() {
+        return image;
+    }
+}
+
+
