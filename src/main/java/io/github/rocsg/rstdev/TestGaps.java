@@ -1,4 +1,4 @@
-package rstdev;
+package io.github.rocsg.rstdev;
 
 import ij.IJ;
 import ij.ImageJ;

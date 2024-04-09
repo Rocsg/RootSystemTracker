@@ -1,10 +1,11 @@
 package io.github.rocsg.rootsystemtracker.test;
 
-import io.github.rocsg.rootsystemtracker.PipelineActionsHandler;
-import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
 import org.junit.Test;
 
-import static io.github.rocsg.rootsystemtracker.PipelineActionsHandler.stackData;
+import io.github.rocsg.rstplugin.PipelineActionsHandler;
+import io.github.rocsg.rstplugin.PipelineParamHandler;
+
+import static io.github.rocsg.rstplugin.PipelineActionsHandler.stackData;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestPipelineActionsHandler {

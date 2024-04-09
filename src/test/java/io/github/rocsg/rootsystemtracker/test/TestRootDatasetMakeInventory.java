@@ -1,7 +1,8 @@
 package io.github.rocsg.rootsystemtracker.test;
 
-import io.github.rocsg.rootsystemtracker.Plugin_RootDatasetMakeInventory;
 import org.junit.jupiter.api.Test;
+
+import io.github.rocsg.rstplugin.Plugin_RootDatasetMakeInventory;
 
 import java.io.File;
 import java.io.IOException;

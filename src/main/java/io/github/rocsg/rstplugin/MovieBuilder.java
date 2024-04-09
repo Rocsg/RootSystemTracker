@@ -1,4 +1,4 @@
-package io.github.rocsg.rootsystemtracker;
+package io.github.rocsg.rstplugin;
 
 import ij.IJ;
 import ij.ImagePlus;

@@ -12,14 +12,9 @@ import ij.plugin.Memory;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
-import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.common.Timer;
 import org.apache.commons.io.FileUtils;
-import org.jgrapht.Graph;
-import org.jgrapht.GraphPath;
-import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
-import org.jgrapht.graph.DefaultUndirectedGraph;
 import org.scijava.vecmath.Point3d;
 
 import javax.swing.*;
@@ -945,6 +940,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * Action change time.
      */
     public void actionChangeTime() {
+        IJ.showMessage("Are you sure about what you are doing ? Save before, this is a dev feature. Next window could help you abort if you change your mind.");
+        if(!VitiDialogs.getYesNoUI("Sure ?", "Sure")){
+            finishActionAborted();
+        }
         System.out.println("I1");
         boolean did = false;
         addLog("Running action \"Change time of a node\" ...", -1);
@@ -974,7 +973,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * If the resampling operation is successful, the method finishes the action and updates the image.
      * If the resampling operation is not successful, the method aborts the action.
      */
-    public void actionResample() {
+    public void actionResample() {//TODO : il n 'y a pas d'annuler
         // Print debug information
         System.out.println("I1");
 

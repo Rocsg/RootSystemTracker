@@ -1,7 +1,8 @@
 package io.github.rocsg.rootsystemtracker.test;
 
-import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
 import org.junit.jupiter.api.Test;
+
+import io.github.rocsg.rstplugin.PipelineParamHandler;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
