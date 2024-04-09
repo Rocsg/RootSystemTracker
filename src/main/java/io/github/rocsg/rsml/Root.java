@@ -307,8 +307,10 @@ public class Root implements Comparable<Root> {
             if (n.birthTime < 1) n.birthTime = 0;
             n = n.child;
         }
-        if (n.birthTimeHours < 0) n.birthTimeHours = 0;
-        if (n.birthTime < 1) n.birthTime = 0;
+        if(n!=null){
+            if (n.birthTimeHours < 0) n.birthTimeHours = 0;
+            if (n.birthTime < 1) n.birthTime = 0;
+        }
     }
 
     public void interpolateTime() {

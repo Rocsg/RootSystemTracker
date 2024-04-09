@@ -323,7 +323,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * Function to read the InfoRSMLExpert.csv file and get the stack and rsml paths
      */
     public void readInfoFile() {
-        String[][] tab = VitimageUtils.readStringTabFromCsv(new File(dataDir, "InfoRSMLExpert.csv").getAbsolutePath());
+        String[][] tab = VitimageUtils.readStringTabFromCsv(new File(dataDir, "InfoRSMLExpert.csv").getAbsolutePath().replace("\\", "/"));
         this.tabModifs = new String[500][nMaxModifs];
         for (String[] tabModif : tabModifs) Arrays.fill(tabModif, "");
         for (int i = 0; i < tab.length; i++) System.arraycopy(tab[i], 0, tabModifs[i], 0, tab[i].length);
@@ -333,14 +333,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     }
 
     public void writeInfoFile() {
-        VitimageUtils.writeStringTabInCsv2(tabModifs, new File(dataDir, "InfoRSMLExpert.csv").getAbsolutePath());
+        VitimageUtils.writeStringTabInCsv2(tabModifs, new File(dataDir, "InfoRSMLExpert.csv").getAbsolutePath().replace("\\", "/"));
     }
 
     public void startNewExpertize() {
 //        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath().replace("\\", "/");
 //        this.rsmlPath = new File(dataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/");
-        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath();
-        this.rsmlPath = new File(dataDir, "61_graph.rsml").getAbsolutePath();
+        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath().replace("\\", "/");
+        this.rsmlPath = new File(dataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/");
         try {
             FileUtils.copyFile(new File(dataDir, "61_graph.rsml"), new File(dataDir, "61_graph_copy_before_expertize.rsml"));
         } catch (IOException e) {
