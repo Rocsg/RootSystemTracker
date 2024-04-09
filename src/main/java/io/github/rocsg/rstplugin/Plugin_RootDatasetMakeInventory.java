@@ -626,16 +626,16 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
                 String path = new File(pathDir, obs[no]).getAbsolutePath(); //
                 FileTime ft = getLastModifiedTime(path);
                 String rtd = new File(inputDir).getAbsolutePath();
-                objCSV[no + 1] = new String[]{"" + no, ft.toString(),
+                objCSV[no + 1] = new String[]{"" + no, Objects.requireNonNull(ft).toString(),
                         "" + VitimageUtils.dou(hoursBetween(path0, path)),
                         path.replace(rtd, "").substring(1).replace("\\", "/")};
                 if (first == null)
                     first = getLastModifiedTime(path);
                 if (last == null)
                     last = getLastModifiedTime(path);
-                if (first.compareTo(ft) == 1)
+                if (Objects.requireNonNull(first).compareTo(ft) == 1)
                     first = getLastModifiedTime(path);
-                if (last.compareTo(ft) == -1)
+                if (Objects.requireNonNull(last).compareTo(ft) == -1)
                     last = getLastModifiedTime(path);
             }
             VitimageUtils.writeStringTabInCsv2(objCSV,
@@ -644,8 +644,8 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
             // the subdirectory
         }
         // Update the main CSV file with the total number of objects and images
-        mainCSV[0] = new String[]{"First observation time", first.toString(), "NA"};
-        mainCSV[1] = new String[]{"Last observation time", last.toString(), "NA"};
+        mainCSV[0] = new String[]{"First observation time", Objects.requireNonNull(first).toString(), "NA"};
+        mainCSV[1] = new String[]{"Last observation time", Objects.requireNonNull(last).toString(), "NA"};
         mainCSV[2][1] = "" + N;
         mainCSV[3][1] = "" + incrImg;
         VitimageUtils.writeStringTabInCsv2(mainCSV,
@@ -669,7 +669,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         // Sort the File objects by their modification time
         Arrays.sort(fTab, Comparator.comparingLong(File::lastModified));
         // Convert the File objects back to filenames
-        return (Arrays.stream(fTab)).map(f -> f.getAbsolutePath()).map(s -> s.replace(rdt, "").substring(1))
+        return (Arrays.stream(fTab)).map(File::getAbsolutePath).map(s -> s.replace(rdt, "").substring(1))
                 .toArray(String[]::new);
     }
 
