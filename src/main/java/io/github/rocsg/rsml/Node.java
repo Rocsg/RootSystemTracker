@@ -202,6 +202,12 @@ public class Node {
         return (delta < VitimageUtils.EPSILON);
     }
 
+    public boolean hasDoubleParentBirthTime() {
+        double bthD  = birthTime;
+        double delta = Math.abs(bthD - birthTime);
+        return (delta < VitimageUtils.EPSILON);
+    }
+
     /**
      * Checks if is parent or equal.
      *

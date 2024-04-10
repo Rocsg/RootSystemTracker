@@ -1854,6 +1854,34 @@ public class RootModel extends WindowAdapter {
     public Object[] getClosestNode(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
+        double t = pt.z;
+        AtomicReference<Double> squareDistMin = new AtomicReference<>(Double.MAX_VALUE);
+        AtomicReference<Node> nodeMin = new AtomicReference<>();
+        AtomicReference<Root> rootMin = new AtomicReference<>();
+
+        rootList.parallelStream().forEach(r -> {
+            //if (r.childList == null || r.childList.isEmpty()) continue;
+            Node n = r.firstNode;
+            while (n != null) {
+                double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
+                if (squareDist < squareDistMin.get()) {
+                    squareDistMin.set(squareDist);
+                    rootMin.set(r);
+                    nodeMin.set(n);
+                }
+                n = n.child;
+            }
+        });
+        if (nodeMin.get().birthTime <= t) {
+            return new Object[]{nodeMin.get(), rootMin.get()};
+        }
+        else {
+            return null;
+        }
+    }
+    /*public Object[] getClosestNode(Point3d pt) {
+        double x = pt.x;
+        double y = pt.y;
         double distMin = 1E18;
         Node nodeMin = null;
         Root rootMin = null;
@@ -1870,7 +1898,7 @@ public class RootModel extends WindowAdapter {
             }
         }
         return new Object[]{nodeMin, rootMin};
-    }
+    }*/
 
     /**
      * Gets the closest node in primary.
@@ -1905,7 +1933,8 @@ public class RootModel extends WindowAdapter {
     public Object[] getClosestNodeInPrimary(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
-        AtomicReference<Double> distMin = new AtomicReference<>(1E18);
+        double t = pt.z;
+        AtomicReference<Double> squareDistMin = new AtomicReference<>(Double.MAX_VALUE);
         AtomicReference<Node> nodeMin = new AtomicReference<>();
         AtomicReference<Root> rootMin = new AtomicReference<>();
 
@@ -1914,9 +1943,9 @@ public class RootModel extends WindowAdapter {
             if (r.order <= 1) {
                 Node n = r.firstNode;
                 while (n != null) {
-                    double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
-                    if (dist < distMin.get() && n.birthTime <= pt.z) {
-                        distMin.set(dist);
+                    double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
+                    if (squareDist < squareDistMin.get()) {
+                        squareDistMin.set(squareDist);
                         rootMin.set(r);
                         nodeMin.set(n);
                     }
@@ -1924,8 +1953,12 @@ public class RootModel extends WindowAdapter {
                 }
             }
         });
-
-        return new Object[]{nodeMin.get(), rootMin.get()};
+        if (nodeMin.get().birthTime <= t) {
+            return new Object[]{nodeMin.get(), rootMin.get()};
+        }
+        else {
+                return null;
+            }
     }
 
     /**
@@ -1943,9 +1976,9 @@ public class RootModel extends WindowAdapter {
         float dist;
         float distMin = 1000000.0f;
 
-        for (int i = 0; i < ls; i++) {
-            rp = rootList.get(i);
-            if (rp.getRootKey() == r.getRootKey()) continue;
+        for (Root root : rootList) {
+            rp = root;
+            if (rp.getRootKey().equals(r.getRootKey())) continue;
             Node np = rp.firstNode;
             dist = (float) Point2D.distance(n.x, n.y, np.x, np.y);
             if (dist < distMin) {
