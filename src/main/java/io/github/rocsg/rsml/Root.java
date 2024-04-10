@@ -201,7 +201,7 @@ public class Root implements Comparable<Root> {
     /**
      * The pixel size.
      */
-    private float dpi, pixelSize;
+    public float dpi, pixelSize;
 
     /**
      * Constructor
@@ -246,6 +246,9 @@ public class Root implements Comparable<Root> {
         nextRootKey++;
         readRSML(parentDOM, rm, parentRoot, origin, timeLapseModel);
     }
+
+   
+    
 
     /**
      * Instantiates a new root.

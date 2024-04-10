@@ -95,6 +95,7 @@ public class Node {
         needsRefresh = true;
     }
 
+    
 
     /**
      * Instantiates a new node.

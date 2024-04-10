@@ -111,7 +111,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private final JButton buttonUndo = new JButton("Undo last action");
     private final JButton buttonMove = new JButton("Move a point");
     private final JButton buttonRemove = new JButton("Remove a point");
-    private final JButton buttonAdd = new JButton("Add a middle point");
+    private final JButton buttonRefine = new JButton("Refine a segment");
     private final JButton buttonSwitch = new JButton("Switch a false cross");
     private final JButton buttonCreateLateral = new JButton("Create a new branch");
     private final JButton buttonExtend = new JButton("Extend a branch");
@@ -479,8 +479,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonMove.setToolTipText("<html><p width=\"500\">" + "Change the position of a point" + "</p></html>");
         buttonRemove.addActionListener(this);
         buttonRemove.setToolTipText("<html><p width=\"500\">" + "Remove a point" + "</p></html>");
-        buttonAdd.addActionListener(this);
-        buttonAdd.setToolTipText("<html><p width=\"500\">" + "Add a new point" + "</p></html>");
+        buttonRefine.addActionListener(this);
+        buttonRefine.setToolTipText("<html><p width=\"500\">" + "Add a new point" + "</p></html>");
         buttonSwitch.addActionListener(this);
         buttonSwitch.setToolTipText("<html><p width=\"500\">" + "Switch two crossing branches" + "</p></html>");
         buttonExtend.addActionListener(this);
@@ -510,7 +510,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(buttonUndo);
         buttonsPanel.add(buttonMove);
         buttonsPanel.add(buttonRemove);
-        buttonsPanel.add(buttonAdd);
+        buttonsPanel.add(buttonRefine);
         buttonsPanel.add(buttonChange);
 
         buttonsPanel.add(createLabel("----Root modification---------"));
@@ -685,10 +685,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     actionRemovePoint();
                     return;
                 }
-                if (e.getSource() == buttonAdd && buttonAdd.isEnabled()) {
+                if (e.getSource() == buttonRefine && buttonRefine.isEnabled()) {
                     disable(ADD);
                     pointStart();
-                    actionAddMiddlePoints();
+                    actionRefineSegment();
                     return;
                 }
                 if (e.getSource() == buttonSwitch && buttonSwitch.isEnabled()) {
@@ -865,7 +865,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     /**
      * Action add middle points.
      */
-    public void actionAddMiddlePoints() {
+    public void actionRefineSegment() {
         String[] infos = null;
         boolean did = false;
         addLog("Running action \"Add point\" ...", -1);
@@ -874,7 +874,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         waitOkClicked();
         Point3d[] tabPt = getAndAdaptCurrentPoints((PointRoi) currentImage.getRoi());
         if (tabPt != null) {
-            infos = addMiddlePointsInModel(tabPt, currentModel);
+            infos = refineSegmentInModel(tabPt, currentModel);
         }
         if (infos != null) did = true;
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
@@ -1214,7 +1214,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * @param tabPts the tab pts
      * @return true, if successful
      */
-    public String[] addMiddlePointsInModel(Point3d[] tabPts, RootModel rm) {
+    public String[] refineSegmentInModel(Point3d[] tabPts, RootModel rm) {
         String[] infos = formatInfos("ADDMIDDLE", tabPts);
         System.out.println("H1");
         if (tabPts.length < 2) {
@@ -2001,7 +2001,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 removePointInModel(tabPt, rm);
                 break;// TODO
             case "ADDMIDDLE":
-                addMiddlePointsInModel(tabPt, rm);
+                refineSegmentInModel(tabPt, rm);
                 break;// TODO
             case "SWITCHPOINT":
                 switchPointInModel(tabPt, rm);
@@ -2327,7 +2327,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     this.buttonBackExtend.setEnabled(state);
                     break;
                 case ADD:
-                    this.buttonAdd.setEnabled(state);
+                    this.buttonRefine.setEnabled(state);
                     break;
                 case REMOVE:
                     this.buttonRemove.setEnabled(state);

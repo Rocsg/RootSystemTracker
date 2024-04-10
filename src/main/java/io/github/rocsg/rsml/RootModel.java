@@ -1866,7 +1866,7 @@ public class RootModel extends WindowAdapter {
             Node n = r.firstNode;
             while (n != null) {
                 double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
+                if (/*(n.birthTime <= pt.z) && */(squareDist < squareDistMin.get())) {
                     squareDistMin.set(squareDist);
                     rootMin.set(r);
                     nodeMin.set(n);
@@ -1946,7 +1946,7 @@ public class RootModel extends WindowAdapter {
                 Node n = r.firstNode;
                 while (n != null) {
                     double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                    if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
+                    if (/*(n.birthTime <= pt.z) && */(squareDist < squareDistMin.get())) {
                         squareDistMin.set(squareDist);
                         rootMin.set(r);
                         nodeMin.set(n);
@@ -2907,8 +2907,8 @@ public class RootModel extends WindowAdapter {
         int nTot = 0;
         int nPrim = 0;
         int nSecond = 0;
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
+        // draw lines
+        for (Root r : rootList) {
             Node n = r.firstNode;
             Node n1;
             int color = (r.order == 1 ? 127 : 255);
@@ -2941,14 +2941,29 @@ public class RootModel extends WindowAdapter {
                 }
             }
         }
+
+        if (dotLineForHidden) {
+            for (Root r : rootList) {
+                if (r.order < 2) continue;
+                Node n = r.firstNode;
+                Node nPar = r.parentNode;
+                if (nPar == null) continue;
+                int dotEvery = 2;
+                double width = 2;
+                if (!((countInHours ? n.birthTimeHours : n.birthTime) > observationTime)) {
+                    drawDotline(ip, ImagePlus.GRAY8, (int) ((nPar.x + 0.5) * SIZE_FACTOR), (int) ((nPar.y + 0.5) * SIZE_FACTOR), (int) ((n.x + 0.5) * SIZE_FACTOR), (int) ((n.y + 0.5) * SIZE_FACTOR), dotEvery, width, binaryColor ? 1 : (countInHours ? n.birthTimeHours : n.birthTime));
+                }
+            }
+        }
+
         int sum = 0;
-        for (int i = 0; i < rootList.size(); i++) {
+        // draw symbols
+        for (Root root : rootList) {
             if (!showSymbols) continue;
-            Root r = rootList.get(i);
-            Node n = r.firstNode;
+            Node n = root.firstNode;
             if ((countInHours ? n.birthTimeHours : n.birthTime) > observationTime) continue;
             Node n1;
-            double wid = lineWidths[r.order - 1];
+            double wid = lineWidths[root.order - 1];
             if (distinguishStartSymbol) {
                 //draw starting point as start symbol
                 ip.setColor(Color.white);
@@ -3012,8 +3027,8 @@ public class RootModel extends WindowAdapter {
                 ip.drawPixel(xCenter + 2, yCenter);
                 ip.drawPixel(xCenter + 2, yCenter + 2);
                 ip.drawPixel(xCenter, yCenter + 2);
-                if (r.order <= 1) sum++;
-                if (r.order <= 1) {
+                if (root.order <= 1) sum++;
+                if (root.order <= 1) {
                     ip.setColor(Color.white);
                     ip.drawPixel(xCenter - 1, yCenter - 1);
                     ip.drawPixel(xCenter + 3, yCenter - 1);
@@ -3026,6 +3041,12 @@ public class RootModel extends WindowAdapter {
                 }
             }
         }
+
+        // draw line between primary and secondary roots
+        // This lines connects the closest point of the first node of the secondary root (member of a primary root) to the node in question
+        // discontinued dot line
+
+
         if (binaryColor) IJ.run(imgRSML, "Red/Green", "");
         else IJ.run(imgRSML, "Fire", "");
         imgRSML.setDisplayRange(0, maxDate + 2);
