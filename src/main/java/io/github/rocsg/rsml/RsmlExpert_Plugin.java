@@ -739,7 +739,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     IJ.showMessage("See you next time !");
                     frame.setVisible(false);
                     closeAllViews();
-                    System.exit(0); // TODO, comment this line
                 }
             }
         });
@@ -815,20 +814,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         addLog("Running action \"Move a point\" ...", -1);
         addLog(" Click on the point to move, then the target destination.", 1);
         disable(all);
-        System.out.println("M3");
         Point3d[] tabPt = getAndAdaptCurrentPoints(waitPoints(2));
-        System.out.println("M4");
         String[] infos = null;
         if (tabPt != null) {
-            System.out.println("M5, len=" + tabPt.length);
             infos = movePointInModel(tabPt, currentModel);
-            System.out.println("M7");
             did = true;
         }
-        System.out.println("M8");
-        if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
+        if (did && infos!=null) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
         else finishActionAborted();
-        System.out.println("M9");
     }
 
     /**
@@ -1123,6 +1116,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] movePointInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("MOVEPOINT", tabPt);
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        if(obj==null){
+            IJ.showMessage("You selected a weird node, that may not have appeared at the pointed time. Abort.");
+            return null;
+        }
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
         System.out.println("Moving :\n --> Node " + n + "\n --> Of root " + r);
@@ -1143,6 +1140,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         System.out.println("Rem21");
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        if(obj==null){
+            IJ.showMessage("You selected a weird node. Abort.");
+            return null;
+        }
+
         Node n1 = (Node) obj[0];
         Root r1 = (Root) obj[1];
 
@@ -1242,6 +1244,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         String[] infos = formatInfos("SWITCHPOINT", tabPt);
         Object[] obj1 = rm.getClosestNode(tabPt[0]);
         Object[] obj2 = rm.getClosestNode(tabPt[1]);
+        if (obj1 == null || obj2 == null) {
+            IJ.showMessage("The point selected are not convenient. Abort.");
+            return null;
+        }
+
         Node n1 = (Node) obj1[0];
         Root r1 = (Root) obj1[1];
         Node n2 = (Node) obj2[0];
@@ -1576,6 +1583,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         /*if (tabPt.length < 2) return null;
         int N = tabPt.length;
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        BEWARE WHEN UNCOMMENTING THIS BLOCK WE SHOULD WRITE A TEST OF NULLITY OF OBJ
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
         System.out.println("Back extending branch from :\n --> Node " + n + "\n --> Of root " + r);
@@ -1780,6 +1788,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     public void informAboutPointInModel(Point3d[] tabPt, RootModel rm) {
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        if (obj == null) {
+            IJ.showMessage("Please don't. Abort.");
+            return;
+        }
+
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
         IJ.showMessage("Informations at coordinates " + tabPt[0] + " :\n --> Node " + n + "\n --> Of root " + r);
@@ -1794,6 +1807,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] changeTimeInPointInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("CHANGETIME", tabPt);
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        if (obj == null) return null;
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
         if (n == null) return null;

@@ -1857,14 +1857,16 @@ public class RootModel extends WindowAdapter {
         double t = pt.z;
         AtomicReference<Double> squareDistMin = new AtomicReference<>(Double.MAX_VALUE);
         AtomicReference<Node> nodeMin = new AtomicReference<>();
+        nodeMin.set(null);
         AtomicReference<Root> rootMin = new AtomicReference<>();
+        rootMin.set(null);
 
         rootList.parallelStream().forEach(r -> {
             //if (r.childList == null || r.childList.isEmpty()) continue;
             Node n = r.firstNode;
             while (n != null) {
                 double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                if (squareDist < squareDistMin.get()) {
+                if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
                     squareDistMin.set(squareDist);
                     rootMin.set(r);
                     nodeMin.set(n);
@@ -1872,7 +1874,7 @@ public class RootModel extends WindowAdapter {
                 n = n.child;
             }
         });
-        if (nodeMin.get().birthTime <= t) {
+        if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
         }
         else {
@@ -1944,7 +1946,7 @@ public class RootModel extends WindowAdapter {
                 Node n = r.firstNode;
                 while (n != null) {
                     double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                    if (squareDist < squareDistMin.get()) {
+                    if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
                         squareDistMin.set(squareDist);
                         rootMin.set(r);
                         nodeMin.set(n);
@@ -1953,7 +1955,7 @@ public class RootModel extends WindowAdapter {
                 }
             }
         });
-        if (nodeMin.get().birthTime <= t) {
+        if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
         }
         else {
