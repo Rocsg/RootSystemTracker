@@ -1492,7 +1492,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        if (n.birthTime != (tabPt[0].z == 0 ? 1 : tabPt[0].z)) {
+        if (n.birthTime != (tabPt[0].z < 1 ? 0 : tabPt[0].z)) {
             IJ.showMessage("Please select the first point of the branch you want to extend at the right time. Abort.");
             return null;
         }
