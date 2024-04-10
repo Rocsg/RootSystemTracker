@@ -100,11 +100,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private static final int BACKEXTEND = 13;
 
     private static final int FIT = 14;
+    private static final int EXIT = 15;
     /**
      * The Constant all.
      */
     private static final int[] all = new int[]{OK, UNDO, MOVE, REMOVE, ADD, SWITCH, CREATE, EXTEND, INFO, CHANGE,
-            SAVE, RESAMPLE, BACKEXTEND};
+            SAVE, RESAMPLE, BACKEXTEND, FIT, EXIT};
 
     private final JButton buttonOk = new JButton("OK");
     private final JButton buttonUndo = new JButton("Undo last action");
@@ -121,6 +122,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private final JButton buttonResample = new JButton("Time-resampling");
     private final JButton buttonCreatePrimary = new JButton("Create a primary root");
     private final JButton buttonFit = new JButton("Fit roots curve");
+    private final JButton buttonExit = new JButton("Exit");
 
     /**
      * The log area.
@@ -485,8 +487,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonSave.setToolTipText("<html><p width=\"500\">" + "Save the current model" + "</p></html>");
         buttonCreatePrimary.addActionListener(this);
         buttonCreatePrimary.setToolTipText("<html><p width=\"500\">" + "Create a primary root" + "</p></html>");
-        //buttonFit.addActionListener(this);
-        buttonFit.setToolTipText("<html><p width=\"500\">" + "Unable for now..."/*"Fit the roots curve"*/ + "</p></html>");
+        // buttonFit.addActionListener(this);
+        buttonFit.setToolTipText("<html><p width=\"500\">" + "Not available yet" + "</p></html>");
+        buttonExit.addActionListener(this);
+        buttonExit.setToolTipText("<html><p width=\"500\">" + "Exit the plugin" + "</p></html>");
 
         buttonsPanel.add(createLabel("----Points modification-------"));
         buttonsPanel.add(new JLabel());
@@ -515,9 +519,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(new JLabel());
         buttonsPanel.add(buttonInfo);
         buttonsPanel.add(buttonSave);
+        buttonsPanel.add(new JLabel());
+        buttonsPanel.add(buttonExit);
     }
-
-
 
     /* Helpers of the Gui ************************************************************************************/
 
@@ -731,6 +735,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     disable(RESAMPLE);
                     actionResample();
                 }
+                if (e.getSource() == buttonExit && buttonExit.isEnabled()) {
+                    IJ.showMessage("See you next time !");
+                    frame.setVisible(false);
+                    closeAllViews();
+                    System.exit(0); // TODO, comment this line
+                }
             }
         });
     }
@@ -774,7 +784,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         currentModel.resampleFlyingRoots();
 
         // Update the current image with the modified model
-        VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
 
         // Log the successful completion of the undo action
         addLog("Ok.", 2);
@@ -1142,6 +1152,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             n1 = n1.parent;
         }
 
+
         System.out.println("Removing :\n --> Node " + n1 + "\n --> Of root " + r1);
         //Case where we remove a part of a primary
         System.out.println("Rem23");
@@ -1274,22 +1285,19 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // the time order
         //boolean[] extremity = new boolean[tabPt.length];
 
-
-        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
-
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (/*timeOrder !=*/ (tabPt[l + 1].z < tabPt[l].z)) {
-                IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
+            if (tabPt[l].z > tabPt[l + 1].z) {
+                IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
+
             if (tabPt[l] == null || tabPt[l + 1] == null) {
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
             }
 
-            // Skiping a slice
             if ((tabPt[l + 1].z - tabPt[l].z) > 1) {
                 IJ.showMessage("You gave points that does not follow in time, there is a gap. Abort.");
                 return null;
@@ -1368,20 +1376,29 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * successful
      */
     public String[] createBranchInModel(Point3d[] tabPt, RootModel rm) {
-        String[]infos=	formatInfos("CREATEBRANCH",tabPt);
-        if(tabPt.length<2)return null;
-        int N=tabPt.length;
-        Object[]obj=rm.getClosestNodeInPrimary(tabPt[0]);
-        Node n=(Node) obj[0];
-        Root r=(Root) obj[1];
-        System.out.println("Creating branch from :\n --> Node "+n+"\n --> Of root "+r );
+        String[] infos = formatInfos("CREATEBRANCH", tabPt);
+        if (tabPt.length < 2) return null;
 
-        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
+        Object[] obj = rm.getClosestNodeInPrimary(tabPt[0]);
+        if (obj == null) {
+            IJ.showMessage("The branch has not yet appeared. Abort.");
+            return null;
+        }
+
+        Node n = (Node) obj[0];
+        Root r = (Root) obj[1];
+        System.out.println("Creating branch from :\n --> Node " + n + "\n --> Of root " + r);
+
+//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
+//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
+//            return null;
+//        }
+
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (/*timeOrder != */(tabPt[l + 1].z < tabPt[l].z)) {
-                IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
+            if (tabPt[l].z > tabPt[l + 1].z) {
+                IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
             if (tabPt[l] == null || tabPt[l + 1] == null) {
@@ -1404,10 +1421,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
 
-        n=new Node((float)tabPt[0].x,(float)tabPt[0].y, null, false);
-        n.birthTime=(float) tabPt[0].z;
+        n = new Node((float) tabPt[0].x, (float) tabPt[0].y, null, false);
+        n.birthTime = (float) tabPt[0].z;
         n.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) tabPt[0].z];
-        Node firstNode=n;
+        Node firstNode = n;
 
         // replace the first point of the list of the first time by n
         //pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
@@ -1422,9 +1439,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
         nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
 
-        Root rNew=new Root(null, rm,"",2);
-        rNew.firstNode=firstNode;
-        rNew.lastNode=nPar;
+        Root rNew = new Root(null, rm, "", 2);
+        rNew.firstNode = firstNode;
+        rNew.lastNode = nPar;
         rNew.updateTiming();
         System.out.println(rNew);
         System.out.println(r);
@@ -1459,11 +1476,20 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (tabPt.length < 2) return null;
 
         Object[] obj = rm.getClosestNode(tabPt[0]);
+        if (obj == null) {
+            IJ.showMessage("The branch has not yet appeared. Abort.");
+            return null;
+        }
 
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
         System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
+
+//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
+//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
+//            return null;
+//        }
 
         if (n != r.lastNode) {
             IJ.showMessage("Please select the last point of the branch you want to extend. Abort.");
@@ -1475,16 +1501,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-
-        boolean timeOrder = (tabPt[1].z >= tabPt[0].z);
-
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (/*timeOrder != */(tabPt[l + 1].z < tabPt[l].z)) { //TRICKY TRICKY DO NOT TOUCH
-                IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
+            if (tabPt[l].z > tabPt[l + 1].z) {
+                IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
+
             if (tabPt[l] == null || tabPt[l + 1] == null) {
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
@@ -1614,13 +1638,20 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         Object[] obj = rm.getClosestNode(tabPt[tabPt.length - 1]);
 
+        if (obj == null) {
+            IJ.showMessage("The branch has not yet appeared. Abort.");
+            return null;
+        }
+
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
         System.out.println("Back-Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
 
-        System.out.println("Et en effet, puisque n="+n);
-        System.out.println("Et en effet, puisque r.firstNode="+r.firstNode);
+//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
+//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
+//            return null;
+//        }
 
         if ((n != r.firstNode)) {
             IJ.showMessage("The node clicked seems not to be the first node of the corresponding root\n"+
@@ -1634,13 +1665,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        //boolean timeOrder = (tabPt[1].z <= tabPt[0].z);
-
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if ((tabPt[l + 1].z < tabPt[l].z)) {
-                IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
+            if (tabPt[l].z > tabPt[l + 1].z) {
+                IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
             if (tabPt[l] == null || tabPt[l + 1] == null) {
@@ -1707,6 +1736,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
 
             for (Point3d pt : entry.getValue()) {
+                // Skip the very first point of the first time slice
+                // if the coordinates of pt are equal to the coordinates of the par node, continue
+                if ((nPar != null) && (nPar.x == (float) pt.x) && (nPar.y == (float) pt.y) && (nPar.birthTime == (float) pt.z)) {
+                    continue;
+                }
+
                 System.out.println(" --> " + pt);
                 // Create a new Node for the current point and link it to the previous node
                 Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
@@ -1737,7 +1772,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         }
         return nPar;
     }
-
 
     /**
      * Inform about point in model.
@@ -1855,10 +1889,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         return infos;
     }
 
-
     public RootModel resampleRootModelToTargetTimestep(RootModel rm, double timestep) {
         //Preparing variables
-        boolean debug = true;
+        boolean debug = false;
         if (debug) IJ.log("Starting resampling");
         double[] tabHours = Arrays.copyOf(rm.hoursCorrespondingToTimePoints, rm.hoursCorrespondingToTimePoints.length);
         int NimgInit = this.registeredStack.getStackSize();
@@ -1910,7 +1943,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         res.show();
         return rm;
     }
-
 
     public String[] formatInfos(String action, Point3d[] tabPt) {
         int nbPoints = tabPt.length;
@@ -1968,7 +2000,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         }
     }
 
-
     /**
      * Finish action aborted.
      */
@@ -2004,7 +2035,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         System.arraycopy(infos, 0, tabModifs[nModifs], 0, infos.length);
 
         // Update the data in the current image based on the current model
-        VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
 
         // Log that the image update was successful
         addLog("Ok.", 2);
@@ -2026,7 +2057,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         IJ.setTool("hand");
         addLog("Saving RSML", 0);
         this.currentModel.writeRSML3D(new File(dataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"), "", true, false);
-        VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
         addLog("Ok.", 2);
         enable(all);
         disable(OK);
@@ -2127,7 +2158,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Return the image
         return res;
     }
-
 
 
     /**
@@ -2295,6 +2325,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     break;
                 case RESAMPLE:
                     this.buttonResample.setEnabled(state);
+                    break;
+                case EXIT:
+                    this.buttonExit.setEnabled(state);
                     break;
             }
         }
