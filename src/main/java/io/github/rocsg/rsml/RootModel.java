@@ -1876,8 +1876,7 @@ public class RootModel extends WindowAdapter {
         });
         if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
-        }
-        else {
+        } else {
             return null;
         }
     }
@@ -1957,10 +1956,9 @@ public class RootModel extends WindowAdapter {
         });
         if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
+        } else {
+            return null;
         }
-        else {
-                return null;
-            }
     }
 
     /**
