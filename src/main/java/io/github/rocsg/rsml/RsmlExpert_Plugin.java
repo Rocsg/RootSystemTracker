@@ -485,8 +485,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonSave.setToolTipText("<html><p width=\"500\">" + "Save the current model" + "</p></html>");
         buttonCreatePrimary.addActionListener(this);
         buttonCreatePrimary.setToolTipText("<html><p width=\"500\">" + "Create a primary root" + "</p></html>");
-        buttonFit.addActionListener(this);
-        buttonFit.setToolTipText("<html><p width=\"500\">" + "Fit the roots curve" + "</p></html>");
+        //buttonFit.addActionListener(this);
+        buttonFit.setToolTipText("<html><p width=\"500\">" + "Unable for now..."/*"Fit the roots curve"*/ + "</p></html>");
 
         buttonsPanel.add(createLabel("----Points modification-------"));
         buttonsPanel.add(new JLabel());
@@ -1280,7 +1280,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (timeOrder != (tabPt[l + 1].z >= tabPt[l].z)) {
+            if (/*timeOrder !=*/ (tabPt[l + 1].z < tabPt[l].z)) {
                 IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
                 return null;
             }
@@ -1380,7 +1380,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (timeOrder != (tabPt[l + 1].z >= tabPt[l].z)) {
+            if (/*timeOrder != */(tabPt[l + 1].z < tabPt[l].z)) {
                 IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
                 return null;
             }
@@ -1481,7 +1481,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (timeOrder != (tabPt[l + 1].z >= tabPt[l].z)) {
+            if (/*timeOrder != */(tabPt[l + 1].z < tabPt[l].z)) { //TRICKY TRICKY DO NOT TOUCH
                 IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
                 return null;
             }
@@ -1600,23 +1600,31 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         r.updateTiming();*/
         if (tabPt.length < 2) return null;
 
+        System.out.println("Toto1");
+        for(Point3d pt: tabPt)System.out.println(pt);
+
         // Reverse the order of the points
         for (int i = 0; i < tabPt.length / 2; i++) {
             Point3d temp = tabPt[i];
             tabPt[i] = tabPt[tabPt.length - 1 - i];
             tabPt[tabPt.length - 1 - i] = temp;
         }
+        System.out.println("Toto2");
+        for(Point3d pt: tabPt)System.out.println(pt);
 
         Object[] obj = rm.getClosestNode(tabPt[tabPt.length - 1]);
 
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
-        System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
+        System.out.println("Back-Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
 
+        System.out.println("Et en effet, puisque n="+n);
+        System.out.println("Et en effet, puisque r.firstNode="+r.firstNode);
 
         if ((n != r.firstNode)) {
-            IJ.showMessage("Please select the first point of the branch you want to extend. Abort.");
+            IJ.showMessage("The node clicked seems not to be the first node of the corresponding root\n"+
+                                "Please select the first point of the branch you want to extend. Abort.");
             return null;
         }
 
@@ -1626,12 +1634,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        boolean timeOrder = (tabPt[1].z <= tabPt[0].z);
+        //boolean timeOrder = (tabPt[1].z <= tabPt[0].z);
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
 
-            if (timeOrder && (tabPt[l + 1].z <= tabPt[l].z)) {
+            if ((tabPt[l + 1].z < tabPt[l].z)) {
                 IJ.showMessage("You gave points that does not follow in time, wrong time order. Abort.");
                 return null;
             }
