@@ -238,9 +238,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public static void main(String[] args) {
         final ImageJ ij = new ImageJ();
 
+
         String testDir = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/TestSplit/Processing_of_TEST1230403-SR-split/230403SR056";
         RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
-        plugin.run(testDir);//testDir);
+        plugin.run(null);//testDir);
     }
 
     private static Map<Double, List<Boolean>> getTimeMap(TreeMap<Double, List<Point3d>> pointsByTime) {
@@ -306,9 +307,19 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         t = new Timer();
 
         //Choose an existing expertize, or initiate a new one
-        if (arg != null && !arg.isEmpty() && new File(arg).exists()) dataDir = arg;
-        else dataDir = VitiDialogs.chooseDirectoryUI("Choose a boite directory", "Ok");
+        System.out.println("Toto 31");
+        if (arg != null && !arg.isEmpty() && new File(arg).exists()) {
+            dataDir = arg;
+            System.out.println("Toto 32");
+        }
+        else  {
+            System.out.println("Toto 33");
+            dataDir = VitiDialogs.chooseDirectoryUI("Choose a boite directory", "Ok");
+            System.out.println("Toto 34");
+        }
+        System.out.println("Toto 35");
         if (!new File(dataDir, "InfoRSMLExpert.csv").exists()) startNewExpertize();
+        System.out.println("Toto 36");
         readInfoFile();
         t.mark();
 
@@ -441,6 +452,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 IJ.showMessage("See you next time !");
                 frame.setVisible(false);
                 closeAllViews();
+                System.exit(0);
             }
         });
         frame.setVisible(true);
@@ -739,6 +751,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     IJ.showMessage("See you next time !");
                     frame.setVisible(false);
                     closeAllViews();
+                    System.exit(0);
                 }
             }
         });
