@@ -3,6 +3,7 @@ package io.github.rocsg.rsml;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
+import mdbtools.libmdb.mem;
 
 import java.awt.*;
 import java.awt.geom.GeneralPath;
@@ -377,10 +378,19 @@ public class Root implements Comparable<Root> {
         double[] distToNext = new double[N];
 
         // Identify nodes that fall exactly on an observation timepoint
+        int memory=123456789;
         for (int i = 0; i < N; i++) {
             tabExact[i] = (Math.abs(tabNode[i].birthTime - Math.round(tabNode[i].birthTime)) < VitimageUtils.EPSILON);
+            if(Math.round(tabNode[i].birthTime)==memory && (i!=(N-1))){
+                tabExact[i]=false;
+            }
+            if(tabExact[i])memory=Math.round(tabNode[i].birthTime);
             if (debug) System.out.println(" i=" + i + " isExact ?" + tabExact[i] + " " + tabNode[i]);
         }
+
+
+        
+
 
         Node prev = null;
         double dist = 0;

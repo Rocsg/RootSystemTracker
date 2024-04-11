@@ -2905,7 +2905,7 @@ public class RootModel extends WindowAdapter {
         int nTot = 0;
         int nPrim = 0;
         int nSecond = 0;
-        // draw lines
+        /////////////////// draw lines
         for (Root r : rootList) {
             Node n = r.firstNode;
             Node n1;
@@ -2916,7 +2916,7 @@ public class RootModel extends WindowAdapter {
             double rMaxDate = r.getDateMax();
             if (maxDate < rMaxDate) maxDate = rMaxDate;
             boolean timeOver = false;
-            while (n.child != null && (!timeOver) && (((countInHours ? n.birthTimeHours : n.birthTime) < observationTime))) {
+            while (n.child != null && (!timeOver) && (((countInHours ? n.birthTimeHours : n.child.birthTime) <= observationTime))) {//TODO
                 n1 = n;
                 n = n.child;
                 int dotEvery = 0;
@@ -2959,7 +2959,7 @@ public class RootModel extends WindowAdapter {
         for (Root root : rootList) {
             if (!showSymbols) continue;
             Node n = root.firstNode;
-            if ((countInHours ? n.birthTimeHours : n.birthTime) > observationTime) continue;
+            if ((countInHours ? n.birthTimeHours : n.birthTime) > observationTime) continue;//TODO
             Node n1;
             double wid = lineWidths[root.order - 1];
             if (distinguishStartSymbol) {

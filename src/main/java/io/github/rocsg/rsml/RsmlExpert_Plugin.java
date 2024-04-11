@@ -118,7 +118,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private final JButton buttonBackExtend = new JButton("Backwards extension");
     private final JButton buttonInfo = new JButton("Information about a node and a branch");
     private final JButton buttonChange = new JButton("Change time");
-    private final JButton buttonSave = new JButton("Save RSML");
+    private final JButton buttonSave = new JButton("Save final edited RSML");
     private final JButton buttonResample = new JButton("Time-resampling");
     private final JButton buttonCreatePrimary = new JButton("Create a primary root");
     private final JButton buttonFit = new JButton("Fit roots curve");
@@ -244,13 +244,29 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         plugin.run(null);//testDir);
     }
 
-    private static Map<Double, List<Boolean>> getTimeMap(TreeMap<Double, List<Point3d>> pointsByTime) {
+    private static Map<Double, List<Boolean>> getTimeMapLast(TreeMap<Double, List<Point3d>> pointsByTime) {
         Map<Double, List<Boolean>> extremity = new TreeMap<>();
         // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
         for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
             List<Boolean> list = new ArrayList<>();
             for (int i = 0; i < entry.getValue().size(); i++) {
                 if (i == entry.getValue().size() - 1) {// if (i == 0 || i == entry.getValue().size() - 1) {
+                    list.add(true);
+                } else {
+                    list.add(false);
+                }
+            }
+            extremity.put(entry.getKey(), list);
+        }
+        return extremity;
+    }
+    private static Map<Double, List<Boolean>> getTimeMapFirst(TreeMap<Double, List<Point3d>> pointsByTime) {
+        Map<Double, List<Boolean>> extremity = new TreeMap<>();
+        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
+        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
+            List<Boolean> list = new ArrayList<>();
+            for (int i = 0; i < entry.getValue().size(); i++) {
+                if (i == 0) {// if (i == 0 || i == entry.getValue().size() - 1) {
                     list.add(true);
                 } else {
                     list.add(false);
@@ -567,13 +583,19 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Clean the RSML model and resample the flying roots
         System.out.println(currentModel.cleanWildRsml());
         System.out.println(currentModel.resampleFlyingRoots());
+        //TODO : certification
 
 
         // Apply any modifications that have been made to the model
-        for (String[] modif : tabModifs) {
+        System.out.println("Loading operations");
+        for (int i=0;i<tabModifs.length;i++) {
+            String []modif=tabModifs[i];
+            System.out.println(i+" : "+modif[0]);
             if (modif[0].isEmpty()) break;
             // Skip first line
+            System.out.println("Loading operations");
             if (tabModifs[0][0].equals(modif[0])) continue;
+
             readLineAndExecuteActionOnModel(modif, currentModel);
             nModifs++;
         }
@@ -1151,7 +1173,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] removePointInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("REMOVEPOINT", tabPt);
 
-        System.out.println("Rem21");
         Object[] obj = rm.getClosestNode(tabPt[0]);
         if(obj==null){
             IJ.showMessage("You selected a weird node. Abort.");
@@ -1162,7 +1183,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Root r1 = (Root) obj[1];
 
         //Identify the first parent to stay
-        System.out.println("Rem22");
         while (n1.parent != null && !n1.parent.hasExactBirthTime()) {
             n1 = n1.parent;
         }
@@ -1339,7 +1359,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             }
         }
 
-        Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
+        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
+        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
 
         // Print each time, number of points and points
         /*for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
@@ -1364,7 +1385,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime, extremityFirst,extremityLast, recordedNodes, nPar);
 
         // Add the new primary root to the RootModel
         Root rNew = new Root(null, rm, "", 1);
@@ -1376,7 +1397,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Free memory
         pointsByTime.clear();
-        extremity.clear();
+        extremityLast.clear(); 
+        extremityFirst.clear();
         recordedNodes.clear();
 
         return formatInfos("CREATEPRIMARY", tabPt);
@@ -1439,7 +1461,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
         }
 
-        Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
+        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
+        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
 
         n = new Node((float) tabPt[0].x, (float) tabPt[0].y, null, false);
         n.birthTime = (float) tabPt[0].z;
@@ -1457,7 +1480,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(firstNode);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
 
         Root rNew = new Root(null, rm, "", 2);
         rNew.firstNode = firstNode;
@@ -1472,7 +1495,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // free memory
         pointsByTime.clear();
-        extremity.clear();
+        extremityLast.clear();
+        extremityFirst.clear();
         recordedNodes.clear();
 
         return infos;
@@ -1494,23 +1518,16 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] extendBranchInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("EXTENDBRANCH", tabPt);
         if (tabPt.length < 2) return null;
-
         Object[] obj = rm.getClosestNode(tabPt[0]);
         if (obj == null) {
             IJ.showMessage("The branch has not yet appeared. Abort.");
             return null;
         }
-
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
         System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
-
-//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
-//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
-//            return null;
-//        }
-
+//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");//            return null;//        }
         if (n != r.lastNode) {
             IJ.showMessage("Please select the last point of the branch you want to extend. Abort.");
             return null;
@@ -1547,7 +1564,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
         }
 
-        Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
+        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
+        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
 
         // replace the first point of the list of the first time by n
         pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
@@ -1571,14 +1589,29 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime,  extremityFirst,extremityLast, recordedNodes, nPar);
 
         r.lastNode = nPar;
+
+
+/*         Node n0=r.firstNode;
+        while(n0.child!=null){
+            System.out.println(n0);
+            n0=n0.child;
+        }
+        System.out.println(n0);*/
         r.updateTiming();
+       /*  n0=r.firstNode;
+        while(n0.child!=null){
+            System.out.println(n0);
+            n0=n0.child;
+        }
+        System.out.println(n0);*/
 
         // free memory
         pointsByTime.clear();
-        extremity.clear();
+        extremityLast.clear();
+        extremityFirst.clear();
         recordedNodes.clear();
 
         return infos;
@@ -1711,7 +1744,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
         }
 
-        Map<Double, List<Boolean>> extremity = getTimeMap(pointsByTime);
+        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
+        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
 
         Object[] obj2 = rm.getClosestNode(tabPt[0]);
 
@@ -1729,7 +1763,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Node nPar = nFirst;
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremity, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime,  extremityFirst,extremityLast, recordedNodes, nPar);
 
         nPar.child = r.firstNode;
         r.firstNode.parent = nPar;
@@ -1746,15 +1780,16 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // free memory
         pointsByTime.clear();
-        extremity.clear();
+        extremityLast.clear();
+        extremityFirst.clear();
         recordedNodes.clear();
 
         return infos;
     }
 
-    private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremity, List<Node> recordedNodes, Node nPar) {
+    private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremityFirst, Map<Double, List<Boolean>> extremityLast, List<Node> recordedNodes, Node nPar) {
         for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
+            //System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
 
             for (Point3d pt : entry.getValue()) {
                 // Skip the very first point of the first time slice
@@ -1763,7 +1798,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     continue;
                 }
 
-                System.out.println(" --> " + pt);
+                //System.out.println(" --> " + pt);
                 // Create a new Node for the current point and link it to the previous node
                 Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
 
@@ -1774,12 +1809,16 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
 
                 // If the current point is an extremity, set its birth time and birth time in hours
-                if (extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z;
+                if (extremityLast.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
+                    nn.birthTime = (float) pt.z+(float)0.0;
+                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
+                }
+                else if (extremityFirst.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
+                        nn.birthTime = (float) pt.z;
                     nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
                 } else {
                     // If the current point is not an extremity, calculate its birth time and birth time in hours
-                    nn.birthTime = (float) (pt.z - 0.5);
+                    nn.birthTime = (float) (pt.z + 0.5);
                     nn.birthTimeHours =
                             (float) (0.5 * rm.hoursCorrespondingToTimePoints[(int) pt.z] + 0.5 * nPar.birthTime);
                 }
