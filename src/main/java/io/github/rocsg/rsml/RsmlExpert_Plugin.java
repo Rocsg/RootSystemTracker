@@ -212,7 +212,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
     private String version = "v1.6.1 Identifiant-unique-2 - Release candidate";
 
-
+    private boolean isDevModeActivated=false;
     /**
      * Instantiates a new rsml expert plugin.
      */
@@ -241,6 +241,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         String testDir = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/TestSplit/Processing_of_TEST1230403-SR-split/230403SR056";
         RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
+        plugin.isDevModeActivated=true;
         plugin.run(null);//testDir);
     }
 
@@ -468,7 +469,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 IJ.showMessage("See you next time !");
                 frame.setVisible(false);
                 closeAllViews();
-                System.exit(0);
+                if(isDevModeActivated)System.exit(0);
             }
         });
         frame.setVisible(true);
@@ -773,7 +774,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     IJ.showMessage("See you next time !");
                     frame.setVisible(false);
                     closeAllViews();
-                    System.exit(0);
+                    if(isDevModeActivated)System.exit(0);
                 }
             }
         });
