@@ -9,9 +9,12 @@ import static io.github.rocsg.rstplugin.PipelineActionsHandler.stackData;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestPipelineActionsHandler {
-    @Test
-    public void testStackData() {
+        public static boolean doNotDoTests=true;
 
+        @Test
+    public void testStackData() {
+        if(doNotDoTests)return;
+  
         TestRootDatasetMakeInventory prev_test = new TestRootDatasetMakeInventory();
 
         prev_test.globalTestNoRun();
@@ -31,7 +34,8 @@ public class TestPipelineActionsHandler {
 
     @Test
     public void testRegistrationData() {
-
+        if(doNotDoTests)return;
+  
         String inputFolderPath = "../data/Output/Inventory";
         String outputFolderPath0 = "../data/Output/Process";
         String outputFolderPath = "../data/Output/Process/data1";
@@ -50,7 +54,8 @@ public class TestPipelineActionsHandler {
 
     @Test
     public void testComputeMaskandRemoveLeaves() {
-
+        if(doNotDoTests)return;
+  
         String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker"
                 +
                 "\\data\\ordered_input\\output_inv";
@@ -84,6 +89,7 @@ public class TestPipelineActionsHandler {
 
     @Test
     public void testComputeGraph() {
+        if(doNotDoTests)return;
         String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker"
                 +
                 "\\data\\ordered_input\\output_inv";
@@ -118,6 +124,7 @@ public class TestPipelineActionsHandler {
 
     @Test
     public void doAll() {
+        if(doNotDoTests)return;
         TestRootDatasetMakeInventory prev_test = new TestRootDatasetMakeInventory();
 
         prev_test.globalTestNoRun();

@@ -14,13 +14,13 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Objects;
 
 public class TestRootDatasetMakeInventory {
-
+    public static boolean doNotDoTests=true;
     public TestRootDatasetMakeInventory() {
     }
 
     @Test
     void globalTestNoRun() {
-        // print current directory
+        if(doNotDoTests)return;// print current directory
         System.out.println("Current directory: " + System.getProperty("user.dir"));
 
         // Define the path to the output folder

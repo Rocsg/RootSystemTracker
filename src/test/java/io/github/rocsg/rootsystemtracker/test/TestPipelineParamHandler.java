@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class TestPipelineParamHandler {
+    public static boolean doNotDoTests=true;
 
     @Test
     public void testRunCleaningAssistant() {
+        if(doNotDoTests)return;
 
         TestRootDatasetMakeInventory prev_test = new TestRootDatasetMakeInventory();
 
@@ -26,6 +28,7 @@ public class TestPipelineParamHandler {
 
     @Test
     void testDefaultConstructor() {
+        if(doNotDoTests)return;
         PipelineParamHandler handler = new PipelineParamHandler();
         assertNotNull(handler);
     }

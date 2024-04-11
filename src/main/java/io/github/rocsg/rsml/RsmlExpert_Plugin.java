@@ -210,7 +210,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
     private boolean toResize = true;
 
-    private String version = "v1.6.0 patch Cici";
+    private String version = "v1.6.1 Identifiant-unique-2 - Release candidate";
 
 
     /**
@@ -2378,7 +2378,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return str;
         }
 
-        str[0] = "Welcome to RSML Expert ";
+        str[0] = "Welcome to RSML Expert "+version;
         str[1] = "System check. Available memory in JVM=" + jvmMemory + " MB over " + memoryFullSize + " MB. #Available processor cores=" + nbCpu + ".";
         if (verbose) return str;
         else return new String[]{"", ""};
