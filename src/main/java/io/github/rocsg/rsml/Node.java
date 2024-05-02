@@ -351,6 +351,10 @@ public class Node {
     public String toString() {
         return ("Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null));
     }
+
+    public boolean getNodeType() {
+        return false;
+    }
 }
 
 

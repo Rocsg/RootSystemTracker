@@ -586,6 +586,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
     public static void startInventoryOfAlreadyTidyDir(String inputDir0, String outputDir0) {
         String inputDir = inputDir0.replace("\\", "/");
         String outputDir = outputDir0.replace("\\", "/");
+
         // List the data
         String[] spec = new File(inputDir).list(); // List of subdirectories
         Arrays.sort(Objects.requireNonNull(spec)); // Sort the list of subdirectories
@@ -607,11 +608,12 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         for (int n = 0; n < N; n++) {
             // Registered in the old csv
             mainCSV[7 + n] = new String[]{"Object", "" + n, spec[n]};
-            String[] obs = new File(inputDir, spec[n]).list();
+            String[] obs = new File(inputDir, spec[n]).list(); // List of images in the subdirectory
             System.out.println("File " + new File(inputDir, spec[n]).getAbsolutePath());
             System.out.println("Processing " + spec[n] + " with " + Objects.requireNonNull(obs).length + " images");
 
-            obs = sortFilesByModificationOrder(new File(inputDir, spec[n]).getAbsolutePath(), obs);
+            //obs = sortFilesByModificationOrder(new File(inputDir, spec[n]).getAbsolutePath(), obs);
+            obs = sortFilesByName(new File(inputDir, spec[n]).getAbsolutePath(), obs);
             int Nobj = obs.length;
             incrImg += Nobj;
 
@@ -671,6 +673,19 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         // Convert the File objects back to filenames
         return (Arrays.stream(fTab)).map(File::getAbsolutePath).map(s -> s.replace(rdt, "").substring(1))
                 .toArray(String[]::new);
+    }
+
+    static String[] sortFilesByName(String parent, String[] tab) {
+        String rdt = new File(parent).getAbsolutePath(); // Without the / at the end
+        String[] ret = Arrays.copyOf(tab, tab.length);
+        // Convert the filenames to File objects
+        File[] fTab = Arrays.stream(ret).map(s -> new File(parent, s)).toArray(File[]::new);
+        // Sort the File objects by their modification time
+        Arrays.sort(fTab, Comparator.comparing(File::getName));
+        // Convert the File objects back to filenames
+        return (Arrays.stream(fTab)).map(File::getAbsolutePath).map(s -> s.replace(rdt, "").substring(1))
+                .toArray(String[]::new);
+
     }
 
     ////// Tidy dir inventory

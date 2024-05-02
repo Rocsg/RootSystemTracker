@@ -14,7 +14,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Objects;
 
 public class TestRootDatasetMakeInventory {
-    public static boolean doNotDoTests=true;
+    public static boolean doNotDoTests=false;
     public TestRootDatasetMakeInventory() {
     }
 
@@ -24,11 +24,15 @@ public class TestRootDatasetMakeInventory {
         System.out.println("Current directory: " + System.getProperty("user.dir"));
 
         // Define the path to the output folder
-        String inputFolderPath = "..\\data\\Input";
-        String outputFolderPath = "..\\data\\Output\\Inventory";
+        String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Input\\";
+        String outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
 
         // Create a File object for the output folder
         File outputFolder = new File(outputFolderPath);
+        //create the output folder if it does not exist
+        if (!outputFolder.exists()) {
+            outputFolder.mkdir();
+        }
 
         // Check if the output folder is not empty
         if (Objects.requireNonNull(outputFolder.list()).length > 0) {

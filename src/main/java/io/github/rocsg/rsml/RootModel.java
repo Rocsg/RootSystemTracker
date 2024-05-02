@@ -16,7 +16,9 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
 import org.scijava.vecmath.Point3d;
+import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import javax.swing.*;
@@ -278,7 +280,8 @@ public class RootModel extends WindowAdapter {
     public RootModel(String dataFName) {
         dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
         pixelSize = 2.54f / dpi;
-        readRSML(dataFName);
+        //readRSML(dataFName);
+        readRSMLNew(dataFName);
     }
 
     /**
@@ -291,6 +294,71 @@ public class RootModel extends WindowAdapter {
         dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
         pixelSize = 2.54f / dpi;
         readRSML(dataFName, timeLapseModel);
+    }
+
+    public RootModel(RootModel rm) {
+        this.dpi = rm.dpi;
+        this.pixelSize = rm.pixelSize;
+        this.directory = rm.directory;
+        this.nPlants = rm.nPlants;
+        this.imgName = rm.imgName;
+        this.previousMagnification = rm.previousMagnification;
+        this.nextAutoRootID = rm.nextAutoRootID;
+        this.img = rm.img;
+        this.ip = rm.ip;
+        this.angleStep = rm.angleStep;
+        this.threshold = rm.threshold;
+        this.dM = rm.dM;
+        this.AUTOBUILD_MIN_STEP = rm.AUTOBUILD_MIN_STEP;
+        this.AUTOBUILD_STEP_FACTOR_BORDER = rm.AUTOBUILD_STEP_FACTOR_BORDER;
+        this.AUTOBUILD_STEP_FACTOR_DIAMETER = rm.AUTOBUILD_STEP_FACTOR_DIAMETER;
+        this.AUTOBUILD_MIN_THETA_STEP = rm.AUTOBUILD_MIN_THETA_STEP;
+        this.AUTOBUILD_THETA_STEP_FACTOR = rm.AUTOBUILD_THETA_STEP_FACTOR;
+        this.rootList = new ArrayList<Root>();
+        for (Root r : rm.rootList) {
+            this.rootList.add(new Root(r.parent, this, r.getRootID(), r.order));
+        }
+        this.hoursCorrespondingToTimePoints = rm.hoursCorrespondingToTimePoints;
+    }
+
+    public RootModel(Map<Date, List<Object>> map) {
+        this.dpi = 1;
+        this.pixelSize = 2.54f / dpi;
+        this.directory = "";
+        this.nPlants = 1;
+        this.imgName = "";
+        this.previousMagnification = 0;
+        this.nextAutoRootID = 0;
+        this.img = null;
+        this.ip = null;
+        this.angleStep = 0;
+        this.threshold = 0;
+        this.dM = 0;
+        this.AUTOBUILD_MIN_STEP = 3;
+        this.AUTOBUILD_STEP_FACTOR_BORDER = 0.5f;
+        this.AUTOBUILD_STEP_FACTOR_DIAMETER = 2;
+        this.AUTOBUILD_MIN_THETA_STEP = 0.02f;
+        this.AUTOBUILD_THETA_STEP_FACTOR = (float) Math.PI / 2;
+        this.rootList = new ArrayList<Root>();
+        this.hoursCorrespondingToTimePoints = new double[map.size()];
+        int i = 0;
+        for (Date date : map.keySet()) {
+            this.hoursCorrespondingToTimePoints[i] = date.getTime();
+            i++;
+        }
+        Arrays.sort(this.hoursCorrespondingToTimePoints);
+        for (Date date : map.keySet()) {
+            List<Object> list = map.get(date);
+            Root r = new Root(null, this, "", 1);
+            for (Object o : list) {
+                if (o instanceof Point3d) {
+                    Point3d p = (Point3d) o;
+                    r.addNode(p.x, p.y, p.z, 0, 0, 0, 0, true);
+                }
+            }
+            r.computeDistances();
+            this.rootList.add(r);
+        }
     }
 
     //A main function to test the function below
@@ -411,8 +479,7 @@ public class RootModel extends WindowAdapter {
             tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
             IJ.run(tabRes[i], "RGB Color", "");
         }
-        ImagePlus res = VitimageUtils.slicesToStack(tabRes);
-        return res;
+        return VitimageUtils.slicesToStack(tabRes);
     }
 
     /**
@@ -1339,7 +1406,7 @@ public class RootModel extends WindowAdapter {
      *
      * @param f the f
      */
-    //TODO : still in use ?
+    // still in use ? Yes, peviously called when making Blockmatching registration setup
     public void readRSML(String f) {
 
         // Choose the datafile
@@ -1361,14 +1428,9 @@ public class RootModel extends WindowAdapter {
 
         try {
             DocumentBuilder builder = factory.newDocumentBuilder();
-            documentDOM = builder.parse(new File(fPath));
-        } catch (SAXException sxe) {
-            logReadError();
-            return;
-        } catch (ParserConfigurationException pce) {
-            logReadError();
-            return;
-        } catch (IOException ioe) {
+            File file = new File(fPath);
+            documentDOM = builder.parse(file);
+        } catch (SAXException | ParserConfigurationException | IOException sxe) {
             logReadError();
             return;
         }
@@ -1398,7 +1460,7 @@ public class RootModel extends WindowAdapter {
                     String metaName = nodeMeta.getNodeName();
                     // Get the image resolution
                     if (metaName.equals("unit")) unit = nodeMeta.getFirstChild().getNodeValue();
-                    if (metaName.equals("resolution")) res = Float.valueOf(nodeMeta.getFirstChild().getNodeValue());
+                    if (metaName.equals("resolution")) res = Float.parseFloat(nodeMeta.getFirstChild().getNodeValue());
                     if (metaName.equals("file-key")) datafileKey = nodeMeta.getFirstChild().getNodeValue();
                     if (metaName.equals("software")) origin = nodeMeta.getFirstChild().getNodeValue();
                     nodeMeta = nodeMeta.getNextSibling();
@@ -1441,7 +1503,6 @@ public class RootModel extends WindowAdapter {
      * @param f the f
      */
     public void readRSMLNew(String f) {
-
         // Choose the datafile
         String fPath = f;
 
@@ -1460,15 +1521,8 @@ public class RootModel extends WindowAdapter {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         try {
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            documentDOM = builder.parse(new File(fPath));
-        } catch (SAXException sxe) {
-            logReadError();
-            return;
-        } catch (ParserConfigurationException pce) {
-            logReadError();
-            return;
-        } catch (IOException ioe) {
+            documentDOM = factory.newDocumentBuilder().parse(new File(fPath));
+        } catch (SAXException | ParserConfigurationException | IOException sxe) {
             logReadError();
             return;
         }
@@ -1498,7 +1552,7 @@ public class RootModel extends WindowAdapter {
                     String metaName = nodeMeta.getNodeName();
                     // Get the image resolution
                     if (metaName.equals("unit")) unit = nodeMeta.getFirstChild().getNodeValue();
-                    if (metaName.equals("resolution")) res = Float.valueOf(nodeMeta.getFirstChild().getNodeValue());
+                    if (metaName.equals("resolution")) res = Float.parseFloat(nodeMeta.getFirstChild().getNodeValue());
                     if (metaName.equals("file-key")) datafileKey = nodeMeta.getFirstChild().getNodeValue();
                     if (metaName.equals("software")) origin = nodeMeta.getFirstChild().getNodeValue();
                     nodeMeta = nodeMeta.getNextSibling();
@@ -3183,8 +3237,7 @@ public class RootModel extends WindowAdapter {
         imgRSML = VitimageUtils.gaussianFiltering(imgRSML, sigmaSmooth, sigmaSmooth, sigmaSmooth);
         if (skeleton) {
             ImageProcessor ip = imgRSML.getProcessor();
-            for (int i = 0; i < rootList.size(); i++) {
-                Root r = rootList.get(i);
+            for (Root r : rootList) {
                 System.out.println("Got root " + r);
                 Node n = r.firstNode;
                 Node n1;
@@ -3196,8 +3249,7 @@ public class RootModel extends WindowAdapter {
                     //ip.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
                 }
             }
-            for (int i = 0; i < rootList.size(); i++) {
-                Root r = rootList.get(i);
+            for (Root r : rootList) {
                 Node n = r.firstNode;
                 Node n1;
                 ip.setColor(Color.white);

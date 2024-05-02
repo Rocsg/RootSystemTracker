@@ -20,7 +20,7 @@ public class PipelineParamHandler {
     // Memory saving mode, if 1, don't save very big debug images
     public int memorySaving = 0;
     // Subsampling factor
-    public int subsamplingFactor = 1;
+    public int subsamplingFactor = 5;
     // Tolerance distance for Beucker simplification
     public double toleranceDistanceForBeuckerSimplification = 0.9;
     // Times of the images
@@ -79,16 +79,16 @@ public class PipelineParamHandler {
     int yMinCrop = 1;
     int dxCrop = 430;
     int dyCrop = 500;*/
-    int xMinCrop=122;
-    int yMinCrop=212;
-    int dxCrop=1348;
-    int dyCrop=1166;
+    int xMinCrop=(int) 1200.0 / subsamplingFactor;
+    int yMinCrop=(int) 195.0 / subsamplingFactor ;
+    int dxCrop=(int) (10620.0-837) / subsamplingFactor;
+    int dyCrop=(int) (8783-.0-195) / subsamplingFactor;
     // Maximum linear
     int maxLinear = 4;
     // Type of experiment
     String typeExp = "Simple";
     // Margin for registration
-    int marginRegisterLeft = 420;
+    int marginRegisterLeft =420;
     int marginRegisterUp = 0;
     int marginRegisterRight = 20;
     // Flag to apply full pipeline image after image
@@ -440,25 +440,25 @@ public class PipelineParamHandler {
     }
 
     public String getString(String tit) {
-        for (int i = 0; i < params.length; i++)
-            if (params[i][0].equals(tit))
-                return params[i][1].replace("\\", "/");
+        for (String[] param : params)
+            if (param[0].equals(tit))
+                return param[1].replace("\\", "/");
         // IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
         return "";
     }
 
     public double getDouble(String tit) {
-        for (int i = 0; i < params.length; i++)
-            if (params[i][0].equals(tit))
-                return Double.parseDouble(params[i][1]);
+        for (String[] param : params)
+            if (param[0].equals(tit))
+                return Double.parseDouble(param[1]);
         IJ.showMessage("Parameter not found : " + tit + " in param file of " + outputDir);
         return NO_PARAM_DOUBLE;
     }
 
     public int getInt(String tit) {
-        for (int i = 0; i < params.length; i++)
-            if (params[i][0].equals(tit))
-                return Integer.parseInt(params[i][1]);
+        for (String[] param : params)
+            if (param[0].equals(tit))
+                return Integer.parseInt(param[1]);
         IJ.showMessage("Parameter not found : " + tit + " in param file of " + outputDir);
         return NO_PARAM_INT;
     }

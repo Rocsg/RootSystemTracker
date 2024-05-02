@@ -178,6 +178,8 @@
         <dependency>
             <groupId>org.itk.simple</groupId>
             <artifactId>simpleitk</artifactId>
+            <!--scope>system</scope>
+            <systemPath>${basedir}/lib/SimpleITK-0.9.0-Java-win64/simpleitk-0.9.0.jar</systemPath>-->
             <version>0.9.0</version>
             <type>jar</type>
         </dependency>
@@ -276,7 +278,7 @@
     </dependencies>
 
     </dependencyManagement>-->
-    <!--<build>
+    <build>
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -289,5 +291,5 @@
                 </plugin>
             </plugins>
         </pluginManagement>
-    </build>-->
+    </build>
 </project>

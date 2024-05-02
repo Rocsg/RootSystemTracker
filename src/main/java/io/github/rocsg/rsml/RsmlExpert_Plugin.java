@@ -6,6 +6,7 @@ package io.github.rocsg.rsml;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
 import ij.plugin.Memory;
@@ -18,21 +19,35 @@ import io.github.rocsg.fijiyama.common.*;
 import org.apache.commons.io.FileUtils;
 import org.jgrapht.GraphPath;
 import org.scijava.vecmath.Point3d;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.swing.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Line2D;
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -138,6 +153,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * The user precision on click.
      */
     private final double USER_PRECISION_ON_CLICK = 20;
+    private final boolean isDevModeActivated = false;
     /**
      * The Nt.
      */
@@ -202,17 +218,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * The count.
      */
     private int count = 0;
-
-
     private String stackPath;
-
     private String rsmlPath;
-
     private boolean toResize = true;
-
     private String version = "v1.6.1 Identifiant-unique-2 - Release candidate";
 
-    private boolean isDevModeActivated=false;
     /**
      * Instantiates a new rsml expert plugin.
      */
@@ -235,14 +245,362 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * @param args the arguments
      */
     /* Plugin entry points for test/debug or run in production ******************************************************************/
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         final ImageJ ij = new ImageJ();
 
 
-        String testDir = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/TestSplit/Processing_of_TEST1230403-SR-split/230403SR056";
-        RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
-        plugin.isDevModeActivated=true;
-        plugin.run(null);//testDir);
+        //createTif();
+        Path folderPath = Paths.get("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
+        createRootModelFromRSMLs(folderPath);
+
+        RootModel rm = new RootModel();
+        rm.readRSMLNew("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
+        //RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
+        //plugin.isDevModeActivated = true;
+        //plugin.run(null);//testDir);
+    }
+
+    /**
+     * Function to create tif files from the directories containing the images
+     * <p>
+     * @param inputDirectory The directory containing the images
+     * @param outputDirectory The directory where the tif files will be saved
+     */
+    private static void createTif(String inputDirectory, String outputDirectory) {
+        // for all the directories in the directory
+        for (File file : Objects.requireNonNull(new File(inputDirectory).listFiles())) {
+            if (file.isDirectory()) {
+                System.out.println("Directory : " + file.getAbsolutePath());
+                try {
+                    ImagePlus imgPlus = createImageFromImageDirectory(file.getAbsolutePath());
+                    // save the image keeping the folder structure
+                    String outputDirWithFolder = outputDirectory + file.getName();
+                    File outputDirFile = new File(outputDirWithFolder);
+                    if (!outputDirFile.exists()) {
+                        outputDirFile.mkdirs();
+                    }
+                    String outputDirWithFolderAndFile = outputDirWithFolder + "\\" + file.getName() + ".tif";
+                    IJ.saveAsTiff(imgPlus, outputDirWithFolderAndFile);
+
+                    // free the memory
+                    imgPlus.flush();
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+
+    /*
+    public static Stack<String> checkUniquenessRSMLs(Path folderPath) {
+        // From the folder path, get the list of rsml files
+
+        //// list the rsml files
+        List<Path> rsmlFiles = null;
+        try {
+            // must end with rsml, or rsml01, rsml02, ...
+            Pattern pattern = Pattern.compile("\\*.rsml\\d{2}");
+            rsmlFiles = Files.list(folderPath)
+                    .filter(path -> path.toString().matches(".*\\.rsml\\d{2}$") || path.toString().matches(".*\\.rsml$"))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // data structure that does not keep duplicates
+        Stack<String> keptRsmlFiles = new Stack<>();
+
+        // Read all the files content and check which ones are the same
+        for (Path rsmlFile : rsmlFiles) {
+            // read the file content
+            List<String> content;
+            try {
+                content = Files.readAllLines(rsmlFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            // check if the content is the same as the other files that have been added to the stack
+            if (keptRsmlFiles.empty()) {
+                keptRsmlFiles.push(rsmlFile.toString());
+            }
+            else {
+                boolean isSame = false;
+                for (String keptRsmlFile : keptRsmlFiles) {
+                    List<String> keptContent;
+                    try {
+                        keptContent = Files.readAllLines(Paths.get(keptRsmlFile));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    if (content.equals(keptContent)) {
+                        System.out.println("Same file : " + rsmlFile.toString() + " and " + keptRsmlFile);
+                        isSame = true;
+                        break;
+                    }
+                    // if the files have the same basename (without the extension)
+                    // TODO Check these ones by hand | Could be tricky
+                    if (rsmlFile.toString().split("\\.")[0].equals(keptRsmlFile.split("\\.")[0])) {
+                        System.out.println("Same file names \n : " + rsmlFile.toString() + "\n and \n" + keptRsmlFile+ "\n");
+                        isSame = true;
+                        break;
+                    }
+                }
+                if (!isSame) {
+                    keptRsmlFiles.push(rsmlFile.toString());
+                }
+            }
+        }
+        System.out.println("\nKept files : " + keptRsmlFiles);
+        return keptRsmlFiles;
+    }
+    */
+    /**
+     * Function that checks the uniqueness of the rsml files in a folder (comparing their content)
+     *
+     * @param folderPath The path to the folder containing the rsml files
+     * @return a stack of String containing the path of the rsml files that are unique
+     */
+    public static Stack<String> checkUniquenessRSMLs(Path folderPath) {
+        try {
+            // From the folder path, get the list of rsml files
+            List<Path> rsmlFiles = Files.list(folderPath)
+                    .filter(path -> path.toString().matches(".*\\.rsml\\d{2}$") || path.toString().matches(".*\\.rsml$"))
+                    .collect(Collectors.toList());
+
+            // data structure that does not keep duplicates
+            Stack<String> keptRsmlFiles = new Stack<>();
+
+            // Read all the files content and check which ones are the same
+            rsmlFiles.forEach(rsmlFile -> {
+                try {
+                    // read the file content
+                    List<String> content = Files.readAllLines(rsmlFile);
+
+                    // check if the content is the same as the other files that have been added to the stack
+                    Optional<String> duplicateFile = keptRsmlFiles.stream()
+                            .filter(keptRsmlFile -> {
+                                try {
+                                    List<String> keptContent = Files.readAllLines(Paths.get(keptRsmlFile));
+                                    return content.equals(keptContent) || rsmlFile.toString().split("\\.")[0].equals(keptRsmlFile.split("\\.")[0]);
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            })
+                            .findFirst();
+
+                    if (duplicateFile.isPresent()) {
+                        System.out.println("Same file : " + rsmlFile + " and " + duplicateFile.get());
+                    } else {
+                        keptRsmlFiles.push(rsmlFile.toString());
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+
+            System.out.println("\nKept files : " + keptRsmlFiles);
+            return keptRsmlFiles;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Function to get the information described in the rsml files and put them in a map
+     * <p>
+     * It reads the rsml file and extract :
+     * the metadata
+     * image metadata
+     * property definitions
+     * plant and roots
+     *
+     * @param path2RSML The path to the rsml file
+     * @param rsmlInfos The map to put the rsml infos
+     * @param fileDate  The date of the file (extrated from its name) TODO generalize
+     */
+    public static void getSimpleRSMLinfos(Path path2RSML, Map<Date, List<Object>> rsmlInfos, Date fileDate) {
+        // read the rsml file
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder;
+        try {
+            dBuilder = dbFactory.newDocumentBuilder();
+            Document doc = dBuilder.parse(new File(path2RSML.toString()));
+            doc.getDocumentElement().normalize();
+
+            RsmlInfo rsmlInfo = new RsmlInfo();
+
+            // Extract metadata
+            Element metadata = (Element) doc.getElementsByTagName("metadata").item(0);
+            rsmlInfo.version = metadata.getElementsByTagName("version").item(0).getTextContent();
+            rsmlInfo.unit = metadata.getElementsByTagName("unit").item(0).getTextContent();
+            rsmlInfo.resolution = metadata.getElementsByTagName("resolution").item(0).getTextContent();
+            rsmlInfo.lastModified = metadata.getElementsByTagName("last-modified").item(0).getTextContent();
+            rsmlInfo.software = metadata.getElementsByTagName("software").item(0).getTextContent();
+            rsmlInfo.user = metadata.getElementsByTagName("user").item(0).getTextContent();
+            rsmlInfo.fileKey = metadata.getElementsByTagName("file-key").item(0).getTextContent();
+
+            // Extract image metadata
+            Element image = (Element) metadata.getElementsByTagName("image").item(0);
+            rsmlInfo.captured = image.getElementsByTagName("captured").item(0).getTextContent();
+            rsmlInfo.label = image.getElementsByTagName("label").item(0).getTextContent();
+
+            // Extract property definitions
+            NodeList propertyDefinitions = metadata.getElementsByTagName("property-definition");
+            for (int i = 0; i < propertyDefinitions.getLength(); i++) {
+                Element propertyDefinition = (Element) propertyDefinitions.item(i);
+                RsmlInfo.PropertyDefinition pd = new RsmlInfo.PropertyDefinition();
+                pd.label = propertyDefinition.getElementsByTagName("label").item(0).getTextContent();
+                pd.type = propertyDefinition.getElementsByTagName("type").item(0).getTextContent();
+                pd.unit = propertyDefinition.getElementsByTagName("unit").item(0).getTextContent();
+                rsmlInfo.propertyDefinitions.add(pd);
+            }
+
+            // Extract plant
+            for (int plantNum = 0; plantNum < doc.getElementsByTagName("plant").getLength(); plantNum++) {
+                Element plant = (Element) doc.getElementsByTagName("plant").item(0);
+
+                // Extract roots
+                String firstRoot = "";
+                RsmlInfo.RootFromRSML parent = null;
+                NodeList roots = plant.getElementsByTagName("root");
+                for (int i = 0; i < roots.getLength(); i++) {
+                    Element root = (Element) roots.item(i);
+                    RsmlInfo.RootFromRSML r = new RsmlInfo.RootFromRSML();
+                    r.id = root.getAttribute("ID");
+                    r.label = root.getAttribute("label");
+                    if (i == 0) {
+                        firstRoot = r.label;
+                        r.parent = null;
+                        r.children = new ArrayList<>();
+                    }
+                    else { // TODO : generalize to n order root
+                        r.parent = parent;
+                    }
+                    r.accession = root.getAttribute("po:accession");
+
+                    // Extract properties
+                    Element properties = (Element) root.getElementsByTagName("properties").item(0);
+                    r.rulerAtOrigin = Double.parseDouble(properties.getElementsByTagName("rulerAtOrigin").item(0).getTextContent());
+                    r.length = Double.parseDouble(properties.getElementsByTagName("length").item(0).getTextContent());
+                    r.orientation = Double.parseDouble(properties.getElementsByTagName("orientation").item(0).getTextContent());
+                    // if exists
+                    if (properties.getElementsByTagName("lbuz").getLength() > 0)
+                        r.lbuz = Double.parseDouble(properties.getElementsByTagName("lbuz").item(0).getTextContent());
+                    else r.lbuz = -Double.MAX_VALUE;
+                    if (properties.getElementsByTagName("lauz").getLength() > 0)
+                        r.lauz = Double.parseDouble(properties.getElementsByTagName("lauz").item(0).getTextContent());
+                    else r.lauz = -Double.MAX_VALUE;
+
+                    // Extract geometry
+                    Element geometry = (Element) root.getElementsByTagName("geometry").item(0);
+                    NodeList points = geometry.getElementsByTagName("point");
+                    for (int j = 0; j < points.getLength(); j++) {
+                        Element point = (Element) points.item(j);
+                        String xs = point.getAttribute("x");
+                        String ys = point.getAttribute("y");
+                        double x = Double.parseDouble(xs);
+                        double y = Double.parseDouble(ys);
+                        r.pointCoordinates.add(new Point2D.Double(x, y));
+                    }
+
+                    // Extract functions
+                    NodeList functions = root.getElementsByTagName("function");
+                    for (int k = 0; k < functions.getLength(); k++) {
+                        Element function = (Element) functions.item(k);
+                        String functionName = function.getAttribute("name");
+                        String functionDomain = function.getAttribute("domain"); // Extract domain attribute
+                        NodeList samples = function.getElementsByTagName("sample");
+                        List<String> sampleValues = new ArrayList<>();
+                        for (int l = 0; l < samples.getLength(); l++) {
+                            sampleValues.add(samples.item(l).getTextContent());
+                        }
+                        // Use a composite key (root_label + functionName + functionDomain) to store the sample values
+                        r.functionSamples.put(k + "_" + r.label + "_" + functionName + "_" + functionDomain, sampleValues);
+                    }
+                    rsmlInfo.roots.add(r);
+
+                    if (i == 0) {
+                        parent = r;
+                    }
+                    else {
+                        parent.children.add(r);
+                    }
+                }
+
+                // remove all the keys that don't start with "0_" or "1_" from the very first added root (use firstRoot) to get the label of the first root
+
+                // get keys that contains firstRoot
+                String finalFirstRoot = firstRoot;
+                List<String> keys = rsmlInfo.roots.get(0).functionSamples.keySet().stream()
+                        .filter(key -> key.contains(finalFirstRoot))
+                        .filter(key -> !key.startsWith("0_") && !key.startsWith("1_"))
+                        .collect(Collectors.toList());
+
+                // remove the keys
+                keys.forEach(rsmlInfo.roots.get(0).functionSamples::remove);
+
+            }
+            rsmlInfos.get(fileDate).add(rsmlInfo);
+
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Function to get the information described in the rsml files
+     * <p>
+     * It checks for the different rsml files similarity, takes into account the unique ones
+     * And iterate over the unique ones to get the information used to describe the roots
+     *
+     * @param folderPath The path to the folder containing the rsml files
+     * @return A TreeMap with the date as key and the list of rsml infos as value
+     * @throws IOException If an I/O error occurs
+     */
+    public static Map<Date, List<Object>> getRSMLsinfos(Path folderPath) throws IOException {
+        // check the uniqueness of the rsml files
+        Stack<String> keptRsmlFiles = checkUniquenessRSMLs(folderPath);
+
+        // get Date of each rsml (that supposetly match the image date) // TODO generalize
+        Pattern pattern = Pattern.compile("\\d{2}_\\d{2}_\\d{4}");
+        ConcurrentHashMap<String, Date> fileDates = new ConcurrentHashMap<>();
+
+        Files.list(folderPath)
+                .parallel()
+                .filter(path -> path.toString().matches(".*\\.(rsml|rsml01|rsml02|rsml03|rsml04)$"))
+                .forEach(path -> {
+                    String file = path.toString();
+                    Matcher matcher = pattern.matcher(file);
+                    if (matcher.find()) {
+                        int year = Integer.parseInt(matcher.group(0).split("_")[2]) - 1900;
+                        int month = Integer.parseInt(matcher.group(0).split("_")[1]) - 1;
+                        int day = Integer.parseInt(matcher.group(0).split("_")[0]);
+                        fileDates.put(file, new Date(year, month, day));
+                    }
+                });
+
+        Map<Date, List<Object>> rsmlInfos = new TreeMap<>();
+
+        // add dates as keys
+        fileDates.values().forEach(date -> rsmlInfos.put(date, new ArrayList<>()));
+
+        /*for (String path : keptRsmlFiles) {
+            getSimpleRSMLinfos(Paths.get(path), rsmlInfos, fileDates.get(path));
+        }*/
+
+        keptRsmlFiles.parallelStream().forEach(path -> getSimpleRSMLinfos(Paths.get(path), rsmlInfos, fileDates.get(path)));
+
+        System.out.println("rsmlInfos : " + rsmlInfos);
+        return rsmlInfos;
+    }
+
+    public static RootModel createRootModelFromRSMLs(Path folderPath) throws IOException {
+        Map<Date, List<Object>> rsmlInfos = getRSMLsinfos(folderPath);
+
+        RootModel rootModel = new RootModel();
+
+
+        return rootModel;
     }
 
     private static Map<Double, List<Boolean>> getTimeMapLast(TreeMap<Double, List<Point3d>> pointsByTime) {
@@ -261,6 +619,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         }
         return extremity;
     }
+
     private static Map<Double, List<Boolean>> getTimeMapFirst(TreeMap<Double, List<Point3d>> pointsByTime) {
         Map<Double, List<Boolean>> extremity = new TreeMap<>();
         // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
@@ -293,6 +652,73 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             extremity.put(entry.getKey(), list);
         }
         return extremity;
+    }
+
+    // TODO Generalization
+    public static List<String> getImagesFromFolder(String directory) throws IOException {
+        Pattern pattern = Pattern.compile("\\d{2}_\\d{2}_\\d{4}");
+        ConcurrentHashMap<String, Date> imageDates = new ConcurrentHashMap<>();
+
+        Files.list(Paths.get(directory))
+                .parallel()
+                .filter(path -> path.toString().matches(".*\\.(tif|tiff|jpg|jpeg|png)$"))
+                .forEach(path -> {
+                    String image = path.toString();
+                    Matcher matcher = pattern.matcher(image);
+                    if (matcher.find()) {
+                        int year = Integer.parseInt(matcher.group(0).split("_")[2]) - 1900;
+                        int month = Integer.parseInt(matcher.group(0).split("_")[1]) - 1;
+                        int day = Integer.parseInt(matcher.group(0).split("_")[0]);
+                        imageDates.put(image, new Date(year, month, day));
+                    }
+                });
+
+        return imageDates.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
+
+    public static ImagePlus getImageStackFromImages(List<String> images) throws InterruptedException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // check if the images have all the same size, if not resize them to the "smallest" size
+        ImagePlus firstImage = IJ.openImage(images.get(0));
+        int width = firstImage.getWidth();
+        int height = firstImage.getHeight();
+        firstImage.close();
+
+        for (String image : images) {
+            ImagePlus img = IJ.openImage(image);
+            if (img.getWidth() < width || img.getHeight() < height) {
+                width = Math.min(width, img.getWidth());
+                height = Math.min(height, img.getHeight());
+            }
+        }
+
+        final ImageStack finalStack = new ImageStack(width, height);
+        for (String image : images) {
+            int finalWidth = width;
+            int finalHeight = height;
+            executor.submit(() -> {
+                ImagePlus img = IJ.openImage(image);
+                if (img.getWidth() != finalWidth || img.getHeight() != finalHeight) {
+                    img = VitimageUtils.resize(img, finalWidth, finalHeight, img.getNSlices());
+                }
+                finalStack.addSlice(img.getProcessor());
+                img.close();
+            });
+        }
+
+
+        executor.shutdown();
+        executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+        return new ImagePlus("Stack", finalStack);
+    }
+
+    public static ImagePlus createImageFromImageDirectory(String directory) throws IOException, InterruptedException {
+        return getImageStackFromImages(getImagesFromFolder(directory));
     }
 
     public String getBoxName() {
@@ -328,8 +754,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (arg != null && !arg.isEmpty() && new File(arg).exists()) {
             dataDir = arg;
             System.out.println("Toto 32");
-        }
-        else  {
+        } else {
             System.out.println("Toto 33");
             dataDir = VitiDialogs.chooseDirectoryUI("Choose a boite directory", "Ok");
             System.out.println("Toto 34");
@@ -387,6 +812,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         tabModifs[0][2] = this.version;
         writeInfoFile();
     }
+
+    /* Helpers of the Gui ************************************************************************************/
 
     /**
      * This method initializes the Graphical User Interface (GUI) for the plugin.
@@ -469,7 +896,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 IJ.showMessage("See you next time !");
                 frame.setVisible(false);
                 closeAllViews();
-                if(isDevModeActivated)System.exit(0);
+                if (isDevModeActivated) System.exit(0);
             }
         });
         frame.setVisible(true);
@@ -552,8 +979,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         buttonsPanel.add(buttonExit);
     }
 
-    /* Helpers of the Gui ************************************************************************************/
-
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
         label.setHorizontalAlignment(SwingConstants.CENTER);
@@ -589,9 +1014,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Apply any modifications that have been made to the model
         System.out.println("Loading operations");
-        for (int i=0;i<tabModifs.length;i++) {
-            String []modif=tabModifs[i];
-            System.out.println(i+" : "+modif[0]);
+        for (int i = 0; i < tabModifs.length; i++) {
+            String[] modif = tabModifs[i];
+            System.out.println(i + " : " + modif[0]);
             if (modif[0].isEmpty()) break;
             // Skip first line
             System.out.println("Loading operations");
@@ -774,7 +1199,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     IJ.showMessage("See you next time !");
                     frame.setVisible(false);
                     closeAllViews();
-                    if(isDevModeActivated)System.exit(0);
+                    if (isDevModeActivated) System.exit(0);
                 }
             }
         });
@@ -856,7 +1281,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             infos = movePointInModel(tabPt, currentModel);
             did = true;
         }
-        if (did && infos!=null) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
+        if (did && infos != null) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
         else finishActionAborted();
     }
 
@@ -1032,7 +1457,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     public void actionChangeTime() {
         IJ.showMessage("Are you sure about what you are doing ? Save before, this is a dev feature. Next window could help you abort if you change your mind.");
-        if(!VitiDialogs.getYesNoUI("Sure ?", "Sure")){
+        if (!VitiDialogs.getYesNoUI("Sure ?", "Sure")) {
             finishActionAborted();
         }
         System.out.println("I1");
@@ -1152,7 +1577,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] movePointInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("MOVEPOINT", tabPt);
         Object[] obj = rm.getClosestNode(tabPt[0]);
-        if(obj==null){
+        if (obj == null) {
             IJ.showMessage("You selected a weird node, that may not have appeared at the pointed time. Abort.");
             return null;
         }
@@ -1175,7 +1600,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         String[] infos = formatInfos("REMOVEPOINT", tabPt);
 
         Object[] obj = rm.getClosestNode(tabPt[0]);
-        if(obj==null){
+        if (obj == null) {
             IJ.showMessage("You selected a weird node. Abort.");
             return null;
         }
@@ -1386,7 +1811,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremityFirst,extremityLast, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
 
         // Add the new primary root to the RootModel
         Root rNew = new Root(null, rm, "", 1);
@@ -1398,7 +1823,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Free memory
         pointsByTime.clear();
-        extremityLast.clear(); 
+        extremityLast.clear();
         extremityFirst.clear();
         recordedNodes.clear();
 
@@ -1590,7 +2015,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         recordedNodes.add(n);
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime,  extremityFirst,extremityLast, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
 
         r.lastNode = nPar;
 
@@ -1680,7 +2105,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (tabPt.length < 2) return null;
 
         System.out.println("Toto1");
-        for(Point3d pt: tabPt)System.out.println(pt);
+        for (Point3d pt : tabPt) System.out.println(pt);
 
         // Reverse the order of the points
         for (int i = 0; i < tabPt.length / 2; i++) {
@@ -1689,7 +2114,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             tabPt[tabPt.length - 1 - i] = temp;
         }
         System.out.println("Toto2");
-        for(Point3d pt: tabPt)System.out.println(pt);
+        for (Point3d pt : tabPt) System.out.println(pt);
 
         Object[] obj = rm.getClosestNode(tabPt[tabPt.length - 1]);
 
@@ -1709,8 +2134,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 //        }
 
         if ((n != r.firstNode)) {
-            IJ.showMessage("The node clicked seems not to be the first node of the corresponding root\n"+
-                                "Please select the first point of the branch you want to extend. Abort.");
+            IJ.showMessage("The node clicked seems not to be the first node of the corresponding root\n" +
+                    "Please select the first point of the branch you want to extend. Abort.");
             return null;
         }
 
@@ -1764,7 +2189,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Node nPar = nFirst;
 
         // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime,  extremityFirst,extremityLast, recordedNodes, nPar);
+        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
 
         nPar.child = r.firstNode;
         r.firstNode.parent = nPar;
@@ -1811,11 +2236,10 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
                 // If the current point is an extremity, set its birth time and birth time in hours
                 if (extremityLast.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z+(float)0.0;
+                    nn.birthTime = (float) pt.z + (float) 0.0;
                     nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                }
-                else if (extremityFirst.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                        nn.birthTime = (float) pt.z;
+                } else if (extremityFirst.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
+                    nn.birthTime = (float) pt.z;
                     nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
                 } else {
                     // If the current point is not an extremity, calculate its birth time and birth time in hours
@@ -2418,7 +2842,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return str;
         }
 
-        str[0] = "Welcome to RSML Expert "+version;
+        str[0] = "Welcome to RSML Expert " + version;
         str[1] = "System check. Available memory in JVM=" + jvmMemory + " MB over " + memoryFullSize + " MB. #Available processor cores=" + nbCpu + ".";
         if (verbose) return str;
         else return new String[]{"", ""};
@@ -2466,6 +2890,41 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     }
 }
 
+class RsmlInfo {
+    String version;
+    String unit;
+    String resolution;
+    String lastModified;
+    String software;
+    String user;
+    String fileKey;
+    String captured;
+    String label;
+    List<PropertyDefinition> propertyDefinitions = new ArrayList<>();
+    List<RootFromRSML> roots = new ArrayList<>();
+
+    static class PropertyDefinition {
+        String label;
+        String type;
+        String unit;
+    }
+
+    static class RootFromRSML {
+        String id;
+        String label;
+        String accession;
+        double rulerAtOrigin;
+        double length;
+        double orientation;
+        double lbuz;
+        double lauz;
+        List<Point2D.Double> pointCoordinates = new ArrayList<>();
+        Map<String, List<String>> functionSamples = new HashMap<>();
+
+        RootFromRSML parent;
+        List<RootFromRSML> children = new ArrayList<>();
+    }
+}
 
 class extractedImageRepartition {
     private final int zoomFactor;
