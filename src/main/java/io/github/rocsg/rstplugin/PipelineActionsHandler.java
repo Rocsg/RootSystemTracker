@@ -32,6 +32,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class PipelineActionsHandler {
     // Flag indicating the pipeline has finished processing
@@ -103,7 +106,7 @@ public class PipelineActionsHandler {
         if (!outputFolder.exists()) {
             outputFolder.mkdir();
         }
-        String outputFolderPath0 = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\1\\";
+        String outputFolderPath0 = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\B73_R04_01\\";
 
         File outputFolderPath01 = new File(outputFolderPath0);
         if (!outputFolderPath01.exists()) {
@@ -111,13 +114,35 @@ public class PipelineActionsHandler {
         }
         // Initialize the PipelineParamHandler object with valid parameters
         PipelineParamHandler pph = new PipelineParamHandler(inputFolderPath, outputFolderPath);
+        t = new Timer();
+        // calling doNextStep
+        // Create a thread pool with a fixed number of threads.
+// Adjust the number of threads to the number of cores in your CPU for optimal performance.
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-        // Call the stackData method
+        for (int k = 0; k < 2; k++) {
+            for (int i = 0; i < 4; i++) {
+                final int index = i;
+                executor.submit(() -> doNextStep(index, pph));
+            }
+        }
+
+// Shutdown the executor and wait for all tasks to complete.
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(60, TimeUnit.MINUTES)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+       /* // Call the stackData method
         stackData(0, pph);
         // Call the Register method
         boolean result = PipelineActionsHandler.registerSerie(0, outputFolderPath0, pph);
 
-        System.out.println("Result of registration: " + result);
+        System.out.println("Result of registration: " + result);*/
     }
 
     /**
@@ -529,20 +554,36 @@ public class PipelineActionsHandler {
             }
             tabImg[n1]=trComposed[n1].transformImage(tabImg[n1], tabImg[n1]);
         }
+
         ImagePlus result1=VitimageUtils.slicesToStack(tabImg);
         result1.setTitle("step 1");
         IJ.saveAsTiff(result1, new File(outputDataDir,"21_midterm_registration.tif").getAbsolutePath());
 
 
-
-
+        // save transform in .txt file i n a folder (Transforms_1)
+        // create folder if it does not exist
+        String transformPath1 = outputDataDir + File.separator + "Transforms_1";
+        File transformFolder1 = new File(transformPath1);
+        if (!transformFolder1.exists()) {
+            transformFolder1.mkdir();
+        }
+        int count = 0;
+        for (ItkTransform itkTransform : tr) {
+            if (itkTransform == null) continue;
+            System.out.println("Writing transform to file: " + transformPath1);
+            System.out.println("Transform" + count + ":" +  itkTransform);
+            count++;
+            itkTransform.writeMatrixTransformToFile(transformPath1 + File.separator + "transform_" + count + ".txt");
+        }
 
         //Second step : daisy-chain dense registration
         ImagePlus result2=null;
         ArrayList<ImagePlus>listAlreadyRegistered=new ArrayList<ImagePlus>();
         listAlreadyRegistered.add(tabImg2 [N-1]);
-        for(int n1=N-2;n1>=0;n1--) {
+        ImagePlus[] imageRefRecc=new ImagePlus[N - 1];
+        for(int n1=N-2;n1>=0;n1--) { // WARNING
             ImagePlus imgRef=listAlreadyRegistered.get(listAlreadyRegistered.size()-1);
+            imageRefRecc[n1]=imgRef;
             RegistrationAction regAct2=new RegistrationAction().defineSettingsFromTwoImages(tabImg[0],tabImg[0],null,false);
             regAct2.setLevelMaxNonLinear(1);
             regAct2.setLevelMinNonLinear(-1);
@@ -580,6 +621,46 @@ public class PipelineActionsHandler {
         result2=VitimageUtils.slicesToStack(tabImg);
         result2.setTitle("Registered stack");
         IJ.saveAsTiff(result2, new File(outputDataDir,"22_registered_stack.tif").getAbsolutePath());
+
+        // save transform in .txt file in a folder (Transforms_2)
+        // create folder if it does not exist
+        String transformPath2 = outputDataDir + File.separator + "Transforms_2";
+        File transformFolder2 = new File(transformPath2);
+        if (!transformFolder2.exists()) {
+            transformFolder2.mkdir();
+        }
+        count = 0;
+
+        for (ItkTransform itkTransform : trComposed) {
+            if (itkTransform == null) continue;
+            System.out.println("Writing transform to file: " + transformPath2);
+            System.out.println("Transform" + count + ":" +  itkTransform);
+
+            if (itkTransform.isDense()) {
+                itkTransform.writeAsDenseField(transformPath2 + File.separator + "transform_" + (count +1)+ ".txt", imageRefRecc[count]);
+            }
+            else {
+                itkTransform.writeMatrixTransformToFile(transformPath2 + File.separator + "transform_" + (count+1) + ".txt");
+            }
+            count++;
+        }
+
+        /*ItkTransform ttk = new ItkTransform(trComposed[0]);
+
+        for (ItkTransform itkTransform : trComposed) {
+            if (itkTransform == null) continue;
+            if (itkTransform.equals(trComposed[0])) continue;
+            ttk.addTransform(itkTransform);
+        }
+
+        // stack imageRef in a new ImagePlus
+        ImagePlus[] imageRef_moins_1 = new ImagePlus[N - 1];
+        System.arraycopy(imageRefRecc, 0, imageRef_moins_1, 0, N - 1);
+        ImagePlus imageRefStack = VitimageUtils.slicesToStack(imageRef_moins_1);
+
+        ttk.writeAsDenseField(transformPath2 + File.separator + "transform_final", imageRefStack);*/
+
+
         return true;
     }
 

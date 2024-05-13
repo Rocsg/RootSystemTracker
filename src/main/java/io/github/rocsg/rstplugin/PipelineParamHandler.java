@@ -20,7 +20,7 @@ public class PipelineParamHandler {
     // Memory saving mode, if 1, don't save very big debug images
     public int memorySaving = 0;
     // Subsampling factor
-    public int subsamplingFactor = 5;
+    public int subsamplingFactor = 20;
     // Tolerance distance for Beucker simplification
     public double toleranceDistanceForBeuckerSimplification = 0.9;
     // Times of the images
@@ -79,18 +79,18 @@ public class PipelineParamHandler {
     int yMinCrop = 1;
     int dxCrop = 430;
     int dyCrop = 500;*/
-    int xMinCrop=(int) 1200.0 / subsamplingFactor;
-    int yMinCrop=(int) 195.0 / subsamplingFactor ;
-    int dxCrop=(int) (10620.0-837) / subsamplingFactor;
-    int dyCrop=(int) (8783-.0-195) / subsamplingFactor;
+    int xMinCrop=(int) 1400.0 / subsamplingFactor;
+    int yMinCrop=(int) 350.0 / subsamplingFactor ;
+    int dxCrop=(int) (10620.0-1400.0) / subsamplingFactor;
+    int dyCrop=(int) (8783.0-350.0) / subsamplingFactor;
     // Maximum linear
     int maxLinear = 4;
     // Type of experiment
     String typeExp = "Simple";
     // Margin for registration
-    int marginRegisterLeft =420;
-    int marginRegisterUp = 0;
-    int marginRegisterRight = 20;
+    int marginRegisterLeft = (int) 20.0 / subsamplingFactor;
+    int marginRegisterUp = (int) (1200.0 - 350.0) / subsamplingFactor;
+    int marginRegisterRight = (int) 20.0 / subsamplingFactor;
     // Flag to apply full pipeline image after image
     boolean applyFullPipelineImageAfterImage = true;
     // Names of the images
