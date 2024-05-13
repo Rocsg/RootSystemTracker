@@ -20,7 +20,7 @@ public class PipelineParamHandler {
     // Memory saving mode, if 1, don't save very big debug images
     public int memorySaving = 0;
     // Subsampling factor
-    public int subsamplingFactor = 20;
+    public int subsamplingFactor = 4;
     // Tolerance distance for Beucker simplification
     public double toleranceDistanceForBeuckerSimplification = 0.9;
     // Times of the images
