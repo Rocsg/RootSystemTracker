@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <description>Root system tracker plugin</description>
     <packaging>jar</packaging>
     <version>1.6.1</version>
@@ -84,6 +83,9 @@
     </licenses>
 
 
+
+
+
     <dependencies>
 
         <dependency>
@@ -125,6 +127,7 @@
             <groupId>sc.fiji</groupId>
             <artifactId>3D_Viewer</artifactId>
         </dependency>
+
 
 
         <dependency>
@@ -178,8 +181,6 @@
         <dependency>
             <groupId>org.itk.simple</groupId>
             <artifactId>simpleitk</artifactId>
-            <!--scope>system</scope>
-            <systemPath>${basedir}/lib/SimpleITK-0.9.0-Java-win64/simpleitk-0.9.0.jar</systemPath>-->
             <version>0.9.0</version>
             <type>jar</type>
         </dependency>
@@ -257,6 +258,7 @@
             <artifactId>core</artifactId>
             <version>3.5.1</version>
         </dependency>
+
         <!-- https://mvnrepository.com/artifact/sc.fiji/Trainable_Segmentation -->
         <!--<dependency>
             <groupId>sc.fiji</groupId>
@@ -273,23 +275,12 @@
         <!-- https://mvnrepository.com/artifact/org.scijava/scijava-java3d -->
     </dependencies>
 
+
+
+
     <!--<dependencyManagement>
                 <dependencies>
     </dependencies>
 
     </dependencyManagement>-->
-    <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.2.5</version>
-                    <configuration>
-                        <argLine>-Xmx8G</argLine>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
 </project>

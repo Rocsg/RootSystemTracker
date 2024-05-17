@@ -204,6 +204,11 @@ public class Root implements Comparable<Root> {
      */
     public float dpi, pixelSize;
 
+    /*For converting between rsmls and temporal rsmls*/
+    String label;
+    public HashMap<String, Double> properties = new HashMap<String, Double>();
+    public HashMap<String, List<Double>> functions = new HashMap<String, List<Double>>();
+
     /**
      * Constructor
      * Used when opening a xml file.
@@ -248,9 +253,6 @@ public class Root implements Comparable<Root> {
         readRSML(parentDOM, rm, parentRoot, origin, timeLapseModel);
     }
 
-   
-    
-
     /**
      * Instantiates a new root.
      *
@@ -266,7 +268,7 @@ public class Root implements Comparable<Root> {
         markList = new Vector<Mark>();
         this.rootID = rootID;
         if (parentRoot != null) {
-            attachParent(parentRoot);
+            attachParent(parentRoot); // appel setParentNode sur lui même ???, comment on créé la seconde racine sachant que firstnode et lastnode sont nuls ???
             parentRoot.attachChild(this);
         }
         nextRootKey++;
@@ -1408,6 +1410,16 @@ public class Root implements Comparable<Root> {
         if (childList.size() > 0) updateChildren();
     }
 
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public void setGeometry(List<Node> nodes) {
+        this.firstNode = nodes.get(0);
+        this.lastNode = nodes.get(nodes.size() - 1);
+        this.nNodes = nodes.size();
+    }
+
     /**
      * Automatically set distance from parent apex.
      */
@@ -1476,13 +1488,12 @@ public class Root implements Comparable<Root> {
      * @return true if there is at least one child, false if not.
      */
     public boolean setFirstChild() {
-        if (childList.size() == 0) {
+        if (childList.isEmpty()) {
             firstChild = null;
             return false;
         }
         Root fc = childList.get(0);
-        for (int i = 0; i < childList.size(); i++) {
-            Root c = childList.get(i);
+        for (Root c : childList) {
             if (c.getDistanceFromApex() > fc.getDistanceFromApex()) fc = c;
         }
         firstChild = fc;
@@ -1495,13 +1506,12 @@ public class Root implements Comparable<Root> {
      * @return true if there is at least one child, false if not.
      */
     public boolean setLastChild() {
-        if (childList.size() == 0) {
+        if (childList.isEmpty()) {
             lastChild = null;
             return false;
         }
         Root fc = childList.get(0);
-        for (int i = 0; i < childList.size(); i++) {
-            Root c = childList.get(i);
+        for (Root c : childList) {
             if (c.getDistanceFromApex() < fc.getDistanceFromApex()) fc = c;
         }
         lastChild = fc;

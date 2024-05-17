@@ -22,7 +22,7 @@ public class RstBox {
     // Constructor of box object
     public RstBox(String path) {
         // If no path is provided, ask one to the user
-        if (path == null || path.length() == 0)
+        if (path == null || path.isEmpty())
             path = VitiDialogs.chooseDirectoryNiceUI("Choose dir box", "OK");
 
         // This line is for not being in trouble with windows weird path
