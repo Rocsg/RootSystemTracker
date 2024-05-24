@@ -15,12 +15,12 @@ import io.github.rocsg.fijiyama.common.Timer;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
+import io.github.rocsg.rsmlparser.*;
 import org.scijava.vecmath.Point3d;
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -34,11 +34,14 @@ import javax.xml.transform.stream.StreamResult;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -93,7 +96,7 @@ class DataFileFilterRSML extends javax.swing.filechooser.FileFilter
 /**
  * The Class RootModel.
  */
-public class RootModel extends WindowAdapter {
+public class RootModel extends WindowAdapter implements IRootModelParser {
 
 
     //START UNSAFE ZONE
@@ -263,6 +266,7 @@ public class RootModel extends WindowAdapter {
      * The n plants.
      */
     private int nPlants;
+    private int maxRootOrder = 0;
 
     /**
      * Constructors.
@@ -319,46 +323,6 @@ public class RootModel extends WindowAdapter {
             this.rootList.add(new Root(r.parent, this, r.getRootID(), r.order));
         }
         this.hoursCorrespondingToTimePoints = rm.hoursCorrespondingToTimePoints;
-    }
-
-    public RootModel(Map<Date, List<Object>> map) {
-        this.dpi = 1;
-        this.pixelSize = 2.54f / dpi;
-        this.directory = "";
-        this.nPlants = 1;
-        this.imgName = "";
-        this.previousMagnification = 0;
-        this.nextAutoRootID = 0;
-        this.img = null;
-        this.ip = null;
-        this.angleStep = 0;
-        this.threshold = 0;
-        this.dM = 0;
-        this.AUTOBUILD_MIN_STEP = 3;
-        this.AUTOBUILD_STEP_FACTOR_BORDER = 0.5f;
-        this.AUTOBUILD_STEP_FACTOR_DIAMETER = 2;
-        this.AUTOBUILD_MIN_THETA_STEP = 0.02f;
-        this.AUTOBUILD_THETA_STEP_FACTOR = (float) Math.PI / 2;
-        this.rootList = new ArrayList<Root>();
-        this.hoursCorrespondingToTimePoints = new double[map.size()];
-        int i = 0;
-        for (Date date : map.keySet()) {
-            this.hoursCorrespondingToTimePoints[i] = date.getTime();
-            i++;
-        }
-        Arrays.sort(this.hoursCorrespondingToTimePoints);
-        for (Date date : map.keySet()) {
-            List<Object> list = map.get(date);
-            Root r = new Root(null, this, "", 1);
-            for (Object o : list) {
-                if (o instanceof Point3d) {
-                    Point3d p = (Point3d) o;
-                    r.addNode(p.x, p.y, p.z, 0, 0, 0, 0, true);
-                }
-            }
-            r.computeDistances();
-            this.rootList.add(r);
-        }
     }
 
     //A main function to test the function below
@@ -1006,7 +970,7 @@ public class RootModel extends WindowAdapter {
             }
         };
         //Then we use comparator to sort rootList
-        Collections.sort(this.rootList, comparatorPrimaries);
+        this.rootList.sort(comparatorPrimaries);
         int incr = 0;
         for (int i = 0; i < this.rootList.size(); i++) {
             if (this.rootList.get(i).order == 1) this.rootList.get(i).plantNumber = (incr++);
@@ -1021,7 +985,7 @@ public class RootModel extends WindowAdapter {
             }
         };
         for (Root r : this.rootList) {
-            Collections.sort(r.childList, comparatorLateral);
+            r.childList.sort(comparatorLateral);
         }
 
         for (int i = 0; i < this.rootList.size(); i++) {
@@ -2909,6 +2873,34 @@ public class RootModel extends WindowAdapter {
     }
 
     /**
+     * Apply transform to geometry. for a specific time of appearance
+     *
+     * @param tr the transformation
+     * @param timeAppearance the time of appearance
+     */
+    public void applyTransformToGeometry(ItkTransform tr, int timeAppearance) {
+        Root r;
+        Node n, n1;
+        double[] coords;
+        for (int i = 0; i < rootList.size(); i++) {
+            r = rootList.get(i);
+            n = r.firstNode;
+            if (r.isChild == 1) {
+                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
+                n.x += (n.birthTime == timeAppearance ? (n.x - (float) coords[0]) : 0);
+                n.y += (n.birthTime == timeAppearance ? (n.y - (float) coords[1]) : 0);
+            }
+            while (n.child != null) {
+                n1 = n;
+                n = n.child;
+                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
+                n.x += (n.birthTime == timeAppearance ? (n.x - (float) coords[0]) : 0);
+                n.y += (n.birthTime == timeAppearance ? (n.y - (float) coords[1]) : 0);
+            }
+        }
+    }
+
+    /**
      * Creates the gray scale image with time.
      *
      * @param imgInitSize      the img init size
@@ -3129,8 +3121,7 @@ public class RootModel extends WindowAdapter {
         int nTot = 0;
         int nPrim = 0;
         int nSecond = 0;
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
+        for (Root r : rootList) {
             Node n = r.firstNode;
             Node n1;
             int lwid = (int) lineWidths[r.order - 1];
@@ -3556,5 +3547,531 @@ public class RootModel extends WindowAdapter {
     }
 
 
-}
+    //// Handling interface methods
 
+    @Override
+    public IRootModelParser createRootModel(IRootModelParser rootModel, float time) {
+        if (rootModel instanceof RootModel) {
+            return rootModel;
+        }
+        else if (rootModel instanceof RootModel4Parser) {
+            RootModel rm = new RootModel();
+            nextAutoRootID = 0;
+            String unit = ((RootModel4Parser) rootModel).getUnit();
+            float res = ((RootModel4Parser) rootModel).getResolution();
+            dpi = getDPI(unit, res);
+            pixelSize = 2.54f / dpi;
+            datafileKey = ((RootModel4Parser) rootModel).getFileKey();
+            for (Scene scene : ((RootModel4Parser) rootModel).getScenes()) {
+                for (Plant plant : scene.getPlants()) {
+                    for (Root4Parser root : plant.getFirstOrderRoots()) {
+                        new Root(1, root, true, null, rm, ((RootModel4Parser) rootModel).getSoftware(), time);
+                    }
+                }
+            }
+            FSR.write(rootList.size() + " root(s) were created");
+            setDPI(dpi);
+            return rm;
+        }
+        else {
+            return null;
+        }
+    }
+
+
+    /**
+     * Creates the root models.
+     * @param rootModels the root models ordered by date
+     * @param scaleFactor the scale factor (pph)
+     * @return the root model
+     */
+    @Override
+    public IRootModelParser createRootModels(Map<LocalDate, List<IRootModelParser>> rootModels, float scaleFactor) {
+        RootModel rm = new RootModel();
+        LocalDate firstDate = rootModels.keySet().iterator().next();
+        RootModel4Parser firstRootModel = (RootModel4Parser) rootModels.get(firstDate).get(0);
+
+        rm.imgName = firstRootModel.getFileKey();
+        String unit = firstRootModel.getUnit();
+        float res = firstRootModel.getResolution();
+        rm.dpi = getDPI(unit, res);
+        rm.pixelSize = 2.54f / rm.dpi;
+
+        List<LocalDate> dates = new ArrayList<>(rootModels.keySet());
+        Collections.sort(dates);
+
+        double[] hours = new double[dates.size()];
+        hours[0] = 0;
+        for (int i = 1; i < dates.size(); i++) {
+            hours[i] = hours[i - 1] + ChronoUnit.HOURS.between(dates.get(i - 1).atStartOfDay(), dates.get(i).atStartOfDay());
+        }
+        rm.hoursCorrespondingToTimePoints = hours;
+
+        Map<String, List<Root4Parser>> rootsMap = new HashMap<>();
+
+        for (LocalDate date : dates) {
+            for (IRootModelParser model : rootModels.get(date)) {
+                parseRootModel((RootModel4Parser) model, rootsMap);
+            }
+        }
+
+        for (int level = 1; level <= maxRootOrder; level++) {
+            for (String id : rootsMap.keySet()) {
+                if (rootsMap.get(id).get(0).getOrder() == level) {
+                    buildRootHierarchy(rm, rootsMap, id, null, dates, scaleFactor);
+                }
+            }
+        }
+
+        rm.standardOrderingOfRoots();
+        rm.cleanWildRsml();
+        rm.resampleFlyingRoots();
+
+        return rm;
+    }
+
+    /**
+     * Parse root model. Adding keys to the roots map (id -> list of roots)
+     * We would end up with (id -> time segmentation of the roots)
+     * @param rootModel the root model
+     * @param rootsMap the roots map
+     */
+    private void parseRootModel(RootModel4Parser rootModel, Map<String, List<Root4Parser>> rootsMap) {
+        for (Scene scene : rootModel.getScenes()) {
+            for (Plant plant : scene.getPlants()) {
+                for (Root4Parser root : plant.getFirstOrderRoots()) {
+                    rootsMap.computeIfAbsent(root.getId(), k -> new ArrayList<>()).add(root);
+                    parseChildRoots(root, rootsMap);
+                    if (root.getOrder() > maxRootOrder) maxRootOrder = root.getOrder();
+                }
+            }
+        }
+    }
+
+    /**
+     * Parse child roots. Adding keys to the roots map (id -> list of roots)
+     * @param root the root
+     * @param rootsMap the roots map
+     */
+    private void parseChildRoots(Root4Parser root, Map<String, List<Root4Parser>> rootsMap) {
+        for (IRootParser child : root.getChildren()) {
+            rootsMap.computeIfAbsent(child.getId(), k -> new ArrayList<>()).add((Root4Parser) child);
+            parseChildRoots((Root4Parser) child, rootsMap);
+            if (child.getOrder() > maxRootOrder) maxRootOrder = child.getOrder();
+        }
+    }
+
+    /**
+     * Build root hierarchy. Recursive method to build the root hierarchy
+     * @param rm the root model
+     * @param rootsMap the roots map
+     * @param id the id
+     * @param parent the parent
+     * @param dates the dates
+     * @param scaleFactor the scale factor
+     */
+    private void buildRootHierarchy(RootModel rm, Map<String, List<Root4Parser>> rootsMap, String id, Root parent, List<LocalDate> dates, float scaleFactor) {
+        List<Root4Parser> rootList = rootsMap.get(id);
+        Root root = null;
+        root = createRoot(rm, id, rootList, dates, scaleFactor);
+
+        if (parent != null) {
+            parent.attachChild(root);
+            root.attachParent(parent);
+        } else if (!rm.rootList.isEmpty()) {
+            Root checkRoot = looking4Root(rm.rootList, root.getId());
+            rm.rootList.add(root);
+            if(Objects.requireNonNull(checkRoot).order > 1) {
+                root.attachParent(checkRoot.parent);
+            }
+        } else rm.rootList.add(root);
+
+        for (IRootParser child : rootList.get(rootList.size() - 1).getChildren()) {
+            buildRootHierarchy(rm, rootsMap, child.getId(), root, dates, scaleFactor);
+        }
+    }
+
+    /**
+     * Looking for a certain root with a certain id for correction. Recursive method to find the root in the root list / child lists
+     * @param roots the roots
+     * @param id the id
+     * @return the root
+     */
+    private Root looking4Root(List<Root> roots, String id) {
+        for (Root r : roots) {
+            if (r.rootID.equals(id)) return r;
+        }
+        for (Root r : roots) {
+            Root found = looking4Root(r.childList, id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /**
+     * Create root. Create a root from a list of root4parser
+     * @param rm the root model
+     * @param id the id
+     * @param rootList the root list
+     * @param dates the dates
+     * @param scaleFactor the scale factor
+     * @return the root
+     */
+    private Root createRoot(RootModel rm, String id, List<Root4Parser> rootList, List<LocalDate> dates, float scaleFactor) {
+        Root root = new Root(null, rm, "", rootList.get(0).getOrder());
+        root.rootID = id;
+        root.rootKey = rootList.get(0).getLabel();
+        boolean first = true;
+
+        for (Root4Parser root4Parser : rootList) {
+            int indexPt = 0;
+            for (Point2D points : root4Parser.getGeometry().get2Dpt()) {
+                float diameter = getDiameter(root4Parser, indexPt);
+                int indexTime = dates.indexOf(root4Parser.currentTime) + 1;
+                root.addNode(points.getX() / scaleFactor, points.getY() / scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
+                indexPt++;
+                if (first) first = false;
+            }
+        }
+        root.computeDistances();
+        return root;
+    }
+
+    /**
+     * Get the diameter of a root at a certain index
+     * @param root the root
+     * @param index the index
+     * @return the diameter
+     */
+    private float getDiameter(Root4Parser root, int index) {
+        for (Function f : root.getFunctions()) {
+            if (f.getName().equals("diameter")) {
+                return f.getSamples().get(index).floatValue();
+            }
+        }
+        return 0;
+    }
+
+
+   /* @Override
+    public IRootModelParser createRootModels(Map<LocalDate, List<IRootModelParser>> rootModels, float scaleFactor) {
+        RootModel rm = new RootModel();
+        LocalDate firstDate = rootModels.keySet().iterator().next();
+        RootModel4Parser firstRootModel = (RootModel4Parser) rootModels.get(firstDate).get(0);
+
+        rm.imgName = firstRootModel.getFileKey();
+        String unit = firstRootModel.getUnit();
+        float res = firstRootModel.getResolution();
+        rm.dpi = getDPI(unit, res);
+        rm.pixelSize = 2.54f / rm.dpi;
+
+        List<LocalDate> dates = new ArrayList<>(rootModels.keySet());
+        Collections.sort(dates);
+
+        double[] hours = new double[dates.size()];
+        hours[0] = 0;
+        for (int i = 1; i < dates.size(); i++) {
+            hours[i] = hours[i - 1] + ChronoUnit.HOURS.between(dates.get(i - 1).atStartOfDay(), dates.get(i).atStartOfDay());
+        }
+        rm.hoursCorrespondingToTimePoints = hours;
+
+        Map<String, List<Root4Parser>> primaryRoots = new HashMap<>();
+        Map<String, List<Root4Parser>> lateralRoots = new HashMap<>();
+
+        for (LocalDate date : dates) {
+            for (IRootModelParser model : rootModels.get(date)) {
+                parseRootModel((RootModel4Parser) model, primaryRoots, lateralRoots);
+            }
+        }
+
+        buildRoots(rm, primaryRoots, lateralRoots, dates, scaleFactor);
+        rm.standardOrderingOfRoots();
+        rm.cleanWildRsml();
+        rm.resampleFlyingRoots();
+
+        return rm;
+    }
+
+    OLD
+        public IRootModelParser createRootModels(Map<LocalDate, List<IRootModelParser>> rootModels, float scaleFactor) {
+            RootModel rm = new RootModel();
+            rm.imgName = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getFileKey();
+            String unit = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getUnit();
+            float res = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getResolution();
+            rm.dpi = getDPI(unit, res);
+            rm.pixelSize = 2.54f / dpi;
+            // get all dates in an ordered list and convert them to hours (begining is the first date)
+            List<LocalDate> dates = new ArrayList<>(rootModels.keySet());
+            Collections.sort(dates);
+            double[] hours = new double[dates.size()];
+            hours[0] = 0;
+            for (int i = 1; i < dates.size(); i++) {
+                hours[i] = hours[i - 1] + ChronoUnit.HOURS.between(dates.get(i - 1).atStartOfDay(), dates.get(i).atStartOfDay());
+            }
+            rm.hoursCorrespondingToTimePoints = hours;
+
+            // we want to have the temporal evolution of each root4parser, so, we will order them by their id in a map of lists
+            Map<String, List<Root4Parser>> roots1 = new HashMap<>();
+            Map<String, List<Root4Parser>> roots2 = new HashMap<>();
+            for (LocalDate date : dates) {
+                List<IRootModelParser> rootModelsList = rootModels.get(date);
+                for (IRootModelParser rootModel : rootModelsList) {
+                    for (Scene scene : ((RootModel4Parser) rootModel).getScenes()) {
+                        for (Plant plant : scene.getPlants()) {
+                            for (Root4Parser root : plant.getFirstOrderRoots()) {
+                                if (!roots1.containsKey(root.getId())) {
+                                    roots1.put(root.getId(), new ArrayList<>());
+                                }
+                                roots1.get(root.getId()).add(root);
+
+                                for(IRootParser child : root.getChildren()) {
+                                    if (!roots2.containsKey(child.getId())) {
+                                        roots2.put(child.getId(), new ArrayList<>());
+                                    }
+                                    roots2.get(child.getId()).add((Root4Parser) child);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // hence, we have a list of roots, each one has a hierarchy, and we have it state at each time.
+            // We will now proceed to create a temporal RootModel - inspiration : RootModelWildReadFromRsml1
+            for (String id : roots1.keySet()) {
+                Root rPrim = new  Root(null, rm, "", 1);
+                List<Root4Parser> rootList1 = roots1.get(id);
+                rPrim.rootID = id;
+                rPrim.order = 1;
+                rPrim.rootKey = rootList1.get(0).getLabel();
+                boolean first = true;
+                for (Root4Parser root : rootList1) {
+                    int indexPt = 0;
+                    for (Point2D points : root.getGeometry().get2Dpt()) {
+                        float diameter = 0;
+                        for (Function f : root.getFunctions()) {
+                            if (f.getName().equals("diameter")) {
+                                diameter = f.getSamples().get(indexPt).floatValue();
+                                break;
+                            }
+                        }
+                        int indexTime = dates.indexOf(root.currentTime) + 1;
+                        rPrim.addNode(points.getX()/scaleFactor, points.getY()/scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
+                        indexPt++;
+                        if (first) {
+                            first = false;
+                        }
+                    }
+                }
+                rPrim.computeDistances();
+                //rm.rootList.add(rPrim); first make sure that the root is not already in the list
+                boolean found = false;
+                for (Root r : rm.rootList) {
+                    if (r.rootID.equals(rPrim.rootID)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    rm.rootList.add(rPrim);
+                }
+
+                for (String id2 : roots2.keySet()) {
+                    List<Root4Parser> rootList2 = roots2.get(id2);
+                    for (Root4Parser root : rootList2) {
+                        if (root.getParent().getId().equals(id)) {
+                            Root rLat = null;
+                            if (rm.rootList.stream().anyMatch(r -> r.rootID.equals(id2))) {
+                                rLat = rm.rootList.stream().filter(r -> r.rootID.equals(id2)).findFirst().get();
+                                first = false;
+                            } else {
+                                rLat = new Root(null, rm, "", 2);
+                                rLat.rootID = id2;
+                                rLat.order = 2;
+                                rLat.rootKey = root.getLabel();
+                                first = true;
+                            }
+                            int indexPt = 0;
+                            for (Point2D points : root.getGeometry().get2Dpt()) {
+                                float diameter = 0;
+                                for (Function f : root.getFunctions()) {
+                                    if (f.getName().equals("diameter")) {
+                                        diameter = f.getSamples().get(indexPt).floatValue();
+                                        break;
+                                    }
+                                }
+                                int indexTime = dates.indexOf(root.currentTime) + 1;
+                                rLat.addNode(points.getX()/scaleFactor, points.getY()/scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
+                                indexPt++;
+                                if (first) first = false;
+                            }
+                            rLat.computeDistances();
+                            //rPrim.attachChild(rLat);  first make sure that the root is not already in the list or in the list of children of the primary root
+                            //rLat.attachParent(rPrim);
+                            found = false;
+                            for (Root r : rm.rootList) {
+                                if (r.rootID.equals(rLat.rootID)) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                rm.rootList.add(rLat);
+                                rPrim.attachChild(rLat);
+                                rLat.attachParent(rPrim);
+                            }
+                        }
+                    }
+                }
+            }
+
+            rm.standardOrderingOfRoots();
+            rm.cleanWildRsml();
+            rm.resampleFlyingRoots();
+            return rm;
+        }
+
+    private void parseRootModel(RootModel4Parser rootModel, Map<String, List<Root4Parser>> primaryRoots, Map<String, List<Root4Parser>> lateralRoots) {
+        for (Scene scene : rootModel.getScenes()) {
+            for (Plant plant : scene.getPlants()) {
+                for (Root4Parser root : plant.getFirstOrderRoots()) {
+                    primaryRoots.computeIfAbsent(root.getId(), k -> new ArrayList<>()).add(root);
+                    for (IRootParser child : root.getChildren()) {
+                        lateralRoots.computeIfAbsent(child.getId(), k -> new ArrayList<>()).add((Root4Parser) child);
+                    }
+                }
+            }
+        }
+    }
+
+    private void buildRoots(RootModel rm, Map<String, List<Root4Parser>> primaryRoots, Map<String, List<Root4Parser>> lateralRoots, List<LocalDate> dates, float scaleFactor) {
+        for (String id : primaryRoots.keySet()) {
+            Root root = createRoot(rm, id, primaryRoots.get(id), dates, scaleFactor, 1);
+            rm.rootList.add(root);
+            attachLateralRoots(root, rm, lateralRoots, dates, scaleFactor);
+        }
+    }
+
+    private Root createRoot(RootModel rm, String id, List<Root4Parser> rootList, List<LocalDate> dates, float scaleFactor, int order) {
+        Root root = new Root(null, rm, "", order);
+        root.rootID = id;
+        root.rootKey = rootList.get(0).getLabel();
+        boolean first = true;
+
+        for (Root4Parser root4Parser : rootList) {
+            int indexPt = 0;
+            for (Point2D points : root4Parser.getGeometry().get2Dpt()) {
+                float diameter = 0;
+                int indexTime = dates.indexOf(root4Parser.currentTime) + 1;
+                root.addNode(points.getX() / scaleFactor, points.getY() / scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
+                indexPt++;
+                if (first) first = false;
+            }
+        }
+        root.computeDistances();
+        return root;
+    }
+
+    private void attachLateralRoots(Root primaryRoot, RootModel rm, Map<String, List<Root4Parser>> lateralRoots, List<LocalDate> dates, float scaleFactor) {
+        for (String id : lateralRoots.keySet()) {
+            List<Root4Parser> rootList = lateralRoots.get(id);
+            if (rootList.get(0).getParent().getId().equals(primaryRoot.rootID)) {
+                Root lateralRoot = rm.rootList.stream().filter(r -> r.rootID.equals(id)).findFirst()
+                        .orElse(createRoot(rm, id, rootList, dates, scaleFactor, 2));
+                if (!rm.rootList.contains(lateralRoot)) {
+                    rm.rootList.add(lateralRoot);
+                    primaryRoot.attachChild(lateralRoot);
+                    lateralRoot.attachParent(primaryRoot);
+                }
+            }
+        }
+    }
+    */
+    /**
+     * Root model wild read from rsml.
+     *
+     * @param rsmlFile the rsml file
+     * @return the root model
+     */
+    public static RootModel RootModelWildReadFromRsml1(String rsmlFile) {//Wild read model for Fijiyama did Root model with time, diameter, vx and vy information
+        FSR sr = (new FSR());
+        sr.initialize();
+        boolean debug = false;
+        //String lineSep= System.getProperty("line.separator");
+
+        int Nobs = 100000; //N max of observations
+
+        String[] str = null;
+        if (VitimageUtils.isWindowsOS()) str = VitimageUtils.readStringFromFile(rsmlFile).split("\\n");
+        else str = VitimageUtils.readStringFromFile(rsmlFile).split("\n");
+        RootModel rm = new RootModel();
+        rm.imgName = "";
+        rm.pixelSize = (float) Double.parseDouble(str[4].split(">")[1].split("<")[0]);
+
+        double[] hours = new double[Nobs];
+        boolean hasHours = true;
+        hasHours = (str[9].contains("observation"));
+        double[] tabD = new double[0];
+        if (hasHours) {
+            String[] tab = (str[9].split(">")[1].split("<")[0]).split(",");
+            tabD = new double[tab.length + 1];
+            for (int i = 1; i < tab.length + 1; i++) tabD[i] = Double.parseDouble(tab[i - 1]);
+        }
+        tabD[0] = tabD[1];
+        rm.hoursCorrespondingToTimePoints = tabD;
+
+        int ind = hasHours ? 16 : 15;
+        boolean first;
+        if (debug) IJ.log("Pl" + str[ind]);
+        // for each plant
+        while (str[ind].contains("<plant")) {
+            ind = ind + 1 + 3;//<root then <point
+            Root rPrim = new Root(null, rm, "", 1);
+            first = true;
+            if (debug) IJ.log("Poiprim" + str[ind]);
+            while (str[ind].contains("<point")) {
+                String[] vals = str[ind].replace("<point ", "").replace("/>", "").replace("\"", "").split(" ");
+                if (hasHours)
+                    rPrim.addNode(Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), Double.parseDouble(vals[6].split("=")[1]), first);
+                else
+                    rPrim.addNode(Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), first);
+                if (first) first = false;
+                ind++;
+                if (debug) IJ.log("-Poiprim" + str[ind]);
+            }
+            rPrim.computeDistances();
+            rm.rootList.add(rPrim);
+            ind = ind + 2;//<root or </root
+            if (debug) IJ.log("root lat" + str[ind]);
+            while (str[ind].contains("<root")) {//lateral
+                ind = ind + 3;//point
+                Root rLat = new Root(null, rm, "", 2);
+                first = true;
+                if (debug) IJ.log("PoiLat" + str[ind]);
+                while (str[ind].contains("<point")) {
+                    String[] vals = str[ind].replace("<point ", "").replace("/>", "").replace("\"", "").split(" ");
+                    if (hasHours)
+                        rLat.addNode(Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), Double.parseDouble(vals[6].split("=")[1]), first);
+                    else
+                        rLat.addNode(Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), first);
+                    if (first) first = false;
+                    ind++;
+                    if (debug) IJ.log("-PoiLat?" + str[ind]);
+                }
+                rLat.computeDistances();
+                rPrim.attachChild(rLat);
+                rLat.attachParent(rPrim);
+                rm.rootList.add(rLat);
+                ind = ind + 3;//<root or </root
+                if (debug) IJ.log("-root lat?" + str[ind]);
+            }
+            ind = ind + 2;//<plant or nothing
+            if (debug) IJ.log("-plant?" + str[ind]);
+        }
+        rm.standardOrderingOfRoots();
+        return rm;
+    }
+
+
+
+
+}

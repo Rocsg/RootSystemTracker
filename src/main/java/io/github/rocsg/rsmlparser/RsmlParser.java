@@ -119,6 +119,28 @@ public class RsmlParser {
 }*/
 package io.github.rocsg.rsmlparser;
 
+import com.mxgraph.swing.mxGraphComponent;
+import com.mxgraph.util.mxCellRenderer;
+import com.mxgraph.util.mxConstants;
+import com.mxgraph.util.mxRectangle;
+import com.mxgraph.view.mxGraph;
+import ij.IJ;
+import ij.ImageJ;
+import ij.ImagePlus;
+import ij.ImageStack;
+import ij.plugin.RGBStackMerge;
+import ij.process.ImageProcessor;
+import io.github.rocsg.fijiyama.common.VitimageUtils;
+import io.github.rocsg.fijiyama.registration.ItkTransform;
+import io.github.rocsg.rsml.FSR;
+import io.github.rocsg.rsml.Node;
+import io.github.rocsg.rsml.Root;
+import io.github.rocsg.rsml.RootModel;
+import io.github.rocsg.rstplugin.PipelineParamHandler;
+import math3d.Point3d;
+import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.SimpleGraph;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -127,17 +149,22 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class RsmlParser {
 
@@ -191,15 +218,29 @@ public class RsmlParser {
         } catch (Exception e) {
             e.printStackTrace();
         }*/
-        RsmlParser rsmlParser = new RsmlParser("D:\\loaiu\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
-        Map<Date, List<RootModel4Parser>> result = getRSMLsinfos(Paths.get(rsmlParser.path2RSMLs));
-        result.forEach((date, rootModel4Parsers) -> {
-            System.out.println("Date : " + date);
-            rootModel4Parsers.forEach(System.out::println);
-        });
+        ImageJ ij = new ImageJ();
+        RootModelGraph rootModelGraph = new RootModelGraph();
+        ImagePlus imp = rootModelGraph.image;
+        List<ItkTransform> itkTransforms = rootModelGraph.transforms;
+
     }
 
-    private static void parseRoots(NodeList rootList, Plant parentPlant, Root4Parser parentRoot, int order) { // TODO : we assumed 2nd order root max
+    /**
+     * Function to parse the roots from the rsml files
+     * The roots are parsed by iterating over the root elements in the rsml files
+     * The root elements are parsed to extract the root ID, label, properties, geometry, and functions
+     * The root elements are then recursively parsed to extract the child roots
+     * The roots are added to the Plant object
+     * The Plant object is added to the Scene object
+     * The Scene object is added to the RootModel4Parser object
+     *
+     * @param rootList    The NodeList containing the root elements to parse
+     * @param parentPlant The Plant object to which the roots are added
+     * @param parentRoot  The Root4Parser object to which the child roots are added
+     * @param order       The order of the root
+     * @param dateOfFile  The date of the rsml file
+     */
+    private static void parseRoots(NodeList rootList, Plant parentPlant, Root4Parser parentRoot, int order, String dateOfFile) { // TODO : we assumed 2nd order root max
         for (int i = 0; i < rootList.getLength(); i++) {
             org.w3c.dom.Node rootNode = rootList.item(i);
 
@@ -207,8 +248,9 @@ public class RsmlParser {
                 Element rootElement = (Element) rootNode;
                 String rootID = rootElement.getAttribute("ID");
                 String rootLabel = rootElement.getAttribute("label");
+                String poAccession = rootElement.getAttribute("po:accession");
 
-                Root4Parser root = new Root4Parser(rootID, rootLabel, parentRoot, order);
+                Root4Parser root = new Root4Parser(rootID, rootLabel, poAccession, parentRoot, order, getDate(dateOfFile));
 
                 NodeList propertiesList = rootElement.getElementsByTagName("properties");
                 if (propertiesList.getLength() > 0) {
@@ -272,7 +314,7 @@ public class RsmlParser {
 
                 // Recursively parse child roots
                 NodeList childRoots = rootElement.getElementsByTagName("root");
-                parseRoots(childRoots, parentPlant, root, order + 1);
+                parseRoots(childRoots, parentPlant, root, order + 1, dateOfFile);
             }
         }
 
@@ -358,29 +400,22 @@ public class RsmlParser {
      * @return A TreeMap with the date as key and the list of rsml infos as value
      * @throws IOException If an I/O error occurs
      */
-    public static Map<Date, List<RootModel4Parser>> getRSMLsinfos(Path folderPath) throws IOException {
+    public static Map<LocalDate, List<IRootModelParser>> getRSMLsinfos(Path folderPath) throws IOException {
         // check the uniqueness of the rsml files
         Stack<String> keptRsmlFiles = checkUniquenessRSMLs(folderPath);
 
         // get Date of each rsml (that supposetly match the image date) // TODO generalize
         Pattern pattern = Pattern.compile("\\d{2}_\\d{2}_\\d{4}");
-        ConcurrentHashMap<String, Date> fileDates = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String, LocalDate> fileDates = new ConcurrentHashMap<>();
 
         Files.list(folderPath)
                 .parallel()
                 .filter(path -> path.toString().matches(".*\\.(rsml|rsml01|rsml02|rsml03|rsml04)$"))
                 .forEach(path -> {
-                    String file = path.toString();
-                    Matcher matcher = pattern.matcher(file);
-                    if (matcher.find()) {
-                        int year = Integer.parseInt(matcher.group(0).split("_")[2]) - 1900;
-                        int month = Integer.parseInt(matcher.group(0).split("_")[1]) - 1;
-                        int day = Integer.parseInt(matcher.group(0).split("_")[0]);
-                        fileDates.put(file, new Date(year, month, day));
-                    }
+                    fileDates.put(path.toString(), Objects.requireNonNull(getDate(path.toString().split("\\.")[0])));
                 });
 
-        Map<Date, List<RootModel4Parser>> rsmlInfos = new TreeMap<>();
+        Map<LocalDate, List<IRootModelParser>> rsmlInfos = new TreeMap<>();
 
         // add dates as keys
         fileDates.values().forEach(date -> rsmlInfos.put(date, new ArrayList<>()));
@@ -405,7 +440,7 @@ public class RsmlParser {
                         metadata.version = Float.parseFloat(metadataElement.getElementsByTagName("version").item(0).getTextContent());
                         metadata.unit = metadataElement.getElementsByTagName("unit").item(0).getTextContent();
                         metadata.resolution = Float.parseFloat(metadataElement.getElementsByTagName("resolution").item(0).getTextContent());
-                        metadata.modifDate = metadataElement.getElementsByTagName("last-modified").item(0).getTextContent();
+                        metadata.modifDate = (metadataElement.getElementsByTagName("last-modified").item(0).getTextContent().equals("today") ? LocalDate.now() : getDate(metadataElement.getElementsByTagName("last-modified").item(0).getTextContent()));
                         metadata.software = metadataElement.getElementsByTagName("software").item(0).getTextContent();
                         metadata.user = metadataElement.getElementsByTagName("user").item(0).getTextContent();
                         metadata.fileKey = metadataElement.getElementsByTagName("file-key").item(0).getTextContent();
@@ -421,6 +456,17 @@ public class RsmlParser {
                                 propertyDefinition.type = propertydefElement.getElementsByTagName("type").item(0).getTextContent();
                                 propertyDefinition.unit = propertydefElement.getElementsByTagName("unit").item(0).getTextContent();
                                 metadata.propertiedef.add(propertyDefinition);
+                            }
+                        }
+                        NodeList imageList = metadataElement.getElementsByTagName("image"); // TODO : generalize
+
+                        // get the label node
+                        for (int j = 0; j < imageList.getLength(); j++) {
+                            org.w3c.dom.Node imageNode = imageList.item(j);
+
+                            if (imageNode.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
+                                Element imageElement = (Element) imageNode;
+                                metadata.date2Use = imageElement.getElementsByTagName("label").item(0).getTextContent();
                             }
                         }
                     }
@@ -448,14 +494,13 @@ public class RsmlParser {
                                 Plant plant = new Plant();
 
                                 NodeList rootList = plantElement.getElementsByTagName("root");
-                                parseRoots(rootList, plant, null, 1);
+                                parseRoots(rootList, plant, null, 1, metadata.date2Use);
                                 scene.addPlant(plant);
                             }
                         }
                         RootModel4Parser.addScene(scene);
                     }
                 }
-
                 // add the RootModel4Parser to the corresponding date
                 rsmlInfos.get(fileDates.get(rsmlFile)).add(RootModel4Parser);
 
@@ -468,185 +513,411 @@ public class RsmlParser {
         return rsmlInfos;
     }
 
-}
-// TODO : handle properties by metadata definition in rsml file
+    /**
+     * Function to get the date from a String
+     * The date is extracted from the String using a regular expression
+     * The date is returned as a LocalDate
+     *
+     * @param Date The String from which to extract the date
+     * @return The LocalDate extracted from the String
+     */
+    private static LocalDate getDate(String Date) {
+        // TODO generalize
+        // detect date in a String
+        //// For now pattern is dd_mm_yyyy
+        //// Time is set to 00:00:00
+        Pattern pattern = Pattern.compile("\\d{2}_\\d{2}_\\d{4}");
+        Matcher matcher = pattern.matcher(Date);
+        LocalDate date = null;
+        if (matcher.find()) {
+            int year = Integer.parseInt(matcher.group(0).split("_")[2]);
+            int month = Integer.parseInt(matcher.group(0).split("_")[1]);
+            int day = Integer.parseInt(matcher.group(0).split("_")[0]);
+            date = LocalDate.of(year, month, day);
+        }
 
-class RootModel4Parser {
-    public final List<Scene> scenes;
-    public Metadata metadatas;
-
-    public RootModel4Parser() {
-        this.scenes = new ArrayList<>();
-        this.metadatas = new Metadata();
-    }
-
-    public RootModel4Parser(Metadata metadata) {
-        this.scenes = new ArrayList<>();
-        this.metadatas = metadata;
-    }
-
-    public void addScene(Scene scene) {
-        this.scenes.add(scene);
-    }
-
-    // get metadata elements
-    public float getVersion() {
-        return metadatas.version;
-    }
-
-    public String getUnit() {
-        return metadatas.unit;
-    }
-
-    public float getResolution() {
-        return metadatas.resolution;
-    }
-
-    public String getModifDate() {
-        return metadatas.modifDate;
-    }
-
-    public String getSoftware() {
-        return metadatas.software;
-    }
-
-    public String getUser() {
-        return metadatas.user;
-    }
-
-    public String getFileKey() {
-        return metadatas.fileKey;
-    }
-
-    public List<Scene> getScenes() {
-        return scenes;
-    }
-
-    @Override
-    public String toString() {
-        return "RootModel4Parser{" +
-                "scenes=" + scenes +
-                '}';
+        Pattern pattern4Time = Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
+        Matcher matcher4Time = pattern4Time.matcher(Date);
+        if (matcher4Time.find()) {
+            int hour = Integer.parseInt(matcher4Time.group(0).split(":")[0]);
+            int minute = Integer.parseInt(matcher4Time.group(0).split(":")[1]);
+            int second = Integer.parseInt(matcher4Time.group(0).split(":")[2]);
+            date = Objects.requireNonNull(date).atTime(hour, minute, second).toLocalDate();
+        }
+        return date;
     }
 }
 
-// Metadata.java
-class Metadata {
-    public List<PropertyDefinition> propertiedef;
-    float version;
-    String unit;
-    float resolution;
-    String modifDate;
-    String software;
-    String user;
-    String fileKey;
+class RootModelGraph {
 
-    public Metadata() {
-        this.version = 0;
-        this.unit = "";
-        this.resolution = 0;
-        this.modifDate = "";
-        this.software = "";
-        this.user = "";
-        this.fileKey = "";
-        this.propertiedef = new ArrayList<>();
+    final List<RootModel> rootModels;
+    public List<Graph<Node, DefaultEdge>> graphs;
+    ImagePlus image;
+    List<ItkTransform> transforms;
+
+    public RootModelGraph() throws IOException {
+        this("D:\\loaiu\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output - Copie\\Process\\B73_R04_01\\Transforms_2\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\","D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\B73_R04_01\\11_stack.tif", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\B73_R04_01\\22_registered_stack.tif");
     }
 
-    public Metadata(Metadata metadata) {
-        this.version = metadata.version;
-        this.unit = metadata.unit;
-        this.resolution = metadata.resolution;
-        this.modifDate = metadata.modifDate;
-        this.software = metadata.software;
-        this.user = metadata.user;
-        this.fileKey = metadata.fileKey;
-        this.propertiedef = new ArrayList<>();
-        for (PropertyDefinition propertiedef : metadata.propertiedef) {
-            this.propertiedef.add(new PropertyDefinition(propertiedef.label, propertiedef.type, propertiedef.unit));
+    /**
+     * Constructor of the RootModelGraph class
+     * The RootModelGraph is created by reading the RSMLs from the specified path
+     * The RootModels are extracted from the RSMLs
+     * The RootModels are then converted to JGraphT Graphs
+     * The JGraphT Graphs are then converted to ImagePlus images
+     * The images are then resized using the resampling factor specified in the PipelineParamHandler
+     * The transforms are read from the specified path
+     *
+     * @param path2RSMLs      The path to the RSMLs
+     * @param transformerPath The path to the transforms
+     * @param inputPathPPH    The path to the input PipelineParamHandler
+     * @param outputPathPPH   The path to the output PipelineParamHandler
+     * @throws IOException If an I/O error occurs
+     */
+    public RootModelGraph(String path2RSMLs, String transformerPath, String inputPathPPH, String outputPathPPH, String originalScaledImagePath, String registeredImagePath) throws IOException {
+        this.rootModels = new ArrayList<>();
+        this.graphs = new ArrayList<>();
+        transforms = new ArrayList<>();
+
+        // Getting the resizer factor
+        PipelineParamHandler pph = new PipelineParamHandler(inputPathPPH, outputPathPPH); // assuming the resampling factor is correct TODO
+
+        // Reading all RSMLs and getting the RootModels
+        RsmlParser rsmlParser = new RsmlParser(path2RSMLs);
+        Map<LocalDate, List<IRootModelParser>> result = RsmlParser.getRSMLsinfos(Paths.get(rsmlParser.path2RSMLs));
+        result.forEach((date, rootModel4Parsers) -> {
+            System.out.println("Date : " + date);
+            rootModel4Parsers.forEach(System.out::println);
+        });
+        FSR sr;
+        (sr = new FSR()).initialize();
+
+        RootModel rms = new RootModel();
+        rms = (RootModel) rms.createRootModels(result, pph.subsamplingFactor);
+
+        // Operations with original image (from stack data)
+
+        // Create an array to store processed images
+        ImagePlus[] processedImages = new ImagePlus[13];
+        ImagePlus imgInitSize = new ImagePlus(originalScaledImagePath);
+        // Loop over each time point in the model
+        RootModel finalRms = rms;
+        IntStream.range(0, imgInitSize.getStackSize()).parallel().forEach(i -> {
+            // Create a grayscale image of the RSML model at this time point
+            ImagePlus imgRSML = finalRms.createGrayScaleImageWithTime(imgInitSize, 1, false, (i + 1), true,
+                    new boolean[]{true, true, true, false, true}, new double[]{2, 2});
+
+
+            // Set the display range of the image
+            imgRSML.setDisplayRange(0, imgInitSize.getStackSize() + 3);
+
+            // Merge the grayscale image with the registered stack image
+            processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{new ImagePlus("", imgInitSize.getStack().getProcessor(i+1)), imgRSML}, true);
+            // Convert the image to RGB color
+            IJ.run(processedImages[i], "RGB Color", "");
+        });
+        // Combine the images into a stack
+        ImagePlus res = VitimageUtils.slicesToStack(processedImages);
+        // Set the title of the image
+        res.setTitle("yoho");
+        res.show();
+        
+        // transform the image
+
+        ImagePlus res2 = VitimageUtils.cropImage(new ImagePlus(originalScaledImagePath),  (int) 1400.0 / pph.subsamplingFactor, (int) 350.0 / pph.subsamplingFactor, 0,(int) (10620.0 - 1400.0) / pph.subsamplingFactor,(int) (8783.0 - 350.0) / pph.subsamplingFactor, res.getStackSize());
+        // Read all the transforms
+        Files.list(Paths.get(transformerPath))
+                .filter(path -> path.toString().matches(".*transform.tif"))
+                .sorted(Comparator.comparingInt(o -> Integer.parseInt(o.getFileName().toString().split("_")[1].split("\\.")[0])))
+                .forEach(path -> {
+                    ItkTransform itkTransform = new ItkTransform(ItkTransform.readAsDenseField(path.toString()));
+                    transforms.add(itkTransform);
+                });
+        
+        // transform the graph
+        ImagePlus img0 = toDisplayTemporalGraph(createGraph(rms), res2.getWidth(), res2.getHeight(), 1, res2.getNSlices());
+        img0.show();
+
+        for (ItkTransform transform : this.transforms) {
+            rms.applyTransformToGeometry(transform, transforms.indexOf(transform) + 1);
         }
+
+        ImagePlus img2 = toDisplayTemporalGraph(createGraph(rms), res2.getWidth(), res2.getHeight(), 1, res2.getNSlices());
+        img2.show();
+
+
+
+        /*ImageStack stack = new ImageStack();
+        result.forEach((date, rootModel4Parsers) -> {
+            RootModel rm = new RootModel();
+            rm = (RootModel) rm.createRootModel(rootModel4Parsers.get(0), new ArrayList<>(result.keySet()).indexOf(date));
+            System.out.println(rm);
+
+            // extract the graph from the root model
+            Graph<Node, DefaultEdge> g = createGraph(rm);
+            stack.addSlice(toDisplayGraph(g, 12383, 8783, 1).getProcessor()); // TODO : generalize
+
+            this.rootModels.add(rm);
+            this.graphs.add(g);
+        });
+        // Create the image
+        this.image = new ImagePlus("Root Model Graph", stack);
+
+
+
+
+        // Read all the transforms
+        Files.list(Paths.get(transformerPath))
+                .filter(path -> path.toString().matches(".*transform.tif"))
+                .sorted(Comparator.comparingInt(o -> Integer.parseInt(o.getFileName().toString().split("_")[1].split("\\.")[0])))
+                .forEach(path -> {
+                    ItkTransform itkTransform = new ItkTransform(ItkTransform.readAsDenseField(path.toString()));
+                    transforms.add(itkTransform);
+                    System.out.println(itkTransform);
+                });
+        res = VitimageUtils.cropImage(res.duplicate(),  (int) 1400.0 / pph.subsamplingFactor, (int) 350.0 / pph.subsamplingFactor, 0,(int) (10620.0 - 1400.0) / pph.subsamplingFactor,(int) (8783.0 - 350.0) / pph.subsamplingFactor, res.getStackSize());
+        ImageStack stack4 = new ImageStack();
+        for (ItkTransform transform : this.transforms) {
+            ImageProcessor slice = res.getStack().getProcessor(this.transforms.indexOf(transform));
+            ImagePlus imp3 = new ImagePlus("slice", slice);
+            imp3 = transform.transformImage(imp3, imp3);
+            stack4.addSlice(imp3.getProcessor());
+        }
+       ImagePlus ok = new ImagePlus("Root Model Graph", stack4);
+        ok.show();
+
+        // Check the coherence of the data
+        /*assert ((this.graphs.size() == this.rootModels.size()) && ((this.graphs.size() == this.image.getStackSize())));
+
+        List<Graph<Node, DefaultEdge>> graph0 = resizeGraphsAsImage(this.graphs, 12383, 8783, 12383 / pph.subsamplingFactor, 8783 / pph.subsamplingFactor);
+        ImageStack stack1 = new ImageStack();
+        for (Graph<Node, DefaultEdge> graph : graph0) {
+            ImagePlus imgTemp = toDisplayGraph(graph, this.image.getWidth() / pph.subsamplingFactor, this.image.getHeight() / pph.subsamplingFactor, pph.subsamplingFactor);
+            stack1.addSlice(imgTemp.getProcessor());
+        }
+        ImagePlus imp2 = new ImagePlus("Root Model Graph base 1", stack1);
+        //imp2.show();*/
     }
 
-    class PropertyDefinition {
-        // Mapping label - type - unit
-        public String label;
-        public String type;
-        public String unit;
+    public static ImagePlus toDisplayTemporalGraph(Graph<Node, DefaultEdge> g, int width, int height, float subsamplingFactor, int numSlices) {
+        List<mxGraph> graphs = new ArrayList<>(numSlices);
+        for (int i = 1; i< numSlices+1; i++) {
+            mxGraph graph = new mxGraph();
+            Object parent = graph.getDefaultParent();
 
-        public PropertyDefinition() {
-            this.label = "";
-            this.type = "";
-            this.unit = "";
+            graph.getModel().beginUpdate();
+            try {
+                // Create a map to store the mxGraph vertices created for each Node
+                Map<Node, Object> vertexMap = new HashMap<>();
+
+                for (Node node : g.vertexSet()) {
+                    // Insert the vertex into the graph at the position specified by the Node's x and y properties
+                    // Pass an empty string "" as the label of the vertex
+                    // Reduce the size of the vertex to make it appear as a point
+                    if (node.birthTime == i) {
+                        Object vertex = graph.insertVertex(parent, null, "", node.x, node.y, 1, 1);
+                        vertexMap.put(node, vertex);
+                    }
+                }
+
+                for (DefaultEdge edge : g.edgeSet()) {
+                    Node sourceNode = g.getEdgeSource(edge);
+                    Node targetNode = g.getEdgeTarget(edge);
+                    if (sourceNode.birthTime <= i && targetNode.birthTime == i) {
+                        // Get the mxGraph vertices corresponding to the source and target Nodes
+                        Object sourceVertex = vertexMap.get(sourceNode);
+                        Object targetVertex = vertexMap.get(targetNode);
+                        // Insert the edge into the graph
+                        Object edgeObject = graph.insertEdge(parent, null, "", sourceVertex, targetVertex);
+                        // Remove the arrow from the edge
+                        graph.setCellStyle(mxConstants.STYLE_ENDARROW + "=" + mxConstants.NONE, new Object[]{edgeObject});
+                        // Set the stroke width
+                        graph.setCellStyle(mxConstants.STYLE_STROKEWIDTH + "=" + (1.0 / subsamplingFactor), new Object[]{edgeObject});
+                        // Add a small vertex at the end of the edge to represent it as a point
+                        graph.insertVertex(parent, null, "", targetNode.x, targetNode.y, 1, 1);
+                    }
+                }
+            } finally {
+                graph.getModel().endUpdate();
+            }
+
+
+            mxGraphComponent graphComponent = new mxGraphComponent(graph);
+            graphComponent.addMouseWheelListener(e -> {
+                if (e.isControlDown()) {
+                    if (e.getWheelRotation() < 0) {
+                        graphComponent.zoomIn();
+                    } else {
+                        graphComponent.zoomOut();
+                    }
+                }
+            });
+            graphs.add(graph);
         }
 
-        public PropertyDefinition(String label, String type, String unit) {
-            this.label = label;
-            this.type = type;
-            this.unit = unit;
+        ImageStack stack = new ImageStack();
+        for (mxGraph graph : graphs) {
+            int i = graphs.indexOf(graph);
+            mxGraph mxGraph = graphs.get(i);
+            // get buffered image
+            BufferedImage image = mxCellRenderer.createBufferedImage(mxGraph, null, 1, Color.WHITE, true, new mxRectangle(0, 0, width - 1, height - 1));
+            ImagePlus imp = new ImagePlus("Graph", image);
+            stack.addSlice("slice + " + i, imp.getProcessor());
         }
-    }
-}
-
-// Scene.java
-class Scene {
-    private final List<Plant> plants;
-
-    public Scene() {
-        this.plants = new ArrayList<>();
+        return new ImagePlus("Root Model Graph", stack);
     }
 
-    public void addPlant(Plant plant) {
-        this.plants.add(plant);
-    }
+    // OLD graphs
 
-    public List<Plant> getPlants() {
-        return plants;
-    }
-
-    @Override
-    public String toString() {
-        return "Scene{" +
-                "plants=" + plants +
-                '}';
-    }
-}
-
-// Plant.java
-class Plant {
-    final List<Root4Parser> roots;
-
-    public Plant() {
-        this.roots = new ArrayList<>();
-    }
-
-    public void addRoot(Root4Parser root) {
-        this.roots.add(root);
-    }
-
-    public List<String> getListID() {
-        List<String> listID = new ArrayList<>();
-        for (Root4Parser root : roots) {
-            listID.add(root.id);
+    static Graph<Node, DefaultEdge> resizeGraphAsImage(Graph<Node, DefaultEdge> graph, int originalWidth, int originalHeight, int newWidth, int newHeight) {
+        for (Node node : graph.vertexSet()) {
+            node.x = (node.x / originalWidth) * newWidth;
+            node.y = (node.y / originalHeight) * newHeight;
         }
-        return listID;
+        return graph;
     }
 
-    public Root4Parser getRootByID(String id) {
-        for (Root4Parser root : roots) {
-            if (root.id.equals(id)) {
-                return root;
+    static List<Graph<Node, DefaultEdge>> resizeGraphsAsImage(List<Graph<Node, DefaultEdge>> graphs, int OriginalWidth, int OriginalHeight, int newWidth, int newHeight) {
+        for (Graph<Node, DefaultEdge> graph : graphs) {
+            graphs.set(graphs.indexOf(graph), resizeGraphAsImage(graph, OriginalWidth, OriginalHeight, newWidth, newHeight));
+        }
+        return graphs;
+    }
+
+    /**
+     * Function to create a graph from a RootModel
+     * The graph is created by adding the vertices and edges of the RootModel to a JGraphT Graph
+     * The vertices are the Nodes of the RootModel
+     * The edges are the connections between the Nodes
+     *
+     * @param rootModel The RootModel from which to create the graph
+     * @return The JGraphT Graph created from the RootModel
+     */
+    public static Graph<Node, DefaultEdge> createGraph(RootModel rootModel) {
+        Graph<Node, DefaultEdge> g = new SimpleGraph<>(DefaultEdge.class);
+
+        // Add vertices to the graph
+        for (Root r : rootModel.rootList) {
+            Node firstNode = r.firstNode;
+            while (firstNode != null) {
+                g.addVertex(firstNode);
+                firstNode = firstNode.child;
             }
         }
-        return null;
+
+        // Add edges to the graph
+        for (Root r : rootModel.rootList) {
+            Node firstNode = r.firstNode;
+            while (firstNode != null) {
+                if (firstNode.child != null) {
+                    g.addEdge(firstNode, firstNode.child);
+                }
+                firstNode = firstNode.child;
+            }
+        }
+
+        return g;
     }
 
-    public List<Root4Parser> getRoots() {
-        return roots;
+    /**
+     * Function to transform the graphs
+     * The graphs are transformed by applying the transform to the 2D coordinates of each node
+     * The transform is applied to the 2D coordinates of each node
+     * The 2D coordinates are extracted from the 3D coordinates of each node (3D points (x,y,t))
+     * The 3D coordinates are transformed by the transform
+     * The 2D coordinates are updated with the transformed 3D coordinates
+     *
+     * @return The transformed graphs
+     */
+    public static List<Graph<Node, DefaultEdge>> transformGraphsList(List<Graph<Node, DefaultEdge>> graphs, List<ItkTransform> transforms) {
+        // the graph of nodes contains 2D coordinates + t (the time coordinate), we will extract the 2D coordinates of each node (3D points (x,y,t)) and apply the transform to them (transformPoint)
+        List<Graph<Node, DefaultEdge>> transformedGraphs = new ArrayList<>();
+        for (Graph<Node, DefaultEdge> graph : graphs) {
+            int graphIndex = graphs.indexOf(graph);
+            if (graphIndex >= transforms.size()) {
+                break;
+            }
+            ItkTransform transform = transforms.get(graphs.indexOf(graph));
+            transformedGraphs.add(transformGraph(graph, transform));
+        }
+        return transformedGraphs;
     }
 
-    @Override
-    public String toString() {
-        return "\nPlant{" +
-                "roots=" + roots +
-                "}\n";
+    public static Graph<Node, DefaultEdge> transformGraph(Graph<Node, DefaultEdge> graph, ItkTransform transform) {
+        for (Node node : graph.vertexSet()) {
+            Point3d point = new Point3d(node.x, node.y, node.birthTime);
+            point = transform.transformPoint(point);
+            node.x = (float) point.x;
+            node.y = (float) point.y;
+        }
+        return graph;
     }
-} // TODO : strong assumption : No new plant is created in the same scene
+
+    /**
+     * Function to convert a JGraphT Graph to an ImagePlus
+     * The graph is displayed as a point graph with edges connecting the points
+     * The vertices are represented as points in the image
+     * The edges are represented as lines in the image
+     * The image is created by using the mxGraph library to create a buffered image of the graph
+     * The buffered image is then converted to an ImagePlus
+     *
+     * @param g The JGraphT Graph to convert to an ImagePlus
+     * @return The ImagePlus created from the JGraphT Graph
+     */
+    public static ImagePlus toDisplayGraph(Graph<Node, DefaultEdge> g, int width, int height, float subsamplingFactor) {
+        mxGraph graph = new mxGraph();
+        Object parent = graph.getDefaultParent();
+
+        graph.getModel().beginUpdate();
+        try {
+            // Create a map to store the mxGraph vertices created for each Node
+            Map<Node, Object> vertexMap = new HashMap<>();
+
+            for (Node node : g.vertexSet()) {
+                // Insert the vertex into the graph at the position specified by the Node's x and y properties
+                // Pass an empty string "" as the label of the vertex
+                // Reduce the size of the vertex to make it appear as a point
+                Object vertex = graph.insertVertex(parent, null, "", node.x, node.y, 1, 1);
+                vertexMap.put(node, vertex);
+            }
+
+            for (DefaultEdge edge : g.edgeSet()) {
+                Node sourceNode = g.getEdgeSource(edge);
+                Node targetNode = g.getEdgeTarget(edge);
+                // Get the mxGraph vertices corresponding to the source and target Nodes
+                Object sourceVertex = vertexMap.get(sourceNode);
+                Object targetVertex = vertexMap.get(targetNode);
+                // Insert the edge into the graph
+                Object edgeObject = graph.insertEdge(parent, null, "", sourceVertex, targetVertex);
+                // Remove the arrow from the edge
+                graph.setCellStyle(mxConstants.STYLE_ENDARROW + "=" + mxConstants.NONE, new Object[]{edgeObject});
+                // Set the stroke width
+                graph.setCellStyle(mxConstants.STYLE_STROKEWIDTH + "=" + (10.0 / subsamplingFactor), new Object[]{edgeObject});
+                // Add a small vertex at the end of the edge to represent it as a point
+                graph.insertVertex(parent, null, "", targetNode.x, targetNode.y, 1, 1);
+            }
+        } finally {
+            graph.getModel().endUpdate();
+        }
+
+
+        mxGraphComponent graphComponent = new mxGraphComponent(graph);
+        graphComponent.addMouseWheelListener(e -> {
+            if (e.isControlDown()) {
+                if (e.getWheelRotation() < 0) {
+                    graphComponent.zoomIn();
+                } else {
+                    graphComponent.zoomOut();
+                }
+            }
+        });
+
+        // get buffered image
+        BufferedImage image = mxCellRenderer.createBufferedImage(graph, null, 1, Color.WHITE, true, new mxRectangle(0, 0, width - 1, height - 1));
+
+        return new ImagePlus("Root Model Graph", image);
+    }
+
+}
+
+

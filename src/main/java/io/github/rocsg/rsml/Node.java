@@ -4,8 +4,10 @@
 package io.github.rocsg.rsml;
 
 import io.github.rocsg.fijiyama.common.VitimageUtils;
+import io.github.rocsg.rsmlparser.Function;
 
 import java.awt.geom.Point2D;
+import java.util.List;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -290,7 +292,21 @@ public class Node {
         }
     }
 
-    /**
+    public void getInfosFromParser(Point2D position, float diameter, float orientation, float dpi) {
+        x = (float) position.getX() * dpi;
+        y = (float) position.getY() * dpi;
+        this.diameter = diameter * dpi;
+        theta = orientation;
+        if (parent != null) {
+            float dx = x - parent.x;
+            float dy = y - parent.y;
+            parent.theta = vectToTheta(dx, dy);
+            parent.length = (float) Math.sqrt(dx * dx + dy * dy);
+        }
+        needsRefresh = true;
+    }
+
+                                   /**
      * Read the node information from and RSML file.
      *
      * @param parentDOM the xml elemnt containg the x/y coordinates
@@ -300,11 +316,11 @@ public class Node {
     public void readRSML(org.w3c.dom.Node parentDOM, org.w3c.dom.Node diamDOM, float dpi) {
 
         org.w3c.dom.Node nn = parentDOM.getAttributes().getNamedItem("x");
-        if (nn != null) x = Float.valueOf(nn.getNodeValue()).floatValue() * dpi;
+        if (nn != null) x = Float.parseFloat(nn.getNodeValue()) * dpi;
         nn = parentDOM.getAttributes().getNamedItem("y");
-        if (nn != null) y = Float.valueOf(nn.getNodeValue()).floatValue() * dpi;
+        if (nn != null) y = Float.parseFloat(nn.getNodeValue()) * dpi;
         if (diamDOM != null) {
-            diameter = Float.valueOf(diamDOM.getFirstChild().getNodeValue()).floatValue() * dpi;
+            diameter = Float.parseFloat(diamDOM.getFirstChild().getNodeValue()) * dpi;
         } else {
             diameter = 2;
         }

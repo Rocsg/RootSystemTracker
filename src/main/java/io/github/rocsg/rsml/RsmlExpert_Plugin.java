@@ -29,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.*;
@@ -242,14 +241,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
 
         //createTif();
-        Path folderPath = Paths.get("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
+        //Path folderPath = Paths.get("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
 
 
-        RootModel rm = new RootModel();
-        rm.readRSMLNew("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
-        //RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
+        //RootModel rm = new RootModel();
+        //rm.readRSMLNew("C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\");
+        RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
         //plugin.isDevModeActivated = true;
-        //plugin.run(null);//testDir);
+        plugin.run(null);//testDir);
     }
 
     /**
@@ -1102,7 +1101,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         boolean did = false;
         addLog("Running action \"Fitting curves\" ...", -1);
         String[] infos = null;
-        infos = fitLastActionRootsInModel(currentModel);
+        //infos = fitLastActionRootsInModel(currentModel);
         if (infos != null) did = true;
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
         else finishActionAborted();
@@ -2304,7 +2303,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
             // Merge the grayscale image with the registered stack image
             processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
-
             // Convert the image to RGB color
             IJ.run(processedImages[i], "RGB Color", "");
         });

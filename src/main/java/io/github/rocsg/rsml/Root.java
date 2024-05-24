@@ -3,6 +3,7 @@ package io.github.rocsg.rsml;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
+import io.github.rocsg.rsmlparser.*;
 import mdbtools.libmdb.mem;
 
 import java.awt.*;
@@ -10,6 +11,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -20,7 +22,7 @@ import java.util.*;
  */
 
 
-public class Root implements Comparable<Root> {
+public class Root implements Comparable<Root>, IRootParser {
 
 
     /**
@@ -206,8 +208,8 @@ public class Root implements Comparable<Root> {
 
     /*For converting between rsmls and temporal rsmls*/
     String label;
-    public HashMap<String, Double> properties = new HashMap<String, Double>();
-    public HashMap<String, List<Double>> functions = new HashMap<String, List<Double>>();
+    public List<io.github.rocsg.rsmlparser.Property> properties;
+    public List<io.github.rocsg.rsmlparser.Function> functions;
 
     /**
      * Constructor
@@ -229,6 +231,98 @@ public class Root implements Comparable<Root> {
         rootID = noName;
         nextRootKey++;
         readRSML(parentDOM, rm, parentRoot, origin);
+    }
+
+    public Root(float dpi, IRootParser parentBaseRoot, boolean common, Root parentRoot, RootModel rm, String origin, float time) {
+        this.dpi = dpi;
+        pixelSize = ((float) 2.54 / dpi);
+        nNodes = 0;
+        firstNode = lastNode = null;
+        markList = new Vector<Mark>();
+        rootID = noName;
+        nextRootKey++;
+        getInfoFromRootParser(parentBaseRoot, rm, parentRoot, origin, time);
+    }
+
+    private void getInfoFromRootParser(IRootParser parentBaseRoot, RootModel rm, Root parentRoot, String origin, float time) {
+        this.rootID = parentBaseRoot.getLabel();
+        this.rootKey = parentBaseRoot.getId();
+        this.poIndex = rm.getIndexFromPo(parentBaseRoot.getPoAccession());
+        this.parentKey = parentBaseRoot.getParentId();
+        this.parentName = parentBaseRoot.getParentLabel();
+        this.label = parentBaseRoot.getLabel();
+        this.properties = parentBaseRoot.getProperties();
+        this.functions = parentBaseRoot.getFunctions();
+        this.parent = parentRoot;
+        this.order = parentBaseRoot.getOrder();
+        this.isChild = 0;
+        this.gM = 0;
+        this.rulerAtOrigin = 0.0f;
+        this.distanceFromApex = 0;
+        this.distanceFromBase = 0;
+        this.childDensity = 0;
+        this.insertAngl = 0;
+        this.interBranch = 0;
+
+        // Geometry
+        Geometry geometry = parentBaseRoot.getGeometry();
+        List<Point2D> nodes = geometry.get2Dpt();
+
+        int indexOfDiameter = 0;
+        for (int i = 0; i < functions.size(); i++) {
+            if (functions.get(i).getName().equals("diameter")) {
+                indexOfDiameter = i;
+                break;
+            }
+        }
+        int indexOfOrientation= 0;
+        for (int i = 0; i < functions.size(); i++) {
+            if (functions.get(i).getName().equals("orientation")) {
+                indexOfOrientation = i;
+                break;
+            }
+        }
+
+        for (Point2D point : nodes) {
+            Node no = addNode((float) point.getX(), (float) point.getY(), false);
+            int indexOfNode = nodes.indexOf(point);
+            float diameter = functions.get(indexOfDiameter).getSamples().get(indexOfNode).floatValue();
+            float orientation = functions.get(indexOfOrientation).getSamples().get(indexOfNode).floatValue();
+
+            no.getInfosFromParser(point, diameter, orientation, dpi);
+            // setting first node of last node
+            if (indexOfNode == 0) {
+                firstNode = no;
+            }
+            if (indexOfNode == nodes.size() - 1) {
+                lastNode = no;
+            }
+            no.birthTime = time;
+            no.birthTimeHours = time * 24;
+        }
+        this.firstNode.calcCLength(0.0f);
+        if (validate()) {
+            rm.rootList.add(this);
+        }
+        if (parentRoot != null) {
+            attachParent(parentRoot);
+            parentRoot.attachChild(this);
+        }
+
+        //for (IRootParser child : parentBaseRoot.getChildren()) {
+          //  new Root(dpi, child, true, this, rm, origin, time);
+        //}
+
+        if (rootKey.isEmpty()) rootKey = this.getNewRootKey();
+        if (rootID.equals(noName)) {
+            rootID = "root_" + rm.nextAutoRootID;
+            rm.nextAutoRootID++;
+        }
+
+        Node n = firstNode;
+        while (n != null) {
+            n = n.child;
+        }
     }
 
     /**
@@ -2170,7 +2264,7 @@ public class Root implements Comparable<Root> {
      * @param po the new po accession
      */
     public void setPoAccession(int po) {
-        this.poIndex = (rootID.length() == 0) ? 0 : po;
+        this.poIndex = (rootID.isEmpty()) ? 0 : po;
     }
 
     /**
@@ -2233,4 +2327,107 @@ public class Root implements Comparable<Root> {
         else return 1;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Root) {
+            Root r = (Root) obj;
+            boolean idTest = this.getRootID().equals(r.getRootID());
+            boolean parentTest = (this.parent == null && r.parent == null) || (this.parent != null && r.parent != null && this.parent.equals(r.parent));
+            boolean numNodeTest = (this.nNodes == r.nNodes);
+            boolean firstChildTest = Objects.equals(this.firstChild, r.firstChild);
+            boolean lastChildTest = Objects.equals(this.lastChild, r.lastChild);
+            boolean firstNodeTest = this.firstNode.equals(r.firstNode);
+            boolean lastNodeTest = this.lastNode.equals(r.lastNode);
+            boolean distanceFromApexTest = this.distanceFromApex == r.distanceFromApex;
+            boolean distanceFromBaseTest = this.distanceFromBase == r.distanceFromBase;
+            boolean insertAnglTest = this.insertAngl == r.insertAngl;
+            boolean interBranchTest = this.interBranch == r.interBranch;
+            boolean childDensityTest = this.childDensity == r.childDensity;
+            boolean isChildTest = this.isChild == r.isChild;
+            boolean parentTest2 = (this.parent == null && r.parent == null) || (this.parent != null && r.parent != null && this.parent.equals(r.parent));
+            boolean parentNameTest = (this.parentName == null && r.parentName == null) || (this.parentName != null && r.parentName != null && this.parentName.equals(r.parentName));
+            boolean parentKeyTest = (this.parentKey == null && r.parentKey == null) || (this.parentKey != null && r.parentKey != null && this.parentKey.equals(r.parentKey));
+            boolean rootKeyTest = this.rootKey.equals(r.rootKey);
+            boolean poIndexTest = this.poIndex == r.poIndex;
+            boolean labelTest = (this.label == null && r.label == null) || (this.label != null && r.label != null && this.label.equals(r.label));
+            boolean orderTest = this.order == r.order;
+            boolean propertiesTest = (this.properties == null && r.properties == null) || (this.properties != null && r.properties != null && this.properties.equals(r.properties));
+            boolean functionsTest = (this.functions == null && r.functions == null) || (this.functions != null && r.functions != null && this.functions.equals(r.functions));
+            if (idTest && parentTest && numNodeTest && firstChildTest && lastChildTest && firstNodeTest && lastNodeTest && distanceFromApexTest && distanceFromBaseTest && insertAnglTest && interBranchTest && childDensityTest && isChildTest && parentTest2 && parentNameTest && parentKeyTest && rootKeyTest && poIndexTest && labelTest && orderTest && propertiesTest && functionsTest) {
+                Node firstNode = this.firstNode;
+                Node firstNode2 = r.firstNode;
+                while (firstNode != null) {
+                    if (!firstNode.equals(firstNode2)) {
+                        return false;
+                    }
+                    firstNode = firstNode.child;
+                    firstNode2 = firstNode2.child;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+
+    //// Implementation for IRootParser
+
+    @Override
+    public String getId() {
+        return rootID;
+    }
+
+    @Override
+    public String getLabel() {
+        return label;
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    public List<Property> getProperties() {
+        return properties;
+    }
+
+    @Override
+    public List<Function> getFunctions() {
+        return functions;
+    }
+
+    @Override
+    public Geometry getGeometry() {
+        return null; // TODO
+    }
+
+    @Override
+    public List<IRootParser> getChildren() {
+        return childList.stream().map(r -> (IRootParser) r).collect(Collectors.toList());
+    }
+
+    @Override
+    public void addChild(IRootParser child, IRootModelParser rm) {
+        if (child instanceof Root) {
+            attachChild((Root) child);
+            if (rm instanceof RootModel) {
+                ((RootModel) rm).rootList.add((Root) child);
+            }
+        }
+        else {
+            throw new IllegalArgumentException("Child must be of type Root");
+        }
+    }
+
+    @Override
+    public String getParentId() {
+        return parentKey;
+    }
+
+    @Override
+    public String getParentLabel() {
+        return parentName;
+    }
 }
