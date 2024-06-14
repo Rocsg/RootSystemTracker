@@ -1,5 +1,6 @@
 package io.github.rocsg.rsmlparser;
 
+import java.awt.geom.Point2D;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,24 @@ public class Root4Parser implements IRootParser {
         }
         numFunctions = 2;
         this.currentTime = currentTime;
+    }
+
+    public static void collapseAll(Map<String, List<Root4Parser>> rootMap) {
+        for (String key : rootMap.keySet()) {
+            List<Root4Parser> roots = rootMap.get(key);
+            // all these roots have not the same number of coordinates but the first ones are the same
+            // We will make a mean out of the first coordinates of as much roots as possible
+            double meanX = 0;
+            double meanY = 0;
+            int n = 0;
+            for (int i = 0; i < roots.size(); i++) {
+                if (roots.get(i).geometry != null) {
+                    meanX += roots.get(i).geometry.get2Dpt().get(0).getX();
+                    meanY += roots.get(i).geometry.get2Dpt().get(0).getY();
+                    n++;
+                }
+            }
+        }
     }
 
     @Override

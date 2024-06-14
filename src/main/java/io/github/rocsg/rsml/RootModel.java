@@ -5,6 +5,7 @@ package io.github.rocsg.rsml;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import ij.measure.ResultsTable;
@@ -16,12 +17,18 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
 import io.github.rocsg.rsmlparser.*;
+import org.apache.commons.math3.exception.DimensionMismatchException;
+import org.apache.commons.math3.ml.clustering.CentroidCluster;
+import org.apache.commons.math3.ml.clustering.Cluster;
+import org.apache.commons.math3.ml.clustering.DoublePoint;
+import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.scijava.vecmath.Point3d;
+import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.filechooser.FileFilter;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -34,7 +41,6 @@ import javax.xml.transform.stream.StreamResult;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.Point2D;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -54,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-class IdenticalDataFileFilter extends javax.swing.filechooser.FileFilter {
+class IdenticalDataFileFilter extends FileFilter {
 
     String rootFName;
 
@@ -75,7 +81,7 @@ class IdenticalDataFileFilter extends javax.swing.filechooser.FileFilter {
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-class DataFileFilterRSML extends javax.swing.filechooser.FileFilter
+class DataFileFilterRSML extends FileFilter
         implements java.io.FileFilter {
 
     public DataFileFilterRSML() {
@@ -226,7 +232,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
     /**
      * The threshold.
      */
-    float threshold;
+    float threshold = 100;
     /**
      * The d M.
      */
@@ -254,6 +260,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
      * The autobuild theta step factor.
      */
     float AUTOBUILD_THETA_STEP_FACTOR = (float) Math.PI / 2.0f;
+    Map<Root, List<Node>> insertionPointsMap;
     /**
      * The directory.
      */
@@ -319,15 +326,18 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         this.AUTOBUILD_MIN_THETA_STEP = rm.AUTOBUILD_MIN_THETA_STEP;
         this.AUTOBUILD_THETA_STEP_FACTOR = rm.AUTOBUILD_THETA_STEP_FACTOR;
         this.rootList = new ArrayList<Root>();
+        List<Float> birthTimes = new ArrayList<>();
         for (Root r : rm.rootList) {
-            this.rootList.add(new Root(r.parent, this, r.getRootID(), r.order));
+            Node n = r.firstNode;
+            while (n != null) {
+                if (!birthTimes.contains(n.birthTime)) {
+                    birthTimes.add(n.birthTime);
+                }
+                n = n.child;
+            }
         }
+        birthTimes.sort(Float::compareTo);
         this.hoursCorrespondingToTimePoints = rm.hoursCorrespondingToTimePoints;
-    }
-
-    //A main function to test the function below
-    public static void main(String[] args) {
-        testStandardOrderingOfRoots("/home/rfernandez/Bureau/230403SR055/61_graph.rsml");
     }
 
     /**
@@ -771,7 +781,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         this.standardOrderingOfRoots();
         String fileName = VitimageUtils.withoutExtension(new File(f).getName());
         nextAutoRootID = 0;
-        org.w3c.dom.Document dom = null;
+        Document dom = null;
         Element re, me, met, mett, sce, plant, rootPrim, rootLat, geomPrim, polyPrim, geomLat, polyLat, pt;
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -1387,7 +1397,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         nextAutoRootID = 0;
 
 
-        org.w3c.dom.Document documentDOM = null;
+        Document documentDOM = null;
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         try {
@@ -1463,6 +1473,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Read common datafile structure.
+     * RSML 2D
      *
      * @param f the f
      */
@@ -1481,7 +1492,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         nextAutoRootID = 0;
 
 
-        org.w3c.dom.Document documentDOM = null;
+        Document documentDOM = null;
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         try {
@@ -1578,19 +1589,13 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         nextAutoRootID = 0;
 
 
-        org.w3c.dom.Document documentDOM = null;
+        Document documentDOM = null;
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 
         try {
             DocumentBuilder builder = factory.newDocumentBuilder();
             documentDOM = builder.parse(new File(fPath));
-        } catch (SAXException sxe) {
-            logReadError();
-            return;
-        } catch (ParserConfigurationException pce) {
-            logReadError();
-            return;
-        } catch (IOException ioe) {
+        } catch (SAXException | ParserConfigurationException | IOException sxe) {
             logReadError();
             return;
         }
@@ -1667,7 +1672,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         String fileName = VitimageUtils.withoutExtension(new File(f).getName());
         // String fPath = f;
         nextAutoRootID = 0;
-        org.w3c.dom.Document dom = null;
+        Document dom = null;
         Element re, me, met, mett, sce, plant, rootPrim, rootLat, geomPrim, polyPrim, geomLat, polyLat, pt;
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -1831,7 +1836,11 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
     public int resampleFlyingRoots() {
         int stamp = 0;
         for (Root r : rootList) {
-            stamp += r.resampleFlyingPoints(hoursCorrespondingToTimePoints);
+            try {
+                stamp += r.resampleFlyingPoints(hoursCorrespondingToTimePoints);
+            } catch (Exception e) {
+                IJ.log("Error in resampling root " + r);
+            }
         }
         return stamp;
     }
@@ -1886,13 +1895,15 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                 double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
                 if (/*(n.birthTime <= pt.z) && */(squareDist < squareDistMin.get())) {
                     squareDistMin.set(squareDist);
+                    // if it is not the same node
+                    if (squareDist == 0) continue;
                     rootMin.set(r);
                     nodeMin.set(n);
                 }
                 n = n.child;
             }
         });
-        if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
+        if (nodeMin != null && rootMin != null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
         } else {
             return null;
@@ -1963,7 +1974,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                 Node n = r.firstNode;
                 while (n != null) {
                     double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                    if (/*(n.birthTime <= pt.z) && */(squareDist < squareDistMin.get())) {
+                    if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
                         squareDistMin.set(squareDist);
                         rootMin.set(r);
                         nodeMin.set(n);
@@ -1972,7 +1983,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                 }
             }
         });
-        if (nodeMin!=null && rootMin!=null && nodeMin.get().birthTime <= t) {
+        if (rootMin != null && nodeMin.get().birthTime <= t) {
             return new Object[]{nodeMin.get(), rootMin.get()};
         } else {
             return null;
@@ -2196,7 +2207,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             if (r.isChild() != 0) {
-                n += r.getInsertAngl() * (180 / Math.PI);
+                n += (float) (r.getInsertAngl() * (180 / Math.PI));
                 m++;
             }
         }
@@ -2214,7 +2225,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             if (r.isChild() == 0) {
-                l += r.lPosPixelsToCm(r.getRootLength());
+                l += (int) r.lPosPixelsToCm(r.getRootLength());
             }
         }
         return l;
@@ -2232,7 +2243,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             if (r.isChild() == 0) {
-                l += r.computeRootLength(t);
+                l += (int) r.computeRootLength(t);
             }
         }
         return l;
@@ -2439,7 +2450,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             if (r.isChild() > 0) {
-                l += r.lPosPixelsToCm(r.getRootLength());
+                l += (int) r.lPosPixelsToCm(r.getRootLength());
             }
         }
         return l;
@@ -2457,7 +2468,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             if (r.isChild() > 0) {
-                l += r.computeRootLength(t);
+                l += (int) r.computeRootLength(t);
             }
         }
         return l;
@@ -2563,14 +2574,14 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         Root r;
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
-            if (r.childList.size() != 0) {
+            if (!r.childList.isEmpty()) {
                 ind++;
             }
         }
         String[] n = new String[ind];
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
-            if (r.childList.size() != 0) {
+            if (!r.childList.isEmpty()) {
                 n[i - c] = r.getRootID();
             } else c++;
         }
@@ -2833,7 +2844,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
             nLat = r.firstNode;
             nPrim = rPar.firstNode;
 
-            double distMin = 100000;
+            double distMin = Double.MAX_VALUE;
             while (nPrim.child != null) {
                 nPrim = nPrim.child;
                 if (distance(nPrim, nLat) < distMin) {
@@ -2862,6 +2873,11 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                 n.x += (n.x - (float) coords[0]);
                 n.y += (n.y - (float) coords[1]);
             }
+            if (n.parent == null) {
+                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
+                n.x += (n.x - (float) coords[0]);
+                n.y += (n.y - (float) coords[1]);
+            }
             while (n.child != null) {
                 n1 = n;
                 n = n.child;
@@ -2875,29 +2891,27 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
     /**
      * Apply transform to geometry. for a specific time of appearance
      *
-     * @param tr the transformation
+     * @param tr             the transformation
      * @param timeAppearance the time of appearance
      */
     public void applyTransformToGeometry(ItkTransform tr, int timeAppearance) {
         Root r;
-        Node n, n1;
+        Node n;
         double[] coords;
         for (int i = 0; i < rootList.size(); i++) {
             r = rootList.get(i);
             n = r.firstNode;
-            if (r.isChild == 1) {
-                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
-                n.x += (n.birthTime == timeAppearance ? (n.x - (float) coords[0]) : 0);
-                n.y += (n.birthTime == timeAppearance ? (n.y - (float) coords[1]) : 0);
-            }
+            coords = tr.transformPoint(new double[]{n.x, n.y, 0});
+            n.x += (n.birthTime == timeAppearance ? (n.x - (float) coords[0]) : 0);
+            n.y += (n.birthTime == timeAppearance ? (n.y - (float) coords[1]) : 0);
             while (n.child != null) {
-                n1 = n;
                 n = n.child;
                 coords = tr.transformPoint(new double[]{n.x, n.y, 0});
                 n.x += (n.birthTime == timeAppearance ? (n.x - (float) coords[0]) : 0);
                 n.y += (n.birthTime == timeAppearance ? (n.y - (float) coords[1]) : 0);
             }
         }
+        System.out.println("Transformation applied");
     }
 
     /**
@@ -3210,6 +3224,48 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         return imgRSML;
     }
 
+    public ImagePlus createGrayScaleImages(ImagePlus imgRef, double sigmaSmooth, boolean convexHull, boolean skeleton, int width) {
+        int w = imgRef.getWidth();
+        int h = imgRef.getHeight();
+        int t = imgRef.getStackSize();
+        ImageStack stack = new ImageStack(); // + t
+        for (int i = 1; i <= t; i++) {
+            ImagePlus imgRSML = new ImagePlus("", this.createImage(false, width, false, w, h, convexHull, i));
+            //imgRSML.show();
+            imgRSML = VitimageUtils.gaussianFiltering(imgRSML, sigmaSmooth, sigmaSmooth, sigmaSmooth);
+            if (skeleton) {
+                ImageProcessor ip = imgRSML.getProcessor();
+                for (Root r : rootList) {
+                    Node n = r.firstNode;
+                    Node n1;
+                    while (n.child != null) {
+                        n1 = n;
+                        n = n.child;
+                        if (n.birthTime > i) continue;
+                        ip.setColor(Color.white);
+                        ip.setLineWidth(width);
+                        ip.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
+                    }
+                    ip.setColor(Color.white);
+                    ip.drawRect((int) (n.x - 1), (int) (n.y - 1), 3, 3);
+                    double distLast = 0;
+                    while (n.child != null) {
+                        n1 = n;
+                        n = n.child;
+                        if (n.birthTime > i) continue;
+                        distLast += distance(n, n1);
+                        if (distLast > 5) {
+                            ip.setColor(Color.black);
+                            ip.drawRect((int) (n.x - 1), (int) (n.y - 1), 3, 3);
+                            distLast = 0;
+                        }
+                    }
+                }
+            }
+            stack.addSlice("", imgRSML.getProcessor());
+        }
+        return new ImagePlus("", stack);
+    }
 
     /**
      * Creates the gray scale image.
@@ -3237,7 +3293,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                     n = n.child;
                     ip.setColor(Color.white);
                     ip.setLineWidth(width);
-                    //ip.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
+                    ip.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
                 }
             }
             for (Root r : rootList) {
@@ -3308,6 +3364,66 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
             while (n.child != null) {
                 n1 = n;
                 n = n.child;
+                if (real) tracingP.setLineWidth((int) ((r.isChild() == 0) ? n.diameter : n.diameter - 1));
+                else tracingP.setLineWidth((r.isChild() == 0) ? line : line - 1);
+                tracingP.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
+            }
+            tracing.setProcessor(tracingP);
+            if (convexhull) {
+                if (r.isChild() == 0) {
+                    tracing.setColor(Color.yellow);
+                    PolygonRoi ch = r.getConvexHull();
+                    int[] xRoi = ch.getXCoordinates();
+                    int[] yRoi = ch.getYCoordinates();
+                    Rectangle rect = ch.getBounds();
+                    for (int j = 1; j < xRoi.length; j++) {
+                        tracingP.drawLine(xRoi[j - 1] + rect.x, yRoi[j - 1] + rect.y, xRoi[j] + rect.x, yRoi[j] + rect.y);
+                    }
+                    tracingP.drawLine(xRoi[xRoi.length - 1] + rect.x, yRoi[xRoi.length - 1] + rect.y, xRoi[0] + rect.x, yRoi[0] + rect.y);
+                }
+            }
+            tracingP = tracing.getProcessor();
+        }
+
+        return tracingP;
+    }
+
+    public ImageProcessor createImage(boolean color, int line, boolean real, int w, int h, boolean convexhull, float time) {
+
+        Root r;
+        Node n, n1;
+        ImagePlus tracing;
+
+
+        if (color) tracing = IJ.createImage("tracing", "RGBblack", w, h, 1);
+        else tracing = IJ.createImage("tracing", "8-bitblack", w, h, 1);
+
+
+        ImageProcessor tracingP = tracing.getProcessor();
+
+        //if(name == null) fit.checkImageProcessor();
+        for (int i = 0; i < rootList.size(); i++) {
+            r = rootList.get(i);
+            n = r.firstNode;
+
+            if (color) {
+                switch (r.isChild()) {
+                    case 0:
+                        tracing.setColor(new Color(Math.round(255), 0, 0));
+                        break;
+                    case 1:
+                        tracing.setColor(new Color(0, Math.round(255), 0));
+                        break;
+                    case 2:
+                        tracing.setColor(new Color(0, 0, Math.round(255)));
+                        break;
+                }
+            } else tracing.setColor(Color.white);
+
+            while (n.child != null) {
+                n1 = n;
+                n = n.child;
+                if (n.birthTime > time) continue;
                 if (real) tracingP.setLineWidth((int) ((r.isChild() == 0) ? n.diameter : n.diameter - 1));
                 else tracingP.setLineWidth((r.isChild() == 0) ? line : line - 1);
                 tracingP.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
@@ -3549,12 +3665,18 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     //// Handling interface methods
 
+    /**
+     * Do not use, only for 2D models
+     *
+     * @param rootModel the root model
+     * @param time      the time
+     * @return the root model
+     */
     @Override
     public IRootModelParser createRootModel(IRootModelParser rootModel, float time) {
         if (rootModel instanceof RootModel) {
             return rootModel;
-        }
-        else if (rootModel instanceof RootModel4Parser) {
+        } else if (rootModel instanceof RootModel4Parser) {
             RootModel rm = new RootModel();
             nextAutoRootID = 0;
             String unit = ((RootModel4Parser) rootModel).getUnit();
@@ -3572,16 +3694,15 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
             FSR.write(rootList.size() + " root(s) were created");
             setDPI(dpi);
             return rm;
-        }
-        else {
+        } else {
             return null;
         }
     }
 
-
     /**
      * Creates the root models.
-     * @param rootModels the root models ordered by date
+     *
+     * @param rootModels  the root models ordered by date
      * @param scaleFactor the scale factor (pph)
      * @return the root model
      */
@@ -3615,6 +3736,8 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
             }
         }
 
+        Root4Parser.collapseAll(rootsMap); // DANGER
+
         for (int level = 1; level <= maxRootOrder; level++) {
             for (String id : rootsMap.keySet()) {
                 if (rootsMap.get(id).get(0).getOrder() == level) {
@@ -3626,15 +3749,15 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         rm.standardOrderingOfRoots();
         rm.cleanWildRsml();
         rm.resampleFlyingRoots();
-
         return rm;
     }
 
     /**
      * Parse root model. Adding keys to the roots map (id -> list of roots)
      * We would end up with (id -> time segmentation of the roots)
+     *
      * @param rootModel the root model
-     * @param rootsMap the roots map
+     * @param rootsMap  the roots map
      */
     private void parseRootModel(RootModel4Parser rootModel, Map<String, List<Root4Parser>> rootsMap) {
         for (Scene scene : rootModel.getScenes()) {
@@ -3650,7 +3773,8 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Parse child roots. Adding keys to the roots map (id -> list of roots)
-     * @param root the root
+     *
+     * @param root     the root
      * @param rootsMap the roots map
      */
     private void parseChildRoots(Root4Parser root, Map<String, List<Root4Parser>> rootsMap) {
@@ -3663,11 +3787,12 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Build root hierarchy. Recursive method to build the root hierarchy
-     * @param rm the root model
-     * @param rootsMap the roots map
-     * @param id the id
-     * @param parent the parent
-     * @param dates the dates
+     *
+     * @param rm          the root model
+     * @param rootsMap    the roots map
+     * @param id          the id
+     * @param parent      the parent
+     * @param dates       the dates
      * @param scaleFactor the scale factor
      */
     private void buildRootHierarchy(RootModel rm, Map<String, List<Root4Parser>> rootsMap, String id, Root parent, List<LocalDate> dates, float scaleFactor) {
@@ -3681,7 +3806,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         } else if (!rm.rootList.isEmpty()) {
             Root checkRoot = looking4Root(rm.rootList, root.getId());
             rm.rootList.add(root);
-            if(Objects.requireNonNull(checkRoot).order > 1) {
+            if (Objects.requireNonNull(checkRoot).order > 1) {
                 root.attachParent(checkRoot.parent);
             }
         } else rm.rootList.add(root);
@@ -3693,8 +3818,9 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Looking for a certain root with a certain id for correction. Recursive method to find the root in the root list / child lists
+     *
      * @param roots the roots
-     * @param id the id
+     * @param id    the id
      * @return the root
      */
     private Root looking4Root(List<Root> roots, String id) {
@@ -3710,10 +3836,11 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Create root. Create a root from a list of root4parser
-     * @param rm the root model
-     * @param id the id
-     * @param rootList the root list
-     * @param dates the dates
+     *
+     * @param rm          the root model
+     * @param id          the id
+     * @param rootList    the root list
+     * @param dates       the dates
      * @param scaleFactor the scale factor
      * @return the root
      */
@@ -3732,6 +3859,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
                 indexPt++;
                 if (first) first = false;
             }
+            //first = true; //even though technically true
         }
         root.computeDistances();
         return root;
@@ -3739,7 +3867,8 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
 
     /**
      * Get the diameter of a root at a certain index
-     * @param root the root
+     *
+     * @param root  the root
      * @param index the index
      * @return the diameter
      */
@@ -3752,326 +3881,134 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         return 0;
     }
 
-
-   /* @Override
-    public IRootModelParser createRootModels(Map<LocalDate, List<IRootModelParser>> rootModels, float scaleFactor) {
-        RootModel rm = new RootModel();
-        LocalDate firstDate = rootModels.keySet().iterator().next();
-        RootModel4Parser firstRootModel = (RootModel4Parser) rootModels.get(firstDate).get(0);
-
-        rm.imgName = firstRootModel.getFileKey();
-        String unit = firstRootModel.getUnit();
-        float res = firstRootModel.getResolution();
-        rm.dpi = getDPI(unit, res);
-        rm.pixelSize = 2.54f / rm.dpi;
-
-        List<LocalDate> dates = new ArrayList<>(rootModels.keySet());
-        Collections.sort(dates);
-
-        double[] hours = new double[dates.size()];
-        hours[0] = 0;
-        for (int i = 1; i < dates.size(); i++) {
-            hours[i] = hours[i - 1] + ChronoUnit.HOURS.between(dates.get(i - 1).atStartOfDay(), dates.get(i).atStartOfDay());
-        }
-        rm.hoursCorrespondingToTimePoints = hours;
-
-        Map<String, List<Root4Parser>> primaryRoots = new HashMap<>();
-        Map<String, List<Root4Parser>> lateralRoots = new HashMap<>();
-
-        for (LocalDate date : dates) {
-            for (IRootModelParser model : rootModels.get(date)) {
-                parseRootModel((RootModel4Parser) model, primaryRoots, lateralRoots);
-            }
-        }
-
-        buildRoots(rm, primaryRoots, lateralRoots, dates, scaleFactor);
-        rm.standardOrderingOfRoots();
-        rm.cleanWildRsml();
-        rm.resampleFlyingRoots();
-
-        return rm;
-    }
-
-    OLD
-        public IRootModelParser createRootModels(Map<LocalDate, List<IRootModelParser>> rootModels, float scaleFactor) {
-            RootModel rm = new RootModel();
-            rm.imgName = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getFileKey();
-            String unit = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getUnit();
-            float res = ((RootModel4Parser) rootModels.get(rootModels.keySet().iterator().next()).get(0)).getResolution();
-            rm.dpi = getDPI(unit, res);
-            rm.pixelSize = 2.54f / dpi;
-            // get all dates in an ordered list and convert them to hours (begining is the first date)
-            List<LocalDate> dates = new ArrayList<>(rootModels.keySet());
-            Collections.sort(dates);
-            double[] hours = new double[dates.size()];
-            hours[0] = 0;
-            for (int i = 1; i < dates.size(); i++) {
-                hours[i] = hours[i - 1] + ChronoUnit.HOURS.between(dates.get(i - 1).atStartOfDay(), dates.get(i).atStartOfDay());
-            }
-            rm.hoursCorrespondingToTimePoints = hours;
-
-            // we want to have the temporal evolution of each root4parser, so, we will order them by their id in a map of lists
-            Map<String, List<Root4Parser>> roots1 = new HashMap<>();
-            Map<String, List<Root4Parser>> roots2 = new HashMap<>();
-            for (LocalDate date : dates) {
-                List<IRootModelParser> rootModelsList = rootModels.get(date);
-                for (IRootModelParser rootModel : rootModelsList) {
-                    for (Scene scene : ((RootModel4Parser) rootModel).getScenes()) {
-                        for (Plant plant : scene.getPlants()) {
-                            for (Root4Parser root : plant.getFirstOrderRoots()) {
-                                if (!roots1.containsKey(root.getId())) {
-                                    roots1.put(root.getId(), new ArrayList<>());
-                                }
-                                roots1.get(root.getId()).add(root);
-
-                                for(IRootParser child : root.getChildren()) {
-                                    if (!roots2.containsKey(child.getId())) {
-                                        roots2.put(child.getId(), new ArrayList<>());
-                                    }
-                                    roots2.get(child.getId()).add((Root4Parser) child);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            // hence, we have a list of roots, each one has a hierarchy, and we have it state at each time.
-            // We will now proceed to create a temporal RootModel - inspiration : RootModelWildReadFromRsml1
-            for (String id : roots1.keySet()) {
-                Root rPrim = new  Root(null, rm, "", 1);
-                List<Root4Parser> rootList1 = roots1.get(id);
-                rPrim.rootID = id;
-                rPrim.order = 1;
-                rPrim.rootKey = rootList1.get(0).getLabel();
-                boolean first = true;
-                for (Root4Parser root : rootList1) {
-                    int indexPt = 0;
-                    for (Point2D points : root.getGeometry().get2Dpt()) {
-                        float diameter = 0;
-                        for (Function f : root.getFunctions()) {
-                            if (f.getName().equals("diameter")) {
-                                diameter = f.getSamples().get(indexPt).floatValue();
-                                break;
-                            }
-                        }
-                        int indexTime = dates.indexOf(root.currentTime) + 1;
-                        rPrim.addNode(points.getX()/scaleFactor, points.getY()/scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
-                        indexPt++;
-                        if (first) {
-                            first = false;
-                        }
-                    }
-                }
-                rPrim.computeDistances();
-                //rm.rootList.add(rPrim); first make sure that the root is not already in the list
-                boolean found = false;
-                for (Root r : rm.rootList) {
-                    if (r.rootID.equals(rPrim.rootID)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    rm.rootList.add(rPrim);
-                }
-
-                for (String id2 : roots2.keySet()) {
-                    List<Root4Parser> rootList2 = roots2.get(id2);
-                    for (Root4Parser root : rootList2) {
-                        if (root.getParent().getId().equals(id)) {
-                            Root rLat = null;
-                            if (rm.rootList.stream().anyMatch(r -> r.rootID.equals(id2))) {
-                                rLat = rm.rootList.stream().filter(r -> r.rootID.equals(id2)).findFirst().get();
-                                first = false;
-                            } else {
-                                rLat = new Root(null, rm, "", 2);
-                                rLat.rootID = id2;
-                                rLat.order = 2;
-                                rLat.rootKey = root.getLabel();
-                                first = true;
-                            }
-                            int indexPt = 0;
-                            for (Point2D points : root.getGeometry().get2Dpt()) {
-                                float diameter = 0;
-                                for (Function f : root.getFunctions()) {
-                                    if (f.getName().equals("diameter")) {
-                                        diameter = f.getSamples().get(indexPt).floatValue();
-                                        break;
-                                    }
-                                }
-                                int indexTime = dates.indexOf(root.currentTime) + 1;
-                                rLat.addNode(points.getX()/scaleFactor, points.getY()/scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
-                                indexPt++;
-                                if (first) first = false;
-                            }
-                            rLat.computeDistances();
-                            //rPrim.attachChild(rLat);  first make sure that the root is not already in the list or in the list of children of the primary root
-                            //rLat.attachParent(rPrim);
-                            found = false;
-                            for (Root r : rm.rootList) {
-                                if (r.rootID.equals(rLat.rootID)) {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                rm.rootList.add(rLat);
-                                rPrim.attachChild(rLat);
-                                rLat.attachParent(rPrim);
-                            }
-                        }
-                    }
-                }
-            }
-
-            rm.standardOrderingOfRoots();
-            rm.cleanWildRsml();
-            rm.resampleFlyingRoots();
-            return rm;
-        }
-
-    private void parseRootModel(RootModel4Parser rootModel, Map<String, List<Root4Parser>> primaryRoots, Map<String, List<Root4Parser>> lateralRoots) {
-        for (Scene scene : rootModel.getScenes()) {
-            for (Plant plant : scene.getPlants()) {
-                for (Root4Parser root : plant.getFirstOrderRoots()) {
-                    primaryRoots.computeIfAbsent(root.getId(), k -> new ArrayList<>()).add(root);
-                    for (IRootParser child : root.getChildren()) {
-                        lateralRoots.computeIfAbsent(child.getId(), k -> new ArrayList<>()).add((Root4Parser) child);
-                    }
-                }
-            }
-        }
-    }
-
-    private void buildRoots(RootModel rm, Map<String, List<Root4Parser>> primaryRoots, Map<String, List<Root4Parser>> lateralRoots, List<LocalDate> dates, float scaleFactor) {
-        for (String id : primaryRoots.keySet()) {
-            Root root = createRoot(rm, id, primaryRoots.get(id), dates, scaleFactor, 1);
-            rm.rootList.add(root);
-            attachLateralRoots(root, rm, lateralRoots, dates, scaleFactor);
-        }
-    }
-
-    private Root createRoot(RootModel rm, String id, List<Root4Parser> rootList, List<LocalDate> dates, float scaleFactor, int order) {
-        Root root = new Root(null, rm, "", order);
-        root.rootID = id;
-        root.rootKey = rootList.get(0).getLabel();
-        boolean first = true;
-
-        for (Root4Parser root4Parser : rootList) {
-            int indexPt = 0;
-            for (Point2D points : root4Parser.getGeometry().get2Dpt()) {
-                float diameter = 0;
-                int indexTime = dates.indexOf(root4Parser.currentTime) + 1;
-                root.addNode(points.getX() / scaleFactor, points.getY() / scaleFactor, indexTime, indexTime * 24, diameter, 0, 0, first);
-                indexPt++;
-                if (first) first = false;
-            }
-        }
-        root.computeDistances();
-        return root;
-    }
-
-    private void attachLateralRoots(Root primaryRoot, RootModel rm, Map<String, List<Root4Parser>> lateralRoots, List<LocalDate> dates, float scaleFactor) {
-        for (String id : lateralRoots.keySet()) {
-            List<Root4Parser> rootList = lateralRoots.get(id);
-            if (rootList.get(0).getParent().getId().equals(primaryRoot.rootID)) {
-                Root lateralRoot = rm.rootList.stream().filter(r -> r.rootID.equals(id)).findFirst()
-                        .orElse(createRoot(rm, id, rootList, dates, scaleFactor, 2));
-                if (!rm.rootList.contains(lateralRoot)) {
-                    rm.rootList.add(lateralRoot);
-                    primaryRoot.attachChild(lateralRoot);
-                    lateralRoot.attachParent(primaryRoot);
-                }
-            }
-        }
-    }
-    */
     /**
-     * Root model wild read from rsml.
-     *
-     * @param rsmlFile the rsml file
-     * @return the root model
+     * Finalisation de la creation du rootmodel avant blockmatching
      */
-    public static RootModel RootModelWildReadFromRsml1(String rsmlFile) {//Wild read model for Fijiyama did Root model with time, diameter, vx and vy information
-        FSR sr = (new FSR());
-        sr.initialize();
-        boolean debug = false;
-        //String lineSep= System.getProperty("line.separator");
+    public void adjustRootModel() {
+        float minTime = Float.MAX_VALUE;
+        Map<Float, List<Node>> nodes = new HashMap<>();
 
-        int Nobs = 100000; //N max of observations
+        // Iterate through each root in the root list
+        for (Root r : this.rootList) {
+            Node firstNode = r.firstNode;
 
-        String[] str = null;
-        if (VitimageUtils.isWindowsOS()) str = VitimageUtils.readStringFromFile(rsmlFile).split("\\n");
-        else str = VitimageUtils.readStringFromFile(rsmlFile).split("\n");
-        RootModel rm = new RootModel();
-        rm.imgName = "";
-        rm.pixelSize = (float) Double.parseDouble(str[4].split(">")[1].split("<")[0]);
-
-        double[] hours = new double[Nobs];
-        boolean hasHours = true;
-        hasHours = (str[9].contains("observation"));
-        double[] tabD = new double[0];
-        if (hasHours) {
-            String[] tab = (str[9].split(">")[1].split("<")[0]).split(",");
-            tabD = new double[tab.length + 1];
-            for (int i = 1; i < tab.length + 1; i++) tabD[i] = Double.parseDouble(tab[i - 1]);
-        }
-        tabD[0] = tabD[1];
-        rm.hoursCorrespondingToTimePoints = tabD;
-
-        int ind = hasHours ? 16 : 15;
-        boolean first;
-        if (debug) IJ.log("Pl" + str[ind]);
-        // for each plant
-        while (str[ind].contains("<plant")) {
-            ind = ind + 1 + 3;//<root then <point
-            Root rPrim = new Root(null, rm, "", 1);
-            first = true;
-            if (debug) IJ.log("Poiprim" + str[ind]);
-            while (str[ind].contains("<point")) {
-                String[] vals = str[ind].replace("<point ", "").replace("/>", "").replace("\"", "").split(" ");
-                if (hasHours)
-                    rPrim.addNode(Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), Double.parseDouble(vals[6].split("=")[1]), first);
-                else
-                    rPrim.addNode(Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), first);
-                if (first) first = false;
-                ind++;
-                if (debug) IJ.log("-Poiprim" + str[ind]);
+            // Add nodes to a point list for clustering
+            while (firstNode != null) {
+                nodes.computeIfAbsent(firstNode.birthTime, k -> new ArrayList<>()).add(firstNode);
+                firstNode = firstNode.child;
             }
-            rPrim.computeDistances();
-            rm.rootList.add(rPrim);
-            ind = ind + 2;//<root or </root
-            if (debug) IJ.log("root lat" + str[ind]);
-            while (str[ind].contains("<root")) {//lateral
-                ind = ind + 3;//point
-                Root rLat = new Root(null, rm, "", 2);
-                first = true;
-                if (debug) IJ.log("PoiLat" + str[ind]);
-                while (str[ind].contains("<point")) {
-                    String[] vals = str[ind].replace("<point ", "").replace("/>", "").replace("\"", "").split(" ");
-                    if (hasHours)
-                        rLat.addNode(Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), Double.parseDouble(vals[6].split("=")[1]), first);
-                    else
-                        rLat.addNode(Double.parseDouble(vals[1].split("=")[1]), Double.parseDouble(vals[2].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[0].split("=")[1]), Double.parseDouble(vals[3].split("=")[1]), Double.parseDouble(vals[4].split("=")[1]), Double.parseDouble(vals[5].split("=")[1]), first);
-                    if (first) first = false;
-                    ind++;
-                    if (debug) IJ.log("-PoiLat?" + str[ind]);
+
+            // Find the time with the maximum number of points
+            float timeWithMaxPoints = nodes.keySet().iterator().next();
+            for (Float time : nodes.keySet()) {
+                if (nodes.get(time).size() > nodes.get(timeWithMaxPoints).size()) timeWithMaxPoints = time;
+            }
+
+            // make a mean out of the elements of nodes that have the same indexes in a list
+            r.firstNode = nodes.get(timeWithMaxPoints).get(0);
+            r.firstNode.parent = null;
+            r.lastNode = nodes.get(timeWithMaxPoints).get(nodes.get(timeWithMaxPoints).size() - 1);
+            r.lastNode.child = null;
+            r.nNodes = nodes.get(timeWithMaxPoints).size();
+            Node n = r.firstNode;
+            for (int j = 1; j < r.nNodes; j++) {
+                double meanX = 0;
+                double meanY = 0;
+                float minT = Float.MAX_VALUE;
+                float maxT = Float.MIN_VALUE;
+                int sizeNum = 0;
+                for (float key : nodes.keySet()) {
+                    try {
+                        meanX += nodes.get(key).get(j).x;
+                        meanY += nodes.get(key).get(j).y;
+                        minT = Math.min(key, minT);
+                        maxT = Math.max(key, maxT);
+                        sizeNum++;
+                    } catch (IndexOutOfBoundsException e) {
+                        continue;
+                    }
                 }
-                rLat.computeDistances();
-                rPrim.attachChild(rLat);
-                rLat.attachParent(rPrim);
-                rm.rootList.add(rLat);
-                ind = ind + 3;//<root or </root
-                if (debug) IJ.log("-root lat?" + str[ind]);
+                meanX /= sizeNum;
+                meanY /= sizeNum;
+
+                if (n == null) {
+                    break;
+                }
+                n = n.child;
+                if (n == null) {
+                    break;
+                }
+
+                n.x = (float) meanX;
+                n.y = (float) meanY;
+                n.birthTime = minT;
+                n.birthTimeHours = minT * 24;
+
+                this.hoursCorrespondingToTimePoints = new double[(int) (maxT - minT) + 1];
+                for (int i = 0; i < this.hoursCorrespondingToTimePoints.length; i++) {
+                    this.hoursCorrespondingToTimePoints[i] = minTime + i;
+                }
             }
-            ind = ind + 2;//<plant or nothing
-            if (debug) IJ.log("-plant?" + str[ind]);
+            nodes.clear();
         }
-        rm.standardOrderingOfRoots();
-        return rm;
+
+        // Free memory
+        System.gc();
+
+        for (Root r : this.rootList) {
+            if (r.order == 2) { // TODO generalize
+                r.firstNode.parent = (Node) getClosestNodeInPrimary(new Point3d(r.firstNode.x, r.firstNode.y, r.firstNode.birthTime))[0];
+                r.parent = (Root) getClosestNodeInPrimary(new Point3d(r.firstNode.x, r.firstNode.y, r.firstNode.birthTime))[1];
+                r.firstNode.parent.birthTime = Math.min(r.firstNode.birthTime, r.firstNode.parent.birthTime);
+                r.firstNode.isInsertionPoint = true;
+            }
+        }
+
+        // Update the root model
+        this.resampleFlyingRoots();
+        this.standardOrderingOfRoots();
+        this.cleanWildRsml();
+
     }
 
+    // Helper method to draw clusters on the image
+    private void drawClustersOnImage(ImagePlus image, List<CentroidCluster<DoublePoint>> clusters) {
+        // Iterate through each cluster and draw points
+        for (int clusterIndex = 0; clusterIndex < clusters.size(); clusterIndex++) {
+            Cluster<DoublePoint> cluster = clusters.get(clusterIndex);
+            image.getProcessor().setColor(new Color((int) (Math.random() * 255), (int) (Math.random() * 255), (int) (Math.random() * 255)));
+            for (DoublePoint point : cluster.getPoints()) {
+                System.out.println("Cluster " + clusterIndex + " : " + point.getPoint()[0] + " " + point.getPoint()[1] + " " + point.getPoint()[2]);
+                image.getProcessor().drawOval((int) point.getPoint()[0], (int) point.getPoint()[1], 4, 4);
+            }
+        }
+        // Draw centroids in red
+        image.getProcessor().setColor(Color.red);
+        for (CentroidCluster<DoublePoint> cluster : clusters) {
+            image.getProcessor().drawOval((int) cluster.getCenter().getPoint()[0], (int) cluster.getCenter().getPoint()[1], 4, 4);
+        }
+        image.updateAndDraw();
+    }
 
-
+    public Map<Root, List<Node>> getInsertionPoints() {
+        if (this.insertionPointsMap == null) {
+            this.insertionPointsMap = new HashMap<>();
+            for (Root r : rootList) {
+                this.insertionPointsMap.putIfAbsent(r, new ArrayList<>());
+                Node n = r.firstNode;
+                this.insertionPointsMap.get(r).add(n);
+                n.isInsertionPoint = true;
+                while (n.child != null) {
+                    if (n.birthTime == n.child.birthTime - 1) {
+                        this.insertionPointsMap.get(r).add(n.child);
+                        n.child.isInsertionPoint = true;
+                    }
+                    n = n.child;
+                }
+            }
+            return this.insertionPointsMap;
+        }
+        return this.insertionPointsMap;
+    }
 
 }

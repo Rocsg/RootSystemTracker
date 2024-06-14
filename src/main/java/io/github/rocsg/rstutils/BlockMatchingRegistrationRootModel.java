@@ -5,7 +5,6 @@ import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
 import ij.plugin.Duplicator;
-import ij.process.ByteProcessor;
 import io.github.rocsg.fijiyama.common.ItkImagePlusInterface;
 import io.github.rocsg.fijiyama.common.Timer;
 import io.github.rocsg.fijiyama.common.VitiDialogs;
@@ -13,12 +12,13 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
 import io.github.rocsg.fijiyama.registration.*;
 import io.github.rocsg.rsml.FSR;
+import io.github.rocsg.rsml.Node;
+import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
 import math3d.Point3d;
 import org.itk.simple.DisplacementFieldTransform;
 import org.itk.simple.Image;
 
-import javax.annotation.processing.Processor;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,31 +28,36 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistration {
 
-    private static final double EPSILON = 1E-8;
+    private static final double EPSILON = 1.0E-8;
+    private final String info = "";
     /**
      * The is rsml.
      */
+    static ImagePlus realImageRef;
+    static ImagePlus realImageMov;
     public boolean isRsml = false;
-
     // tool copy
     boolean waitBeforeStart = false;
     Image[] currentField;
     int indField;
+    boolean viewFuseBigger = true;
+    int fontSize = 12;
     /**
      * The root model.
      */
     private RootModel rM;
-
-    private String info = "";
     private double[] refRange = new double[]{-1.0, -1.0};
     private double[] movRange = new double[]{-1.0, -1.0};
-    boolean viewFuseBigger = true;
-    int fontSize = 12;
 
 
     public BlockMatchingRegistrationRootModel() {
         super();
         RootModel rM = new RootModel();
+    }
+
+    public BlockMatchingRegistrationRootModel(RootModel rm) {
+        super();
+        this.rM = rm;
     }
 
     public BlockMatchingRegistrationRootModel(ImagePlus imgReff, ImagePlus imgMovv, Transform3DType transformationType, MetricType metricType, double smoothingSigmaInPixels, double denseFieldSigma, int levelMin, int levelMax, int nbIterations, int sliceInt, ImagePlus maskk, int neighbourX, int neighbourY, int neighbourZ, int blockHalfSizeX, int blockHalfSizeY, int blockHalfSizeZ, int strideX, int strideY, int strideZ, int displayReg) {
@@ -231,7 +236,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         if (this.fontSize < 5) {
             this.fontSize = 0;
         }
-        this.rM = new RootModel(rm);
+        this.rM = rm;
     }
 
 
@@ -266,8 +271,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         RootModel rootModel = new RootModel(VitimageUtils.withoutExtension(pathToImgRef) + ".rsml");
         rootModel.refineDescription(10);
         rootModel.attachLatToPrime();
-        //ImagePlus imgMov = plongement(imgRef, rootModel, false); // TODO Faire attention à la présence de RSML
-        ImagePlus imgMov = new Duplicator().run(imgRef);
+        ImagePlus imgMov = multiPlongement(imgRef, rootModel, false); // TODO Faire attention à la présence de RSML
         RegistrationAction regAct = RegistrationAction.defineSettingsForRSML(imgRef);
         //regAct.typeAutoDisplay = 2;
         BlockMatchingRegistration br = BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
@@ -285,8 +289,74 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         ItkTransform itkTransform = bm.runBlockMatching(null, false);
 
         // save the transformation
+        bm.closeLastImages();
+        bm.freeMemory();
+        return bm.rM;
+    }
 
+    public RootModel setupAndRunRsmlBlockMatchingRegistration(RootModel rootModel, ImagePlus imageRef) {
+        ImagePlus imgRef = imageRef;
+        imgRef = VitimageUtils.resize(imgRef, imgRef.getWidth(), imgRef.getHeight(), imgRef.getStackSize());
+        // the number of blocks will be the number of blocks of an image of size determined by the boundaries of the rootmodel
 
+        int topLeftX = Integer.MAX_VALUE; // TODO assuming no initial transform
+        int topLeftY = Integer.MAX_VALUE;
+        int bottomRightX = Integer.MIN_VALUE;
+        int bottomRightY = Integer.MIN_VALUE;
+        for (Root root : rootModel.rootList) {
+            Node firstNode = root.firstNode;
+            while (firstNode != null) {
+                topLeftX = (int) Math.min(topLeftX, firstNode.x);
+                topLeftY = (int) Math.min(topLeftY, firstNode.y);
+                bottomRightX = (int) Math.max(bottomRightX, firstNode.x);
+                bottomRightY = (int) Math.max(bottomRightY, firstNode.y);
+                firstNode = firstNode.child;
+            }
+        }
+
+        // extract the corresponding part of the image and assign them to imgRef and imgMov (+- blockSize if possible)
+        realImageRef = imgRef.duplicate();
+        int beginX = Math.max(topLeftX - this.blockSizeX, 0);
+        int beginY = Math.max(topLeftY - this.blockSizeY, 0);
+        int dimX = Math.min(bottomRightX + this.blockSizeX, imgRef.getWidth()) - beginX;
+        int dimY = Math.min(bottomRightY + this.blockSizeY, imgRef.getHeight()) - beginY;
+        int beginZ = 0;
+        int dimZ = imgRef.getStackSize() - 1;
+        imgRef = VitimageUtils.cropImage(imgRef, beginX, beginY, beginZ, dimX, dimY, dimZ);
+
+        // creating a linear transform for the crop issue for the root model
+        Point3d[] oldPos = new Point3d[1];
+        Point3d[] newPos = new Point3d[1];
+        oldPos[0] = new Point3d(topLeftX, topLeftY, 0);
+        newPos[0] = new Point3d(0, 0, 0);
+        ItkTransform linearTransform = ItkTransform.estimateBestTranslation3D(oldPos, newPos);
+
+        rootModel.applyTransformToGeometry(linearTransform);
+
+        System.out.println("imgRef = " + imgRef + " width=" + imgRef.getWidth() + " height=" + imgRef.getHeight());
+
+        rootModel.refineDescription(10);
+        rootModel.attachLatToPrime();
+        ImagePlus imgMov = multiPlongement(imgRef, rootModel, false); // TODO Faire attention à la présence de RSML ancienement plongemenet
+        //imgMov.show();
+        RegistrationAction regAct = RegistrationAction.defineSettingsForRSML(imgRef);
+        //regAct.typeAutoDisplay = 2;
+        BlockMatchingRegistration br = BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
+        BlockMatchingRegistrationRootModel bm = new BlockMatchingRegistrationRootModel(br, rootModel);
+
+        boolean display = true;
+        boolean multiRsml = false;
+        if (!display) bm.imageJOutputActivated = false;
+        //bm.waitBeforeStart=false;
+        // bm.updateViews(0, 0, 0, "Start");
+        bm.displayRegistration = display ? 2 : 0;
+        bm.minBlockVariance = 0.05;
+        bm.minBlockScore = 0.01;
+        bm.adjustZoomFactor(512.0 / imgRef.getWidth());
+        bm.defaultCoreNumber = multiRsml ? 1 : VitimageUtils.getNbCores() / 2;
+        ItkTransform itkTransform = bm.runBlockMatching(null, false);
+
+        // save the transformation
         bm.closeLastImages();
         bm.freeMemory();
         RootModel rt = bm.rM;
@@ -297,6 +367,9 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         return rt;
     }
 
+    public static ImagePlus multiPlongement(ImagePlus ref, RootModel rootModel, boolean addCrosses) {
+        return rootModel.createGrayScaleImages(ref, 1, false, addCrosses, 1);
+    }
 
     public static ImagePlus plongement(ImagePlus ref, RootModel rootModel, boolean addCrosses) {
         return rootModel.createGrayScaleImage(ref, 1, false, addCrosses, 1);
@@ -448,32 +521,39 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
     }
 
     /**
-     * Run algorithm from an initial situation (trInit), and return the final transform (including trInit).
+     * This method runs the block matching algorithm for image registration.
+     * It takes an initial transform and a boolean indicating whether to run a stress test.
+     * The method returns the final transform, which "includes" the initial transform.
      *
-     * @param trInit     the tr init
-     * @param stressTest the stress test
-     * @return the itk transform
+     * @param trInit     The initial transform to be applied. If null, an identity transform is created.
+     * @param stressTest A boolean indicating whether to run a stress test.
+     * @return The final transform after running the block matching algorithm.
      */
-    @SuppressWarnings("unchecked")
     public ItkTransform runBlockMatching(ItkTransform trInit, boolean stressTest) {
+        // Initialize arrays for storing time measurements
         double[] timesGlob = new double[20];
         double[][] timesLev = new double[nbLevels][20];
         double[][][] timesIter = new double[nbLevels][nbIterations][20];
+
+        // Record the start time
         long t0 = System.currentTimeMillis();
         timesGlob[0] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
-        handleOutput("Absolute time at start=" + t0);
-//		double progress=0;IJ.showProgress(progress);
+
+        // If no initial transform is provided, create an identity transform
         if (trInit == null) this.currentTransform = new ItkTransform();
         else this.currentTransform = new ItkTransform(trInit);
-        handleOutput(new Date().toString());
-        //Initialize various artifacts
+
+        // Initialize Images
         ImagePlus imgRefTemp = null;
         ImagePlus imgMovTemp = null;
+
+        // Output messages based on whether a stress test is being run
         if (stressTest) {
             handleOutput("BlockMatching preparation stress test");
         } else {
             handleOutput("Standard blockMatching preparation");
         }
+
         handleOutput("------------------------------");
         handleOutput("| Block Matching registration|");
         handleOutput("------------------------------");
@@ -487,6 +567,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         handleOutput(" |       |/         \\  /     /");
         handleOutput(" .-------.           \\/____ /");
         handleOutput("");
+        // Output the parameters of the block matching algorithm
         handleOutput("Parameters Summary");
         handleOutput(" |  ");
         handleOutput(" |--* Transformation type = " + this.transformationType);
@@ -509,55 +590,87 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         handleOutput(" |--* Successive " + TransformUtils.stringVectorN(this.successiveStepFactors, "step factors (in pixels)"));
         handleOutput(" |--* Successive sigma for dense field interpolation = " + TransformUtils.stringVectorN(this.successiveDenseFieldSigma, ""));
         handleOutput(" |--* Successive sigma for image resampling = " + TransformUtils.stringVectorN(this.successiveSmoothingSigma, ""));
+
+
+        // If displayR2 is true, output the initial superposition with global R^2
         if (this.displayR2) {
             handleOutput(" |--* Beginning matching. Initial superposition with global R^2 = " + getGlobalRsquareWithActualTransform() + "\n\n");
         }
+        // Initialize a StringBuilder for storing updates to parameters
         StringBuilder summaryUpdatesParameters = new StringBuilder("Summary of updates=\n");
-        this.updateViews(0, 0, 0, this.transformationType == Transform3DType.DENSE ? null : this.currentTransform.drawableString());
-        if (waitBeforeStart) VitimageUtils.waitFor(20000);
-        timesGlob[1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
-        int nbProc = this.defaultCoreNumber;
-        double timeFactor = 0.000000003;
-        ImagePlus imgMaskTemp = null;
-//		progress=0.05;IJ.showProgress(progress);
 
-        //for each scale
+        // Update the views with the current transform
+        this.updateViews(0, 0, 0, this.transformationType == Transform3DType.DENSE ? null : this.currentTransform.drawableString());
+
+        // If waitBeforeStart is true, wait for 20 seconds
+        if (waitBeforeStart) VitimageUtils.waitFor(20000);
+
+        // Record the time after initialization
+        timesGlob[1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+
+        // Get the number of processors to be used
+        int nbProc = this.defaultCoreNumber;
+
+        // Initialize a factor for time measurements
+        double timeFactor = 0.000000003;
+
+        // Initialize the mask image
+        ImagePlus imgMaskTemp = null;
+        //		progress=0.05;IJ.showProgress(progress);
+
+        // Start of the scale loop
         timesGlob[2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
         for (int lev = 0; lev < nbLevels; lev++) {
+            // Record the start time for this level
             timesLev[lev][0] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
             handleOutput("");
+
+            // Get the current dimensions and voxel sizes for this level
             int[] curDims = successiveDimensions[lev];
             double[] curVoxSizes = successiveVoxSizes[lev];
+
+            // Calculate the subsampling factors based on the original image dimensions and the current level dimensions
             int[] subSamplingFactors = new int[]{(int) Math.round(this.imgRef.getWidth() * 1.0 / curDims[0]), (int) Math.round(this.imgRef.getHeight() * 1.0 / curDims[1]), (int) Math.round(this.imgRef.getStackSize() * 1.0 / curDims[2])};
+
+            // Calculate the step factors for this level
             double stepFactorN = this.successiveStepFactors[lev];
             double voxMin = Math.min(curVoxSizes[0], Math.min(curVoxSizes[1], curVoxSizes[2]));
             double stepFactorX = stepFactorN * voxMin / curVoxSizes[0];
             double stepFactorY = stepFactorN * voxMin / curVoxSizes[1];
             double stepFactorZ = stepFactorN * voxMin / curVoxSizes[2];
 
+            // Calculate the stride for this level
             int levelStrideX = (int) Math.round(Math.max(1, -EPSILON + this.blocksStrideX / Math.pow(subSamplingFactors[0], 1.0 / 3)));
             int levelStrideY = (int) Math.round(Math.max(1, -EPSILON + this.blocksStrideY / Math.pow(subSamplingFactors[1], 1.0 / 3)));
             int levelStrideZ = (int) Math.round(Math.max(1, -EPSILON + this.blocksStrideZ / Math.pow(subSamplingFactors[2], 1.0 / 3)));
+
+            // Output the level information
             handleOutput("--> Level " + (lev + 1) + "/" + nbLevels + " . Dims=(" + curDims[0] + "x" + curDims[1] + "x" + curDims[2] +
                     "), search step factors =(" + stepFactorX + "," + stepFactorY + "," + stepFactorZ + ")" + " pixels." +
                     " Subsample factors=" + subSamplingFactors[0] + "," + subSamplingFactors[1] + "," + subSamplingFactors[2] + " Stride=" + levelStrideX + "," + levelStrideY + "," + levelStrideZ);
 
-            // blocks from fixed
+            // Calculate the number of blocks in each dimension
             int nbBlocksX = 1 + (curDims[0] - this.blockSizeX - 2 * this.neighbourhoodSizeX * strideMoving) / levelStrideX;
             int nbBlocksY = 1 + (curDims[1] - this.blockSizeY - 2 * this.neighbourhoodSizeY * strideMoving) / levelStrideY;
             int nbBlocksZ = 1;
             if (curDims[2] > 1)
                 nbBlocksZ = 1 + (curDims[2] - this.blockSizeZ - 2 * this.neighbourhoodSizeZ * strideMoving) / levelStrideZ;
             int nbBlocksTotal = nbBlocksX * nbBlocksY * nbBlocksZ;
+
+            // Calculate the actual number of blocks based on the percentage of blocks selected
             double nbBlocksActually = nbBlocksTotal * 1.0 * this.percentageBlocksSelectedByScore * this.percentageBlocksSelectedByVariance * this.percentageBlocksSelectedRandomly / (1E6);
+
+            // Calculate the number of operations and expected computation time for this level
             long lo1 = ((int) nbBlocksActually) * (this.neighbourhoodSizeX * 2L + 1) * (this.neighbourhoodSizeY * 2L + 1) * (this.neighbourhoodSizeZ * 2L + 1) * nbIterations;
             double d01 = lo1 / 1000.0;
             double d02 = d01 * this.blockSizeX * this.blockSizeY * this.blockSizeZ / 1000.0;
             double levelTime = (1.0 / nbProc) * (this.neighbourhoodSizeX * 2 + 1) * (this.neighbourhoodSizeY * 2 + 1) * (this.neighbourhoodSizeZ * 2 + 1) * this.blockSizeX * this.blockSizeY * this.blockSizeZ *
                     nbBlocksActually * timeFactor * nbIterations;
+
+            // Output the computation information for this level
             handleOutput("    At this level : # Blocks comparison=" + VitimageUtils.dou(d01 / 1000.0) + " Mega-Ops.     # of voxelwise operations=" + VitimageUtils.dou(d02 / 1000.0) + " Giga-Ops.    Expected computation time=" + VitimageUtils.dou(levelTime) + " seconds.");
 
-
+            // Store the voxel sizes and block sizes for this level
             final double voxSX = curVoxSizes[0];
             final double voxSY = curVoxSizes[1];
             final double voxSZ = curVoxSizes[2];
@@ -571,72 +684,70 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
             final int nSY = this.neighbourhoodSizeY;
             final int nSZ = this.neighbourhoodSizeZ;
 
-            //resample and smooth the fixed image, at the scale and with the smoothing sigma chosen
-            this.resampler.setDefaultPixelValue(this.imgRefDefaultValue);
-            this.resampler.setTransform(new ItkTransform());
-            this.resampler.setOutputSpacing(ItkImagePlusInterface.doubleArrayToVectorDouble(this.successiveVoxSizes[lev]));
-            this.resampler.setSize(ItkImagePlusInterface.intArrayToVectorUInt32(this.successiveDimensions[lev]));
-            imgRefTemp = VitimageUtils.gaussianFilteringIJ(this.imgRef, this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev]);
-            double[] voxSizes = VitimageUtils.getVoxelSizes(imgRefTemp);
-            timesLev[lev][1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
-            imgRefTemp = ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(imgRefTemp)));
-            VitimageUtils.adjustVoxelSize(imgRefTemp, voxSizes);
-            timesLev[lev][2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+            // Resample and smooth the fixed image, at the scale and with the smoothing sigma chosen
+            this.resampler.setDefaultPixelValue(this.imgRefDefaultValue); // Set the default pixel value for the resampler
+            this.resampler.setTransform(new ItkTransform()); // Set the transform for the resampler
+            this.resampler.setOutputSpacing(ItkImagePlusInterface.doubleArrayToVectorDouble(this.successiveVoxSizes[lev])); // Set the output spacing for the resampler
+            this.resampler.setSize(ItkImagePlusInterface.intArrayToVectorUInt32(this.successiveDimensions[lev])); // Set the size for the resampler
+            imgRefTemp = VitimageUtils.gaussianFilteringIJ(this.imgRef, this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev]); // Apply Gaussian filtering to the reference image
+            double[] voxSizes = VitimageUtils.getVoxelSizes(imgRefTemp); // Get the voxel sizes of the reference image
+            timesLev[lev][1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
+            imgRefTemp = ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(imgRefTemp))); // Execute the resampler and convert the result to ImagePlus
+            VitimageUtils.adjustVoxelSize(imgRefTemp, voxSizes); // Adjust the voxel size of the reference image
+            timesLev[lev][2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
 
-
-
-            //resample the mask image
-            if (this.mask != null) {
-                this.resampler.setDefaultPixelValue(1);
-                voxSizes = VitimageUtils.getVoxelSizes(this.mask);
-                imgMaskTemp = ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(this.mask)));
-                VitimageUtils.adjustVoxelSize(imgMaskTemp, voxSizes);
+            // Resample the mask image
+            if (this.mask != null) { // Check if the mask image exists
+                this.resampler.setDefaultPixelValue(1); // Set the default pixel value for the resampler
+                voxSizes = VitimageUtils.getVoxelSizes(this.mask); // Get the voxel sizes of the mask image
+                imgMaskTemp = ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(this.mask))); // Execute the resampler and convert the result to ImagePlus
+                VitimageUtils.adjustVoxelSize(imgMaskTemp, voxSizes); // Adjust the voxel size of the mask image
             }
-            timesLev[lev][3] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+            timesLev[lev][3] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
 
-
-            //for each iteration
+            // For each iteration
             System.out.println("ImageType");
-            for (int iter = 0; iter < nbIterations; iter++) {
-                IJ.showProgress((nbIterations * lev + iter) / (1.0 * nbIterations * nbLevels));
-                timesLev[lev][4] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
-                timesIter[lev][iter][0] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
-//				progress=0.1+0.9*(lev*1.0/nbLevels+(iter*1.0/nbIterations)*1.0/nbLevels);IJ.showProgress(progress);
-                handleOutput("\n   --> Iteration " + (iter + 1) + "/" + this.nbIterations);
+            for (int iter = 0; iter < nbIterations; iter++) { // Iterate over the number of iterations
+                IJ.showProgress((nbIterations * lev + iter) / (1.0 * nbIterations * nbLevels)); // Show the progress
+                timesLev[lev][4] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
+                timesIter[lev][iter][0] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
+                handleOutput("\n   --> Iteration " + (iter + 1) + "/" + this.nbIterations); // Output the iteration number
 
-                this.resampler.setTransform(this.currentTransform);
-                this.resampler.setDefaultPixelValue(this.imgMovDefaultValue);
+                this.resampler.setTransform(this.currentTransform); // Set the transform for the resampler
+                this.resampler.setDefaultPixelValue(this.imgMovDefaultValue); // Set the default pixel value for the resampler
 
-                if(this.isRsml)imgMovTemp=plongement(this.imgRef,this.rM,false);
+                if (this.isRsml)
+                    imgMovTemp = multiPlongement(this.imgRef, this.rM, false); // If this is an RSML, plunge the reference image into the root model
                 else {
-                    imgMovTemp=VitimageUtils.gaussianFilteringIJ(this.imgMov, this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev]);
-                    voxSizes=VitimageUtils.getVoxelSizes(imgMovTemp);
-                    imgMovTemp=ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(imgMovTemp)));
-                    VitimageUtils.adjustVoxelSize(imgMovTemp, voxSizes);
+                    imgMovTemp = VitimageUtils.gaussianFilteringIJ(this.imgMov, this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev], this.successiveSmoothingSigma[lev]); // Apply Gaussian filtering to the moving image
+                    voxSizes = VitimageUtils.getVoxelSizes(imgMovTemp); // Get the voxel sizes of the moving image
+                    imgMovTemp = ItkImagePlusInterface.itkImageToImagePlus(resampler.execute(ItkImagePlusInterface.imagePlusToItkImage(imgMovTemp))); // Execute the resampler and convert the result to ImagePlus
+                    VitimageUtils.adjustVoxelSize(imgMovTemp, voxSizes); // Adjust the voxel size of the moving image
                 }
 
-                timesIter[lev][iter][1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+                timesIter[lev][iter][1] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0); // Record the time
 
-                //Prepare a coordinate summary tabs for these blocks, compute and store their sigma
+                // Prepare a coordinate summary tabs for these blocks, compute and store their sigma
                 int indexTab = 0;
-                nbBlocksTotal = nbBlocksX * nbBlocksY * nbBlocksZ;
-                if (nbBlocksTotal < 0) {
+                nbBlocksTotal = nbBlocksX * nbBlocksY * nbBlocksZ; // Calculate the total number of blocks
+                if (nbBlocksTotal < 0) { // If the total number of blocks is less than 0, output an error message and return the current transform
                     IJ.showMessage("Bad parameters. Nb blocks=0. nbBlocksX=" + nbBlocksX + " , nbBlocksY=" + nbBlocksY + " , nbBlocksZ=" + nbBlocksZ);
                     if (this.returnComposedTransformationIncludingTheInitialTransformationGiven)
                         return this.currentTransform;
                     else return new ItkTransform();
                 }
-                double[][] blocksRefTmp = new double[nbBlocksTotal][4];
-                handleOutput("       # Total population of possible blocks = " + nbBlocksTotal);
+                double[][] blocksRefTmp = new double[nbBlocksTotal][4]; // Initialize the reference blocks
+                handleOutput("       # Total population of possible blocks = " + nbBlocksTotal); // Output the total number of possible blocks
 
 
-                timesIter[lev][iter][2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+                // les blocks ?
+                /*timesIter[lev][iter][2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
                 // Pre-calculate offsets to avoid redundant calculations
                 int xOffset = this.neighbourhoodSizeX * strideMoving;
                 int yOffset = this.neighbourhoodSizeY * strideMoving;
                 int zOffset = this.neighbourhoodSizeZ * strideMoving;
 
-                for (int blX = 0; blX < nbBlocksX; blX++) {
+                for (int blX = 0; blX < nbBlocksX; ++blX) {
                     for (int blY = 0; blY < nbBlocksY; blY++) {
                         for (int blZ = 0; blZ < nbBlocksZ; blZ++) {
                             int startX = blX * levelStrideX + xOffset;
@@ -658,81 +769,155 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                         }
                     }
                 }
+                timesIter[lev][iter][3] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);*/
+                // Record the time before the block processing
+                timesIter[lev][iter][2] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+
+                // chose the begin x position between 0 and top left x - StrideMoving (if possible) or 0
+                int beginPositionX = 0;
+                int beginPositionY = 0;
+                int endPositionX = nbBlocksX;
+                int endPositionY = nbBlocksY;
+                // Iterate over all blocks in the x, y, and z dimensions
+                for (int blX = beginPositionX; blX < endPositionX; ++blX) {
+                    for (int blY = beginPositionY; blY < endPositionY; ++blY) {
+                        for (int blZ = 0; blZ < nbBlocksZ; ++blZ) {
+                            // Calculate the values of the block in the reference image
+                            double[] valsBlock = VitimageUtils.valuesOfBlock(imgRefTemp,
+                                    blX * levelStrideX + this.neighbourhoodSizeX * strideMoving, blY * levelStrideY + this.neighbourhoodSizeY * strideMoving, blZ * levelStrideZ + this.neighbourhoodSizeZ * strideMoving,
+                                    blX * levelStrideX + this.blockSizeX + this.neighbourhoodSizeX * strideMoving - 1, blY * levelStrideY + this.blockSizeY + this.neighbourhoodSizeY * strideMoving - 1, blZ * levelStrideZ + this.blockSizeZ + this.neighbourhoodSizeZ * strideMoving - 1);
+                            // Calculate the statistics of the block values
+                            double[] stats = VitimageUtils.statistics1D(valsBlock);
+                            // Store the block's variance and coordinates in the reference blocks array
+                            blocksRefTmp[indexTab++] = new double[]{stats[1], blX * levelStrideX + this.neighbourhoodSizeX * strideMoving, blY * levelStrideY + this.neighbourhoodSizeY * strideMoving, blZ * levelStrideZ + this.neighbourhoodSizeZ * strideMoving};
+                        }
+                    }
+                }
+                // Record the time after the block processing
                 timesIter[lev][iter][3] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
 
-
+                // Initialize the reference blocks array
                 double[][] blocksRef;
-                //Trim the ones outside the mask
+
+                // Output the start of the trimming process
                 handleOutput("Starting trim with " + nbBlocksTotal + " blocks");
+
+                // If a mask image exists, trim the blocks using the mask
                 if (this.mask != null) blocksRefTmp = this.trimUsingMaskNEW(blocksRefTmp, imgMaskTemp, bSX, bSY, bSZ);
+
+                // Calculate the number of blocks after trimming
                 int nbMeasured = blocksRefTmp.length;
+
+                // Output the number of blocks after considering the mask
                 handleOutput(" --> After considering the mask, " + nbMeasured + " remaining");
 
+                // Update the total number of blocks
                 nbBlocksTotal = blocksRefTmp.length;
+
+                // Sort the blocks by variance
                 Arrays.sort(blocksRefTmp, new VarianceComparator());
+
+                // Record the time after the sorting
                 timesIter[lev][iter][4] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
+
+                // Calculate the index of the last block to be removed
                 int lastRemoval = (nbBlocksTotal * (100 - this.percentageBlocksSelectedByVariance)) / 100;
-                for (int bl = 0; bl < lastRemoval; bl++) blocksRefTmp[bl][0] = -1;
+
+                // Set the variance of the blocks to be removed to -1
+                for (int bl = 0; bl < lastRemoval; bl++) blocksRefTmp[bl][0] = -1; // new
+
+                // Output the number of blocks after sorting and eliminating
                 handleOutput("Sorting " + nbBlocksTotal + " blocks using variance then eliminating blocks from 0 to  " + lastRemoval + " / " + blocksRefTmp.length);
 
+                // Reset the total number of blocks
+                nbBlocksTotal = 0;
 
-                nbBlocksTotal = 0;
-                for (double[] doubles : blocksRefTmp) if (doubles[0] >= this.minBlockVariance) nbBlocksTotal++;
-                blocksRef = new double[nbBlocksTotal][4];
-                nbBlocksTotal = 0;
+                // Iterate over the temporary reference blocks
                 for (double[] doubles : blocksRefTmp)
+                    // If the variance of the block is greater than or equal to the minimum block variance, increment the total number of blocks
+                    if (doubles[0] >= this.minBlockVariance) ++nbBlocksTotal;
+
+                // Initialize the reference blocks array with the total number of blocks
+                blocksRef = new double[nbBlocksTotal][4];
+
+                // Reset the total number of blocks
+                nbBlocksTotal = 0;
+
+                // Iterate over the temporary reference blocks
+                for (double[] doubles : blocksRefTmp)
+                    // If the variance of the block is greater than or equal to the minimum block variance, add the block to the reference blocks array
                     if (doubles[0] >= this.minBlockVariance) {
-                        blocksRef[nbBlocksTotal][3] = doubles[0];
-                        blocksRef[nbBlocksTotal][0] = doubles[1];
-                        blocksRef[nbBlocksTotal][1] = doubles[2];
-                        blocksRef[nbBlocksTotal++][2] = doubles[3];
+                        blocksRef[nbBlocksTotal][3] = doubles[0]; // Variance
+                        blocksRef[nbBlocksTotal][0] = doubles[1]; // X-coordinate
+                        blocksRef[nbBlocksTotal][1] = doubles[2]; // Y-coordinate
+                        blocksRef[nbBlocksTotal++][2] = doubles[3]; // Z-coordinate
                     }
+
+                // Output the number of blocks after trimming
                 handleOutput("       # blocks after trimming=" + nbBlocksTotal);
+
+                // Record the time after trimming
                 timesIter[lev][iter][5] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
 
-
+                // If randomKeepingSelectedBlock is true, perform random selection of blocks
                 if (randomKeepingSelectedBlock) {
-                    blocksRef = randomSelection(blocksRef);
-                    nbMeasured = blocksRef.length;
+                    blocksRef = randomSelection(blocksRef); // Perform random selection
+                    nbMeasured = blocksRef.length; // Update the number of measured blocks
+
+                    // Output the number of blocks after random selection
                     handleOutput(" --> After random selection, " + nbMeasured + " remaining");
                 }
 
+                // Reset the provided correspondences
                 this.correspondanceProvidedAtStart = null;
+
+                // Update the total number of blocks
                 nbBlocksTotal = blocksRef.length;
 
+                // Multithreaded execution of the algorithm core (a block-matching)
+                final ImagePlus imgRefTempThread; // Temporary reference image for threading
+                final ImagePlus imgMovTempThread; // Temporary moving image for threading
+                final double minBS = this.minBlockScore; // Minimum block score
+                final double[][][][] correspondences = new double[nbProc][][][]; // Correspondences for each thread
+                final double[][][] blocksProp = createBlockPropsFromBlockList(blocksRef, nbProc); // Block properties for each thread
 
-                // Multi-threaded exectution of the algorithm core (a block-matching)
-                final ImagePlus imgRefTempThread;
-                final ImagePlus imgMovTempThread;
-                final double minBS = this.minBlockScore;
-                final double[][][][] correspondances = new double[nbProc][][][];
-                final double[][][] blocksProp = createBlockPropsFromBlockList(blocksRef, nbProc);
+                // Duplicate the reference and moving images for threading
                 imgRefTempThread = imgRefTemp.duplicate();
                 imgMovTempThread = imgMovTemp.duplicate();
 
+                // Initialize atomic integers for multithreading
+                AtomicInteger atomNumThread = new AtomicInteger(0); // Atomic integer for the number of threads
+                AtomicInteger curProcessedBlock = new AtomicInteger(0); // Atomic integer for the currently processed block
+                AtomicInteger flagAlert = new AtomicInteger(0); // Atomic integer for alert flags
 
-                AtomicInteger atomNumThread = new AtomicInteger(0);
-                AtomicInteger curProcessedBlock = new AtomicInteger(0);
-                AtomicInteger flagAlert = new AtomicInteger(0);
+                // Get the total number of blocks
                 final int nbTotalBlock = blocksRef.length;
+
+                // Initialize the threads' array
                 this.threads = VitimageUtils.newThreadArray(nbProc);
+
+                // Record the time before the multithreaded execution
                 timesIter[lev][iter][6] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
                 for (int ithread = 0; ithread < nbProc; ithread++) {
+                    // Create a new thread for each processor
                     this.threads[ithread] = new Thread() {
                         {
+                            // Set the priority of the thread to normal
                             setPriority(Thread.NORM_PRIORITY);
                         }
 
-
                         public void run() {
-
                             try {
+                                // Get the number of the current thread
                                 int numThread = atomNumThread.getAndIncrement();
+                                // Get the block properties for the current thread
                                 double[][] blocksPropThread = blocksProp[numThread];
-                                double[][][] correspondancesThread = new double[blocksProp[numThread].length][][];
-                                //for each fixed block
+                                // Initialize the correspondences array for the current thread
+                                double[][][] correspondencesThread = new double[blocksProp[numThread].length][][];
+
+                                // Iterate over each fixed block
                                 for (int fixBl = 0; fixBl < blocksProp[numThread].length && !interrupted(); fixBl++) {
-                                    //extract ref block data in moving image
+                                    // Extract the reference block data in the moving image
                                     int x0 = (int) Math.round(blocksPropThread[fixBl][0]);
                                     int y0 = (int) Math.round(blocksPropThread[fixBl][1]);
                                     int z0 = (int) Math.round(blocksPropThread[fixBl][2]);
@@ -740,21 +925,22 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                     int y1 = y0 + bSY - 1;
                                     int z1 = z0 + bSZ - 1;
                                     double[] valsFixedBlock = VitimageUtils.valuesOfBlock(imgRefTempThread, x0, y0, z0, x1, y1, z1);
-                                    double scoreMax = - 1E100;
+                                    double scoreMax = -1.0E101;
                                     double distMax = 0;
                                     int xMax = 0;
                                     int yMax = 0;
                                     int zMax = 0;
-                                    //for each moving block
+
+                                    // Iterate over each moving block
                                     int numBl = curProcessedBlock.getAndIncrement();
-//								if(nbTotalBlock>1000 && (numBl%(nbTotalBlock/20)==0))handleOutputNoNewline((" "+((numBl*100)/nbTotalBlock)+"%"+VitimageUtils.dou((System.currentTimeMillis()-t0)/1000.0)));
+                                    if (nbTotalBlock > 1000 && (numBl % (nbTotalBlock / 20) == 0))
+                                        handleOutputNoNewline((" " + ((numBl * 100) / nbTotalBlock) + "%" + VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0)));
                                     if (nbTotalBlock > 1000 && (numBl % (nbTotalBlock / 10) == 0))
                                         handleOutput((" " + ((numBl * 100) / nbTotalBlock) + "%" + VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0)));
                                     for (int xPlus = -nSX * strideMoving; xPlus <= nSX * strideMoving; xPlus += strideMoving) {
                                         for (int yPlus = -nSY * strideMoving; yPlus <= nSY * strideMoving; yPlus += strideMoving) {
                                             for (int zPlus = -nSZ * strideMoving; zPlus <= nSZ * strideMoving; zPlus += strideMoving) {
-                                                //compute similarity between blocks, according to the metric
-
+                                                // Compute the similarity between blocks, according to the metric
                                                 double[] valsMovingBlock = curDims[2] == 1 ?
                                                         VitimageUtils.valuesOfBlockDoubleSlice(imgMovTempThread, x0 + xPlus * stepFactorX, y0 + yPlus * (stepFactorY), x1 + xPlus * (stepFactorX), y1 + yPlus * (stepFactorY)) :
                                                         VitimageUtils.valuesOfBlockDouble(imgMovTempThread, x0 + xPlus * stepFactorX, y0 + yPlus * (stepFactorY), z0 + zPlus * (stepFactorZ), x1 + xPlus * (stepFactorX), y1 + yPlus * (stepFactorY), z1 + zPlus * (stepFactorZ));
@@ -764,6 +950,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                                         (yPlus * voxSY * stepFactorY) * (yPlus * voxSY * stepFactorZ) +
                                                         (zPlus * voxSZ * stepFactorZ) * (zPlus * voxSZ * stepFactorZ)));
 
+                                                // Check if the score is abnormally high
                                                 if (Math.abs(score) > 10E10) {
                                                     final int flagA = flagAlert.getAndIncrement();
                                                     if (flagA < 1) {
@@ -776,7 +963,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                                         //VitimageUtils.waitFor(10000);
                                                     }
                                                 }
-                                                //keep the best one
+                                                // Keep the best one
                                                 if ((score > scoreMax) || ((score == scoreMax) && (distance < distMax))) {
                                                     xMax = xPlus;
                                                     yMax = yPlus;
@@ -787,16 +974,19 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                             }
                                         }
                                     }
-                                    correspondancesThread[fixBl] = new double[][]{
+                                    // Store the best correspondence for the current fixed block
+                                    correspondencesThread[fixBl] = new double[][]{
                                             new double[]{blocksPropThread[fixBl][0] + bSXHalf, blocksPropThread[fixBl][1] + bSYHalf, blocksPropThread[fixBl][2] + bSZHalf},
                                             new double[]{blocksPropThread[fixBl][0] + bSXHalf + xMax * stepFactorX, blocksPropThread[fixBl][1] + bSYHalf + yMax * stepFactorZ, blocksPropThread[fixBl][2] + bSZHalf + zMax * stepFactorZ},
                                             new double[]{scoreMax, 1}};
                                 }
+                                // Count the number of correspondences with a score above the minimum block score
                                 int nbKeep = 0;
-                                for (double[][] doubles : correspondancesThread) if (doubles[2][0] >= minBS) nbKeep++;
+                                for (double[][] doubles : correspondencesThread) if (doubles[2][0] >= minBS) ++nbKeep;
+                                // Initialize a new correspondences array with only the correspondences above the minimum block score
                                 double[][][] correspondancesThread2 = new double[nbKeep][][];
                                 nbKeep = 0;
-                                for (double[][] doubles : correspondancesThread) {
+                                for (double[][] doubles : correspondencesThread) {
                                     if (doubles[2][0] >= minBS) {
                                         correspondancesThread2[nbKeep] = new double[][]{{0, 0, 0}, {0, 0, 0}, {0, 0}};
                                         for (int l = 0; l < 3; l++)
@@ -804,11 +994,13 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                         nbKeep++;
                                     }
                                 }
+                                // Output the number of blocks before and after sorting by correspondence score
                                 if (numThread == 0)
-                                    handleOutput("Sorting blocks using correspondance score. Threshold= " + minBS + " . Nb blocks before=" + nbProc * correspondancesThread.length + " and after=" + nbProc * nbKeep);
-                                correspondances[numThread] = correspondancesThread2;
+                                    handleOutput("Sorting blocks using correspondance score. Threshold= " + minBS + " . Nb blocks before=" + nbProc * correspondencesThread.length + " and after=" + nbProc * nbKeep);
+                                // Store the sorted correspondences for the current thread
+                                correspondences[numThread] = correspondancesThread2;
                             } catch (Exception ie) {
-                                throw new RuntimeException(ie);
+                                //throw new RuntimeException(ie); new
                             }
                         }
 
@@ -851,13 +1043,13 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                 handleOutput("");
                 //Convert the correspondance from each thread correspondance list to a main list for the whole image
                 ArrayList<double[][]> listCorrespondances = new ArrayList<>();
-                for (double[][][] correspondance : correspondances) {
+                for (double[][][] correspondance : correspondences) {
                     listCorrespondances.addAll(Arrays.asList(correspondance));
                 }
                 timesIter[lev][iter][9] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
 
 
-                // Selection step 1 : select correspondances by score
+                // Selection step 1 : select correspondences by score
                 ItkTransform transEstimated = null;
                 int nbPts1 = listCorrespondances.size();
                 Object[] ret = getCorrespondanceListAsTrimmedPointArray(listCorrespondances, this.successiveVoxSizes[lev], this.percentageBlocksSelectedByScore, 100, transEstimated);
@@ -949,8 +1141,9 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                         iter = nbIterations;
                         continue;
                     }
+                    timesIter[lev][iter][15] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
                 } else {
-                    handleOutput("       Field interpolation from " + correspondancePoints[0].length + " correspondances with sigma=" + this.successiveDenseFieldSigma[lev] + " " + imgRefTemp.getCalibration().getUnit() +
+                    handleOutput("       Field interpolation from " + correspondancePoints[0].length + " correspondences with sigma=" + this.successiveDenseFieldSigma[lev] + " " + imgRefTemp.getCalibration().getUnit() +
                             " ( " + ((int) (Math.round(this.successiveDenseFieldSigma[lev] / voxSX))) + " voxSX , " + ((int) (Math.round(this.successiveDenseFieldSigma[lev] / voxSY))) + " voxSY , " + ((int) (Math.round(this.successiveDenseFieldSigma[lev] / voxSZ))) + " voxSZ )");
 
                     //compute the field
@@ -963,7 +1156,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                     //Finally, add it to the current stack of transformations
 
                     if (this.isRsml) {
-                        //System.out.println("YE"+(this.indField-1)+"\n"+this.currentField[this.indField-1]);
+                        System.out.println("YE" + (this.indField - 1) + "\n" + this.currentField[this.indField - 1]);
 
                         ItkTransform tr = new ItkTransform(new DisplacementFieldTransform(new Image(this.currentField[this.indField - 1])));
                         System.out.println("Mean distance after trans=" + tr.meanDistanceAfterTrans(imgRefTemp, 100, 100, 1, true)[0]);
@@ -1090,104 +1283,112 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         }
     }
 
-    public void updateViews(int level,int iteration,int subpixellic,String textTrans) {
-        String textIter=String.format("Level=%1d/%1d - Iter=%3d/%3d - %s",
-                level+1,this.levelMax-this.levelMin+1,
-                iteration+1,this.nbIterations,subpixellic>0 ? ("subpixellic 1/"+((int)Math.pow(2,subpixellic))+" pixel") :""
+    public void updateViews(int level, int iteration, int subpixellic, String textTrans) {
+        String textIter = String.format("Level=%1d/%1d - Iter=%3d/%3d - %s",
+                level + 1, this.levelMax - this.levelMin + 1,
+                iteration + 1, this.nbIterations, subpixellic > 0 ? ("subpixellic 1/" + ((int) Math.pow(2, subpixellic)) + " pixel") : ""
         );
 
-        if(displayRegistration==0) {
-            if(this.summary!=null)this.summary.hide();
+        if (displayRegistration == 0) {
+            if (this.summary != null) this.summary.hide();
             return;
         }
         handleOutput("Updating the views...");
-        this.sliceMov=ItkImagePlusInterface.itkImageToImagePlusStack(ItkImagePlusInterface.imagePlusToItkImage(this.currentTransform.transformImage(this.imgRef,this.imgMov,false)),this.sliceInt);
-        if(flagRange)this.sliceMov.setDisplayRange(movRange[0], movRange[1]);
+        this.sliceMov = ItkImagePlusInterface.itkImageToImagePlusStack(ItkImagePlusInterface.imagePlusToItkImage(this.currentTransform.transformImage(this.imgRef, this.imgMov, false)), this.sliceInt);
+        if (flagRange) this.sliceMov.setDisplayRange(movRange[0], movRange[1]);
         else this.sliceMov.resetDisplayRange();
         VitimageUtils.convertToGray8(sliceMov);
 
-        this.sliceMov=VitimageUtils.writeTextOnImage(textIter,this.sliceMov,(this.fontSize*4)/3,0);
-        if(textTrans!=null)this.sliceMov=VitimageUtils.writeTextOnImage(textTrans,this.sliceMov,this.fontSize,1);
+        this.sliceMov = VitimageUtils.writeTextOnImage(textIter, this.sliceMov, (this.fontSize * 4) / 3, 0);
+        if (textTrans != null)
+            this.sliceMov = VitimageUtils.writeTextOnImage(textTrans, this.sliceMov, this.fontSize, 1);
 
 
         //VitimageUtils.waitFor(2000);
-        if(sliceRef==null) {
+        if (sliceRef == null) {
             handleOutput("Starting graphical following tool...");
-            if(this.mask!=null) {
+            if (this.mask != null) {
                 handleOutput("Starting mask...");
                 this.mask.setTitle("Mask in use for image ref");
                 this.mask.show();
             }
-            this.sliceRef=this.imgRef.duplicate();
+            this.sliceRef = this.imgRef.duplicate();
             this.sliceRef.setSlice(this.sliceInt);
-            if(flagRange)this.sliceRef.setDisplayRange(refRange[0], refRange[1]);
+            if (flagRange) this.sliceRef.setDisplayRange(refRange[0], refRange[1]);
             else this.sliceRef.resetDisplayRange();
             VitimageUtils.convertToGray8(sliceRef);
 
-            ImagePlus temp=VitimageUtils.writeTextOnImage(textIter,this.sliceRef,(this.fontSize*4)/3,0);
-            if(textTrans!=null)temp=VitimageUtils.writeTextOnImage(textTrans,temp,this.fontSize,1);
-            if(flagSingleView)this.sliceFuse=(flagRange ? VitimageUtils.compositeNoAdjustOf(temp,this.sliceMov,"Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0 "+this.info) :
-                    VitimageUtils.compositeOf(temp,this.sliceMov,"Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0 "+this.info));
-            else this.sliceFuse=flagRange ? VitimageUtils.compositeNoAdjustOf(temp,this.sliceMov,"Registration is running. Red=Reference, Green=moving. Level="+level+" Iter="+iteration+" "+this.info) :
-                    VitimageUtils.compositeOf(temp,this.sliceMov,"Registration is running. Red=Reference, Green=moving. Level="+level+" Iter="+iteration+" "+this.info);
+            ImagePlus temp = VitimageUtils.writeTextOnImage(textIter, this.sliceRef, (this.fontSize * 4) / 3, 0);
+            if (textTrans != null) temp = VitimageUtils.writeTextOnImage(textTrans, temp, this.fontSize, 1);
+            if (flagSingleView)
+                this.sliceFuse = (flagRange ? VitimageUtils.compositeNoAdjustOf(temp, this.sliceMov, "Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0 " + this.info) :
+                        VitimageUtils.compositeOf(temp, this.sliceMov, "Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0 " + this.info));
+            else
+                this.sliceFuse = flagRange ? VitimageUtils.compositeNoAdjustOf(temp, this.sliceMov, "Registration is running. Red=Reference, Green=moving. Level=" + level + " Iter=" + iteration + " " + this.info) :
+                        VitimageUtils.compositeOf(temp, this.sliceMov, "Registration is running. Red=Reference, Green=moving. Level=" + level + " Iter=" + iteration + " " + this.info);
             this.sliceFuse.show();
-            this.sliceFuse.getWindow().setSize(this.viewWidth*(viewFuseBigger?2:1),this.viewHeight*(viewFuseBigger?2:1));
+            this.sliceFuse.getWindow().setSize(this.viewWidth * (viewFuseBigger ? 2 : 1), this.viewHeight * (viewFuseBigger ? 2 : 1));
             this.sliceFuse.getCanvas().fitToWindow();
             this.sliceFuse.setSlice(this.sliceInt);
-            VitimageUtils.adjustImageOnScreen(this.sliceFuse,0,0);
+            VitimageUtils.adjustImageOnScreen(this.sliceFuse, 0, 0);
 
-            if(displayRegistration>1) {
-                ImagePlus tempImg=VitimageUtils.getBinaryGrid(this.imgRef, 10);
-                this.sliceGrid=this.currentTransform.transformImage(tempImg,tempImg,false);
+            if (displayRegistration > 1) {
+                ImagePlus tempImg = VitimageUtils.getBinaryGrid(this.imgRef, 10);
+                this.sliceGrid = this.currentTransform.transformImage(tempImg, tempImg, false);
                 this.sliceGrid.setSlice(this.sliceInt);
                 this.sliceGrid.show();
                 this.sliceGrid.setTitle("Transform visualization on a uniform 3D grid");
-                this.sliceGrid.getWindow().setSize(this.viewWidth,this.viewHeight);
+                this.sliceGrid.getWindow().setSize(this.viewWidth, this.viewHeight);
                 this.sliceGrid.getCanvas().fitToWindow();
                 this.sliceGrid.setSlice(this.sliceInt);
-                VitimageUtils.adjustImageOnScreenRelative(this.sliceGrid,this.sliceFuse,2,0,10);
+                VitimageUtils.adjustImageOnScreenRelative(this.sliceGrid, this.sliceFuse, 2, 0, 10);
 
-                tempImg=new Duplicator().run(imgRef);
-                tempImg=VitimageUtils.convertToFloat(tempImg);
+                tempImg = new Duplicator().run(imgRef);
+                tempImg = VitimageUtils.convertToFloat(tempImg);
                 tempImg.getProcessor().set(0);
-                this.sliceCorr=tempImg;
+                this.sliceCorr = tempImg;
                 this.sliceCorr.setSlice(this.sliceIntCorr);
                 this.sliceCorr.show();
                 this.sliceCorr.setTitle("Similarity heatmap");
-                this.sliceCorr.getWindow().setSize(this.viewWidth,this.viewHeight);
+                this.sliceCorr.getWindow().setSize(this.viewWidth, this.viewHeight);
                 this.sliceCorr.getCanvas().fitToWindow();
-                this.sliceCorr.getProcessor().setMinAndMax(0,1);
+                this.sliceCorr.getProcessor().setMinAndMax(0, 1);
                 this.sliceCorr.setSlice(this.sliceIntCorr);
                 IJ.selectWindow("Similarity heatmap");
-                IJ.run("Fire","");
-                VitimageUtils.adjustImageOnScreenRelative(this.sliceCorr,this.sliceFuse,2,2,10);
+                IJ.run("Fire", "");
+                VitimageUtils.adjustImageOnScreenRelative(this.sliceCorr, this.sliceFuse, 2, 2, 10);
             }
-            if(flagSingleView)IJ.selectWindow("Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0"+" "+this.info);
-            else IJ.selectWindow("Registration is running. Red=Reference, Green=moving. Level=0 Iter=0"+" "+this.info);
-        }
-        else {
+            if (flagSingleView)
+                IJ.selectWindow("Registration is running. Red=Reference, Green=moving, Gray=score. Level=0 Iter=0" + " " + this.info);
+            else
+                IJ.selectWindow("Registration is running. Red=Reference, Green=moving. Level=0 Iter=0" + " " + this.info);
+        } else {
             handleOutput("Updating graphical following tool...");
-            ImagePlus tempImg=null;
-            ImagePlus temp=VitimageUtils.writeTextOnImage(textIter,this.sliceRef,(this.fontSize*4)/3,0);
-            if(textTrans!=null)temp=VitimageUtils.writeTextOnImage(textTrans,temp,this.fontSize,1);
+            ImagePlus tempImg = null;
+            ImagePlus temp = VitimageUtils.writeTextOnImage(textIter, this.sliceRef, (this.fontSize * 4) / 3, 0);
+            if (textTrans != null) temp = VitimageUtils.writeTextOnImage(textTrans, temp, this.fontSize, 1);
 
-            if(this.flagSingleView)tempImg=VitimageUtils.compositeRGBDoubleJet(temp,this.sliceMov,this.sliceCorr,"Registration is running. Red=Reference, Green=moving, Gray=score. Level="+level+" Iter="+iteration+" "+this.info,true,1);
-            else tempImg=VitimageUtils.compositeOf(temp,this.sliceMov,"Registration is running. Red=Reference, Green=moving. Level="+level+" Iter="+iteration+" "+this.info);
-            VitimageUtils.actualizeData(tempImg,this.sliceFuse);
-            if(this.flagSingleView)this.sliceFuse.setTitle("Registration is running. Red=Reference, Green=moving, Gray=score. Level="+level+" Iter="+iteration+" "+this.info);
-            else this.sliceFuse.setTitle("Registration is running. Red=Reference, Green=moving. Level="+level+" Iter="+iteration+" "+this.info);
+            if (this.flagSingleView)
+                tempImg = VitimageUtils.compositeRGBDoubleJet(temp, this.sliceMov, this.sliceCorr, "Registration is running. Red=Reference, Green=moving, Gray=score. Level=" + level + " Iter=" + iteration + " " + this.info, true, 1);
+            else
+                tempImg = VitimageUtils.compositeOf(temp, this.sliceMov, "Registration is running. Red=Reference, Green=moving. Level=" + level + " Iter=" + iteration + " " + this.info);
+            VitimageUtils.actualizeData(tempImg, this.sliceFuse);
+            if (this.flagSingleView)
+                this.sliceFuse.setTitle("Registration is running. Red=Reference, Green=moving, Gray=score. Level=" + level + " Iter=" + iteration + " " + this.info);
+            else
+                this.sliceFuse.setTitle("Registration is running. Red=Reference, Green=moving. Level=" + level + " Iter=" + iteration + " " + this.info);
             //this.sliceFuse.setSlice(this.sliceIntCorr);
 
-            if(displayRegistration>1) {
-                tempImg=this.correspondancesSummary.duplicate();//setSlice
-                VitimageUtils.actualizeData(tempImg,this.sliceCorr);//TODO : do it using the reaffectation of the pixel value pointer. See in VitimageUtils.actualizeData
+            if (displayRegistration > 1) {
+                tempImg = this.correspondancesSummary.duplicate();//setSlice
+                VitimageUtils.actualizeData(tempImg, this.sliceCorr);//TODO : do it using the reaffectation of the pixel value pointer. See in VitimageUtils.actualizeData
                 //this.sliceCorr.setSlice(this.sliceIntCorr);
 
 
-                tempImg=VitimageUtils.getBinaryGrid(this.imgRef, 10);
-                tempImg=this.currentTransform.transformImage(tempImg,tempImg,false);
+                tempImg = VitimageUtils.getBinaryGrid(this.imgRef, 10);
+                tempImg = this.currentTransform.transformImage(tempImg, tempImg, false);
 
-                VitimageUtils.actualizeData(tempImg,this.sliceGrid);//TODO : do it using the reaffectation of the pixel value pointer
+                VitimageUtils.actualizeData(tempImg, this.sliceGrid);//TODO : do it using the reaffectation of the pixel value pointer
             }
         }
     }
@@ -1321,7 +1522,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         ImagePlus maskGrid = VitimageUtils.makeOperationOnOneImage(gridTemp, 2, 1 / 255.0, true);
         ImagePlus gridResidual = VitimageUtils.makeOperationOnOneImage(gridTemp, 2, 1 / 15.0, true);
         ImagePlus test = VitimageUtils.makeOperationBetweenTwoImages(maskGrid, distMap, 2, true);
-        ImagePlus maskRoot = VitimageUtils.getBinaryMask(plongement(this.imgRef, this.rM, false), 10);
+        ImagePlus maskRoot = VitimageUtils.getBinaryMask(multiPlongement(this.imgRef, this.rM, false), 10); // anciennement plongement
         ImagePlus maskOutRoot = VitimageUtils.gaussianFiltering(maskRoot, 10, 10, 0);
         maskOutRoot = VitimageUtils.getBinaryMaskUnary(maskOutRoot, 4);
 

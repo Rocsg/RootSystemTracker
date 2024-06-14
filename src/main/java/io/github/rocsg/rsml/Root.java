@@ -659,10 +659,25 @@ public class Root implements Comparable<Root>, IRootParser {
                     n1 = n2;
                     n2 = n1.child;
                 }
-            } else {//no need to suppress this node
+            } else {
+                //no need to suppress this node
                 //System.out.println("  Exact");
-                n1 = n2;
-                n2 = n1.child;
+                if (n2 == null) {//last node
+                    //  System.out.println("   Last node");
+                    if (n1 == firstNode) {//also the first node
+                        //  System.out.println("     First node");
+                        return false;//technically the calling function should raise this flag and should suppress this root
+                    } else {//last node but not first node
+                        //System.out.println("     Not first node");
+                        lastNode = n1.parent;
+                        n1.parent.child = null;
+                        n1 = null;
+                    }
+                }
+                else {
+                    n1 = n2;
+                    n2 = n1.child;
+                }
             }
         }
         return true;
@@ -2429,5 +2444,31 @@ public class Root implements Comparable<Root>, IRootParser {
     @Override
     public String getParentLabel() {
         return parentName;
+    }
+
+    public double lenghtRootAtTimeT(float time) {
+        Node n = this.firstNode;
+        double length = 0;
+        while (n.child != null) {
+            if ((n.birthTime == time) && (n.parent != null) && (n.parent.birthTime == time)) {
+                double dx = n.x - n.parent.x;
+                double dy = n.y - n.parent.y;
+                length += Math.sqrt(dx * dx + dy * dy);
+            }
+            n = n.child;
+        }
+        return length;
+    }
+
+    public List<Node> getNodesAtTimeT(float time){
+        List<Node> nodes = new ArrayList<Node>();
+        Node n = this.firstNode;
+        while (n.child != null) {
+            if (n.birthTime == time) {
+                nodes.add(n);
+            }
+            n = n.child;
+        }
+        return nodes;
     }
 }

@@ -247,7 +247,6 @@ public class TestRootSystemTracker {
         pph.typicalHourDelay = 8;
         pph.subsamplingFactor = 4;
         pph.originalPixelSize = 19;
-        pph.typicalHourDelay = 8;
         for (int i = 0; i < pph.getHoursExtremities(0).length; i++)
             System.out.println("i=" + i + " val=" + pph.getHoursExtremities(0)[i]);
         return pph;

@@ -18,6 +18,7 @@ import java.awt.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * CC stands for connexe conections. It is a class that represents a connected component in the context of the
@@ -780,6 +781,7 @@ public class CC implements Serializable {
         }
     }
 
+    /*
     public SimpleWeightedGraph<Pix, Bord> buildConnectionGraphOfComponent(ImagePlus imgSeg, ImagePlus distToExt,
 																		  int connexity) {
         this.pixGraph = new SimpleWeightedGraph<>(Bord.class);
@@ -808,6 +810,44 @@ public class CC implements Serializable {
                 if ((y < (yM - 1))) if (tabPix[x][y + 1] != null)
                     this.pixGraph.addEdge(tabPix[x][y], tabPix[x][y + 1], new Bord(tabPix[x][y], tabPix[x][y + 1]));
             }
+        return this.pixGraph;
+    }*/
+    public SimpleWeightedGraph<Pix, Bord> buildConnectionGraphOfComponent(ImagePlus imgSeg, ImagePlus distToExt, int connexity) {
+        this.pixGraph = new SimpleWeightedGraph<>(Bord.class);
+        int xM = imgSeg.getWidth();
+        int yM = imgSeg.getHeight();
+        Pix[][] tabPix = new Pix[xM][yM];
+        float[] tabData = (float[]) imgSeg.getStack().getPixels(1);
+        float[] tabDist = (float[]) distToExt.getStack().getPixels(1);
+
+        IntStream.range(0, xM).parallel().forEach(x -> {
+            for (int y = 0; y < yM; y++) {
+                if (tabData[y * xM + x] > 0) {
+                    tabPix[x][y] = new Pix(x, y, tabDist[y * xM + x]);
+                    synchronized (pixGraph) {
+                        pixGraph.addVertex(tabPix[x][y]);
+                    }
+                }
+            }
+        });
+
+        int[][] directions = {{1, 0}, {0, 1}, {1, 1}, {-1, 1}};
+        IntStream.range(0, xM).parallel().forEach(x -> {
+            for (int y = 0; y < yM; y++) {
+                if (tabPix[x][y] != null) {
+                    for (int[] direction : directions) {
+                        int newX = x + direction[0];
+                        int newY = y + direction[1];
+                        if (newX >= 0 && newX < xM && newY >= 0 && newY < yM && tabPix[newX][newY] != null) {
+                            synchronized (pixGraph) {
+                                pixGraph.addEdge(tabPix[x][y], tabPix[newX][newY], new Bord(tabPix[x][y], tabPix[newX][newY]));
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
         return this.pixGraph;
     }
 

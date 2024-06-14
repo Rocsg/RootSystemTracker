@@ -25,6 +25,12 @@ public class Geometry {
         return nodes;
     }
 
+    public void addPoint(Point2D point) {
+        Polyline polyline = new Polyline();
+        polyline.addPoint(new Point4Parser(point.getX(), point.getY()));
+        this.polylines.add(polyline);
+    }
+
     @Override
     public String toString() {
         return "Geometry{" +

@@ -6,6 +6,7 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.Arrays;
+import java.util.Objects;
 
 public class PipelineParamHandler {
     // Constants for no parameter values
@@ -55,9 +56,9 @@ public class PipelineParamHandler {
     // Minimum size of connected components
     int minSizeCC = 5;
     // Intensity level of the root tissue
-    double rootTissueIntensityLevel = 30;
+    double rootTissueIntensityLevel = 177;
     // Intensity level of the background
-    double backgroundIntensityLevel = 130;
+    double backgroundIntensityLevel = 189;
     // Maximum speed of lateral movement, defined as the number of pixels per
     // typical timestep
     double maxSpeedLateral = 33;
@@ -74,23 +75,25 @@ public class PipelineParamHandler {
     double minDistanceBetweenLateralInitiation = 4;
     // Minimum lateral stucked to other lateral
     double minLateralStuckedToOtherLateral = 30;
+
     // Crop parameters
     /*int xMinCrop = 1;
     int yMinCrop = 1;
     int dxCrop = 430;
     int dyCrop = 500;*/
-    int xMinCrop = (int) 1400.0 / subsamplingFactor;
+     int xMinCrop = (int) 1400.0 / subsamplingFactor;
     int yMinCrop = (int) 350.0 / subsamplingFactor;
     int dxCrop =  (int) (10620.0 - 1400.0) / subsamplingFactor;
     int dyCrop = (int) (8783.0 - 350.0) / subsamplingFactor;
     // Maximum linear
     int maxLinear = 4;
     // Type of experiment
-    String typeExp = "Simple";
+    String typeExp = "OhOh"; // "Simple"
     // Margin for registration
     int marginRegisterLeft = (int) 20.0 / subsamplingFactor;
     int marginRegisterUp = (int) (1341.0 - 350.0) / subsamplingFactor;
     int marginRegisterRight = (int) 20.0 / subsamplingFactor;
+    int marginRegisterDown = dyCrop  - 1;
     // Flag to apply full pipeline image after image
     boolean applyFullPipelineImageAfterImage = true;
     // Names of the images
@@ -179,6 +182,10 @@ public class PipelineParamHandler {
 
     }
 
+    public boolean isOhOh() {
+        return typeExp.contains("OhOh_101");
+    }
+
     public boolean isSplit() {
         return typeExp.contains("Split_V01");
     }
@@ -255,7 +262,7 @@ public class PipelineParamHandler {
             String[][] paramsImg = VitimageUtils.readStringTabFromCsv(
                     new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", "/"));
             IJ.log("And the String tab initialized is null ? " + (paramsImg == null));
-            IJ.log("Or it has a number of lines = " + (paramsImg.length));
+            IJ.log("Or it has a number of lines = " + (Objects.requireNonNull(paramsImg).length));
             IJ.log("Or imgSerieSize is null ? " + (imgSerieSize == null));
             IJ.log("Or imgSerieSize len is not good ? = " + (imgSerieSize.length));
             imgSerieSize[i] = paramsImg.length - 1;
@@ -357,9 +364,9 @@ public class PipelineParamHandler {
     public void getParametersForNewExperiment() {
         System.out.println(inventoryDir);
         System.out.println(new File(inventoryDir).exists());
-        for (String s : new File(inventoryDir).list())
+        for (String s : Objects.requireNonNull(new File(inventoryDir).list()))
             System.out.println(s);
-        nbData = new File(inventoryDir).list().length - 1;
+        nbData = Objects.requireNonNull(new File(inventoryDir).list()).length - 1;
         if (nbData > MAX_NUMBER_IMAGES) {
             IJ.showMessage("Critical warning : number of images is too high : " + nbData + " > " + MAX_NUMBER_IMAGES);
         }
@@ -424,7 +431,7 @@ public class PipelineParamHandler {
                     return !arg1.equals("NOT_FOUND.csv");
                 }
             });
-            Arrays.sort(listImgs);
+            Arrays.sort(Objects.requireNonNull(listImgs));
 
             for (int i = 0; i < nbData; i++) {
                 imgNames[i] = listImgs[i].replace(".csv", "").replace("\\", "/");
@@ -461,6 +468,14 @@ public class PipelineParamHandler {
                 return Integer.parseInt(param[1]);
         IJ.showMessage("Parameter not found : " + tit + " in param file of " + outputDir);
         return NO_PARAM_INT;
+    }
+
+    public int getyMinCrop() {
+        return yMinCrop;
+    }
+
+    public int getxMinCrop() {
+        return xMinCrop;
     }
 
 }

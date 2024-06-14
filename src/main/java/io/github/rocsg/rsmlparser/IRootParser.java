@@ -62,6 +62,11 @@ class Point4Parser {
         this.y = Double.parseDouble(y);
     }
 
+    public Point4Parser(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
     @Override
     public String toString() {
         return "Point{" +

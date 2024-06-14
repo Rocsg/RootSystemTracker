@@ -60,6 +60,7 @@ public class Node {
      * The needs refresh.
      */
     boolean needsRefresh;
+    public boolean isInsertionPoint = false;
 
     /**
      * The b cross 23.

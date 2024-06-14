@@ -2463,7 +2463,7 @@ public class RegionAdjacencyGraphPipeline {
                 graphs = VitimageUtils.slicesToStack(new ImagePlus[]{imgG});
                 graphs = VitimageUtils.convertFloatToByteWithoutDynamicChanges(graphs);
                 ImagePlus[] datesTab = new ImagePlus[graphs.getStackSize()];
-                for (int i = 0; i < datesTab.length; i++) datesTab[i] = imgDatesHigh;
+                Arrays.fill(datesTab, imgDatesHigh);
                 dates = VitimageUtils.convertFloatToByteWithoutDynamicChanges(VitimageUtils.slicesToStack(datesTab));
             }
 
