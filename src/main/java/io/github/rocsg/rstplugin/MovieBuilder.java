@@ -10,9 +10,9 @@ import ij.plugin.filter.AVI_Writer;
 import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.Timer;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rsml.Node;
 import io.github.rocsg.rsml.Root;
+import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstutils.MorphoUtils;
 
 import java.awt.*;
@@ -23,36 +23,35 @@ import java.util.ArrayList;
 public class MovieBuilder {
 
     //Bug a la ligne 1774 dans 61grah.rsml   de la racine qui commence par <point coord_t="1.0" coord_th="0.0"
-	// coord_x="376.0" coord_y="178.0" diameter="0.0" vx="0.0" vy="0.0"/> (5.1.3)
+    // coord_x="376.0" coord_y="178.0" diameter="0.0" vx="0.0" vy="0.0"/> (5.1.3)
 
+    private static final boolean modelMode1Activated = false;
+    private static final boolean modelMode2Activated = true;
+    private static final int endingAdditionalFrames = 15;
     //Algorithm parameters
     static double umPerPixel = 76;
     static byte lisereVal = (byte) (1 & 0xff);
     static int vMaxDisplayed = 8; //35 (pixels/8h) * 3  (8h/day)  * 76 (µm / pix) =   7980 µm/day//TODO : depends on
-	// parameters
+    // parameters
     static double vMaxInUse = 35 / 8.0;//TODO : depends on parameters
     static double startingBlockRatio = 0.10;//time for a new root to appear, expressed as a ratio of the sequence
-	// length  //TODO : depends on parameters
+    // length  //TODO : depends on parameters
     static boolean smartHandyStart = true;// Make a progressive start to make the movie more friendly
     static double timeStep = 1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph
-	// .nTypicalHours
+    // .nTypicalHours
     static int nTimeStepVirtualEnd = 4; //Make a progressive end to make the movie more friendly //TODO : depends on
-	// parameters
+    // parameters
     static double deltaPixelsSpeedInterpolation = 4;// Compute the speed vectors over the interval [curPix-delta ;
-	// curPix + delta] //TODO : depends on parameters
+    // curPix + delta] //TODO : depends on parameters
     static PipelineParamHandler pph;
-
     static int primaryRadius = 2;
     static int secondaryRadius = 2;
     static double t0Fg = 0.01;//These 4 numbers are relative to deltaHours between original keyframes;
     static double t1Fg = 0.02;
     static double t0Bg = 0.20;
     static double t1Bg = 0.80;
-
     static int sizeFactor = 1;
     static Timer tim;
-    private static final boolean modelMode1Activated = false;
-    private static final boolean modelMode2Activated = true;
     private static int TN;
     private static double[] hoursExtremities;
     private static double[] t;
@@ -61,7 +60,6 @@ public class MovieBuilder {
     private static double[] deltaHoursToAft;
     private static int[] indexImgBef;
     private static int[] indexImgAft;
-    private static final int endingAdditionalFrames = 15;
 
 
     //SAFE
@@ -72,11 +70,11 @@ public class MovieBuilder {
     public static boolean buildMovie(int indexImg, String outputDataDir, PipelineParamHandler pph) {
         tim = new Timer();
         //timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a
-		// timestep (hours per keyframe, standard is 0.5)",0.5);
+        // timestep (hours per keyframe, standard is 0.5)",0.5);
         //Prepare params
         primaryRadius *= sizeFactor;
         secondaryRadius *= sizeFactor;
-        umPerPixel = pph.subsamplingFactor * pph.getDouble("originalPixelSize") / sizeFactor;
+        umPerPixel = PipelineParamHandler.subsamplingFactor * pph.getDouble("originalPixelSize") / sizeFactor;
         tim.print("Starting data importation");
         hoursExtremities = pph.getHoursExtremities(indexImg);
         TN = pph.imgSerieSize[indexImg];
@@ -91,7 +89,7 @@ public class MovieBuilder {
 
 
         //Compute successive masks of foreground and background to simulate continuous growth of the original image
-		// serie
+        // serie
         tim.print("Starting building mix mask ");
         ImagePlus maskFgBgGauss = generateFgBgMask(imgTimes);
         //maskFgBgGauss.show();
@@ -112,14 +110,14 @@ public class MovieBuilder {
         RootModel rm = null;
         if (new File(outputDataDir, "61_graph_expertized.rsml").exists()) {
             rm =
-					RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"));
+                    RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"));
         } else {
             rm =
-					RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/"));
+                    RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/"));
         }
         rm.computeSpeedVectors(deltaPixelsSpeedInterpolation);
         ImagePlus[] imgGridAndFire = generateGridAndFireFromRootModel(rm, imgTimes, imgMaskRootInit);//TODO should be
-		// here
+        // here
         ImagePlus imgSkeleton = generateModelRGBFromRootModel(rm, imgMaskRootInit);
 		/*imgGridAndFire[0].show();
 		imgGridAndFire[1].show();
@@ -130,7 +128,7 @@ public class MovieBuilder {
         //Assemble all info
         tim.print("\nStarting final assembling");
         mixFgBg = assembleRootGridAndFire(mixFgBg, maskFgBgGauss, imgGridAndFire[0], imgGridAndFire[1],
-				imgGridAndFire[2], imgGridAndFire[3], imgSkeleton, imgReg, true, true);//TODO or maybe there
+                imgGridAndFire[2], imgGridAndFire[3], imgSkeleton, imgReg, true, true);//TODO or maybe there
         tim.print("\nEnd. Now saving");
 
 
@@ -147,9 +145,9 @@ public class MovieBuilder {
 
     //TODO : make it depends on sliceindices and delta between
     public static ImagePlus assembleRootGridAndFire(ImagePlus imgRoot, ImagePlus imgMaskRoot, ImagePlus imgFire,
-													ImagePlus imgGrid,
+                                                    ImagePlus imgGrid,
                                                     ImagePlus imgMaskGrid, ImagePlus imgIdent, ImagePlus imgSkeleton,
-													ImagePlus initReg, boolean fireDisplay, boolean joinOpening) {
+                                                    ImagePlus initReg, boolean fireDisplay, boolean joinOpening) {
         int nRoots = (int) VitimageUtils.maxOfImage(imgIdent) + 1;
         byte[][] colorMapFire = getColorMapFire();
         tim.print("\nFinal Assembling starting");
@@ -175,7 +173,7 @@ public class MovieBuilder {
         }
         int N2 = N + delta;
         ImagePlus[] resChan = new ImagePlus[]{IJ.createImage("", X, Y, N2, 8), IJ.createImage("", X, Y, N2, 8),
-				IJ.createImage("", X, Y, N2, 8)};
+                IJ.createImage("", X, Y, N2, 8)};
         for (int c = 0; c < 3; c++) resChan[c].setDisplayRange(0, 255);
         byte[][] skel = new byte[N][];
         byte[][] resR = new byte[N][];
@@ -302,16 +300,16 @@ public class MovieBuilder {
                         } else {
                             byte[] col = colorMapFire[toInt(fire[n][indexSpace])];
                             resR[n][indexSpace] =
-									toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[0]));
+                                    toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[0]));
                             resG[n][indexSpace] =
-									toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[1]));
+                                    toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[1]));
                             resB[n][indexSpace] =
-									toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[2]));
+                                    toByte((1 - weig) * toInt(root[n][indexSpace]) + weig * toInt(col[2]));
                         }
                     } else if ((maskGrid[n][indexSpace] & 0xff) != 0 && (grid[indexSpace] & 0xff) != 0) {//Else if included in grid, weighted copy grid and root
                         weig = (maskGrid[n][indexSpace] & 0xff) / 255.0;
                         val =
-								(byte) ((int) (weig * (grid[indexSpace] & 0xff) + (1 - weig) * (root[n][indexSpace] & 0xff)) & 0xff);
+                                (byte) ((int) (weig * (grid[indexSpace] & 0xff) + (1 - weig) * (root[n][indexSpace] & 0xff)) & 0xff);
                         resR[n][indexSpace] = val;
                         resG[n][indexSpace] = val;
                         resB[n][indexSpace] = val;
@@ -439,7 +437,7 @@ public class MovieBuilder {
                 double xR = (int) (15 + wid / 4 + x0 + (tr - t[n]) * wid / 15.0);//xr0=x0+wid/2 at t=0 and x0
                 int yR = y0 + 52;
                 //System.out.println("At r="+r+" coords="+xR+","+yR+" with wid="+wid+" and (r+1.5)*wid/2.0="+((r+1.5)
-				// *wid/2.0)+" and -tr*wid/20.0="+(-tr*wid/20.0));
+                // *wid/2.0)+" and -tr*wid/20.0="+(-tr*wid/20.0));
                 if (xR < x0) xR = -1000;
                 if (xR > (x1 - t1wid - 20)) xR = -1000;
                 textRoi = new TextRoi(xR + 2, yR - 7 + 15, tr + "h", font27);            //draw time value
@@ -533,7 +531,7 @@ public class MovieBuilder {
                         for (int c = 0; c < 3; c++) {
                             ImageProcessor ip = resChan[c].getStack().getProcessor(incr + 1);
                             TextRoi titleArchi = new TextRoi(X / 2 - 320, 3 * Y / 4, "Architecture reconstruction",
-									font50);
+                                    font50);
                             ip.setColor(Color.white);
                             ip.setAntialiasedText(true);
                             ip.draw(titleArchi);
@@ -589,13 +587,13 @@ public class MovieBuilder {
                     }
                     for (int r = 0; r < tM + 1; r++) {
                         double xR = (int) (15 + x0 + (r + 1.5) * wid / 2.0 - (m - 1) * wid / 2.0);//xr0=x0+wid/2 at
-						// t=0 and x0
+                        // t=0 and x0
                         int yR = y0 + 52;
                         if (xR < x0) xR = -1000;
                         if (xR > (x1 - t1wid - 20)) xR = -1000;
                         roiTab1[r] = new TextRoi(xR + 2, yR - 7 + 15, "t" + r, font27);
                         xR = (int) (x0 - 40 + (r + 1.5) * wid / 2.0 + wid / 4.0 - (m - 1) * wid / 2.0);//xr0=x0+wid/2
-						// at t=0 and x0
+                        // at t=0 and x0
                         if (xR < x0 - t2wid) xR = -1000;
                         if (xR > x1 - t1wid) xR = -1000;
                         if (r < (tM)) roiTab2[r] = new TextRoi(xR, yR + 4, "", font19);
@@ -634,7 +632,7 @@ public class MovieBuilder {
 
     /**
      * Helpers
-	 * ----------------------------------------------------------------------------------------------------------
+     * ----------------------------------------------------------------------------------------------------------
      */
     //Major helpers
     //TODO : make it depends on sliceindices and delta between
@@ -660,7 +658,7 @@ public class MovieBuilder {
                 nPrim++;
             }
         int sizeRatio = 15;//Divide the image space to define the objects size (circles and arrow). The larger the
-		// factor, the smaller the objects
+        // factor, the smaller the objects
         int deltaN = (int) (N * startingBlockRatio);//Used for making appearing roots progressively
         int[] nStart = new int[P];
         for (int p = 0; p < P; p++) {
@@ -865,7 +863,7 @@ public class MovieBuilder {
 
 
     public static ImagePlus mixFgAndBgFromMaskAndStack(ImagePlus imgRootMask, ImagePlus regStack,
-													   ImagePlus maskUpLeaves) {
+                                                       ImagePlus maskUpLeaves) {
         System.out.println("Generating mix");
 
         ImagePlus imgInReg = VitimageUtils.convertToFloat(regStack);
@@ -907,7 +905,7 @@ public class MovieBuilder {
 
                     ////BUILDING Value for BG (not plant points)
                     //If we are in the upper part of the image, smoothly between t0Bg and t1Bg (at start between T0
-					// and T1)
+                    // and T1)
                     if (toInt(tabMaskUp[indexSpace]) == 0) {
                         if (deltaT <= t0Bg) valMixBg = tabInReg[T0][indexSpace];
                         else if (deltaT >= t1Bg) {
@@ -918,7 +916,7 @@ public class MovieBuilder {
                         }
                     } else {
                         //If we are in the plant, don't care, and display the original image // TODO : faire un test
-						// pour faire apparaitre la mousse de la nuit
+                        // pour faire apparaitre la mousse de la nuit
                         valMixBg = tabInReg[0][indexSpace];
                     }
 
@@ -938,7 +936,7 @@ public class MovieBuilder {
                     }
                     double deltaMix = tabInMask[n][indexSpace];
                     tabOut[n][indexSpace] = toByte(valMixFg * deltaMix + valMixBg * (1 - deltaMix));//(float)
-					// (valMixBg*(1-deltaMix));//
+                    // (valMixBg*(1-deltaMix));//
                 }
             }
         }
@@ -1042,7 +1040,7 @@ public class MovieBuilder {
         timeStep = pph.getMovieTimeStep();
         //VitimageUtils.getSystemNeededMemory()
         //timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a
-		// timestep (hours per keyframe, standard is 0.5)",0.5);
+        // timestep (hours per keyframe, standard is 0.5)",0.5);
         ArrayList<double[]> ar = new ArrayList<double[]>();
         ArrayList<double[]> arT = new ArrayList<double[]>();
         int curFrame = 0;
@@ -1055,7 +1053,7 @@ public class MovieBuilder {
             incr++;
             double alpha = 1;
             if (smartHandyStart) {//Progressive starting of the growth with acceleration driven by the slowing factor
-				// alpha
+                // alpha
                 if (curT < (maxT / 30)) alpha = 3;
                 else if (curT < (maxT / 22)) alpha = 2.5;
                 else if (curT < (maxT / 18)) alpha = 2.2;
@@ -1083,7 +1081,7 @@ public class MovieBuilder {
                 valdeltaRatioToBef = valdeltaHoursToBef / (valdeltaHoursToBef + valdeltaHoursToAft);
             }
             ar.add(new double[]{curT, valdeltaRatioToBef, valdeltaHoursToBef, valdeltaHoursToAft, valindexBef,
-					valindexAft});
+                    valindexAft});
 
         }
         for (int i = 0; i < endingAdditionalFrames; i++) {
@@ -1123,8 +1121,8 @@ public class MovieBuilder {
         IJ.run(img, "RGB Color", "");
         ImagePlus[] imgs = ChannelSplitter.split(img);
         byte[][] vals = new byte[][]{(byte[]) imgs[0].getStack().getProcessor(1).getPixels(),
-				(byte[]) imgs[1].getStack().getProcessor(1).getPixels(),
-				(byte[]) imgs[2].getStack().getProcessor(1).getPixels()};
+                (byte[]) imgs[1].getStack().getProcessor(1).getPixels(),
+                (byte[]) imgs[2].getStack().getProcessor(1).getPixels()};
         byte[][] res = new byte[256][3];
         for (int i = 0; i < 3; i++) for (int j = 0; j < 256; j++) res[j][i] = vals[i][j];
         return res;

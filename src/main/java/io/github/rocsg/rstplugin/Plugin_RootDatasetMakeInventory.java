@@ -18,7 +18,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -107,7 +111,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
 
         // Define the output directory
         String outputDir = new File(new File(inputDir).getParent(), "Inventory_of_" + (new File(inputDir).getName()))
-                .getAbsolutePath().replace("\\", "/");
+                .getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
 
         // Get the user's choice for the type of directory
         //// 1 for a data input dir with subdirs containing image series
@@ -115,7 +119,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         // jpg), each one with a QR code
         int choice = VitiDialogs.getIntUI(
                 "Select 1 for a data input dir with subdirs containing image series, 2 for a messy bunch of dirs and " +
-						"subdirs containing images (tif, png, or jpg), each one with a QR code",
+                        "subdirs containing images (tif, png, or jpg), each one with a QR code",
                 1);
 
         // If the choice is not valid, stop the process and return null
@@ -126,11 +130,11 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
 
         // Define the expected paths for the inventory and processing directories
         String expectedInventoryPath = new File(new File(inputDir).getParent(),
-                "Inventory_of_" + (new File(inputDir).getName())).getAbsolutePath().replace("\\", "/"); //
-		// Inventory_of_*
+                "Inventory_of_" + (new File(inputDir).getName())).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator); //
+        // Inventory_of_*
         String expectedProcessingPath = new File(new File(inputDir).getParent(),
-                "Processing_of_" + (new File(inputDir).getName())).getAbsolutePath().replace("\\", "/"); //
-		// Processing_of_*
+                "Processing_of_" + (new File(inputDir).getName())).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator); //
+        // Processing_of_*
 
         // If the inventory or processing directory already exists, stop the process and
         // return an empty string
@@ -145,9 +149,9 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
 
         // Create the inventory and processing directories
         new File(new File(new File(inputDir).getParent(), "Inventory_of_" + (new File(inputDir).getName()))
-                .getAbsolutePath().replace("\\", "/")).mkdirs();
+                .getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)).mkdirs();
         new File(new File(new File(inputDir).getParent(), "Processing_of_" + (new File(inputDir).getName()))
-                .getAbsolutePath().replace("\\", "/")).mkdirs();
+                .getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)).mkdirs();
 
         // Start the inventory process based on the user's choice
         if (choice == 1)
@@ -219,7 +223,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
                     paramsQRcode[2], paramsQRcode[3], paramsQRcode[4], paramsQRcode[5], patience);
             code[n] = (String) objs[0];
             double[] params = (double[]) objs[1];
-            if (code[n].length() < 1 || code[n] == null) {
+            if (code[n].isEmpty() || code[n] == null) {
                 code[n] = codeNotFound;
                 nNot++;
             } else {
@@ -241,7 +245,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         if (nNot > 0) {
             IJ.showMessage("Some QR codes have not been read.");
             IJ.log("DebCici Debug phase starts for Cici (in rootsystemtracker/Pluging_RootDatasetMakeInventory.java, " +
-					"Line ~179");
+                    "Line ~179");
             IJ.log("DebCici Here are additional information");
             IJ.log("DebCici The total number of detected image files is " + NP);
             IJ.log("DebCici Over these images, " + nNot + " images were too messy that the QR code could be read");
@@ -255,33 +259,33 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
             IJ.showMessage("I will show you all the images with QR code not found. With each image come a popup.");
             IJ.showMessage(
                     "For each image, find the corresponding code in the list (see log window), and copy it into the " +
-							"prompt popup.");
+                            "prompt popup.");
             for (int i = 0; i < code.length; i++)
                 if (code[i].equals(codeNotFound)) {
                     IJ.log("DebCici Now reading the image number " + i + " whose code was not found");
                     int subFactor = (int) paramsQRcode[0];
                     IJ.log("DebCici the subsampling for reading the QR was " + subFactor);
                     String guessedCode = guessCode(spec,
-                            new File(inputDir, allImgsPath[i]).getName().replace("\\", "/"));
+                            new File(inputDir, allImgsPath[i]).getName().replace("\\", File.separator + File.separator).replace("/", File.separator));
                     IJ.log("DebCici the guessedCode based on filename patterns and box names patterns is "
                             + guessedCode);
 
                     if (inputDir.contains("230403-SR-split")) {
                         IJ.log("DebCici activating the exp quick hack, and force-applying this code as the robot went" +
-								" OK. It s over for this image.");
+                                " OK. It s over for this image.");
                         code[i] = guessedCode;
                         continue;
                     } // Hack for the first split serie that had perfect robot run but incorrect QR
                     // positioning
                     else {
                         IJ.log("DebCici no force-apply of code. If you are Cici working on split, that should not " +
-								"happen, you should make a claim");
+                                "happen, you should make a claim");
                     }
 
                     IJ.log("DebCici Cici, if you go to there and this message happens, we have a problem. You should " +
-							"check if you kept the naming of the input dir. It have to contain 230403-SR-split");
+                            "check if you kept the naming of the input dir. It have to contain 230403-SR-split");
                     ImagePlus img = IJ
-                            .openImage(new File(inputDir, allImgsPath[i]).getAbsolutePath().replace("\\", "/"));
+                            .openImage(new File(inputDir, allImgsPath[i]).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
                     img = VitimageUtils.resize(img, img.getWidth() / subFactor, img.getHeight() / subFactor, 1);
                     if (reverse)
                         IJ.run(img, "Flip Horizontally", "");
@@ -304,7 +308,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         }
 
         IJ.log("DebCici now I will write the CSV files in order to finish the inventory. The A_Main_inventory CSV " +
-				"will be a CSV with size "
+                "will be a CSV with size "
                 + (N + 7) + " x " + (3));
 
         int header = 7;
@@ -334,20 +338,20 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
 
             int Nobj = obs.length;
             String[][] objCSV = new String[Nobj + 1][4];
-            String pathDir = new File(inputDir).getAbsolutePath().replace("\\", "/");
-            String path0 = new File(pathDir, obs[0]).getAbsolutePath().replace("\\", "/");
+            String pathDir = new File(inputDir).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
+            String path0 = new File(pathDir, obs[0]).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
             objCSV[0] = new String[]{"Num_obs", "DateThour(24h-format)", "Hours_since_series_start",
                     "Relative_path_to_the_img"};
             IJ.log("DebCici a little up again");
             for (int no = 0; no < Nobj; no++) {
                 IJ.log("DebCici proceeding this box' image number " + no);
-                String path = new File(pathDir, obs[no]).getAbsolutePath().replace("\\", "/");
+                String path = new File(pathDir, obs[no]).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
                 FileTime ft = getLastModifiedTime(path);
-                String rtd = new File(inputDir).getAbsolutePath().replace("\\", "/");
+                String rtd = new File(inputDir).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
                 IJ.log("DebCici tiny up");
                 objCSV[no + 1] = new String[]{"" + no, ft.toString(),
                         "" + VitimageUtils.dou(hoursBetween(path0, path)),
-                        path.replace(rtd, "").substring(1).replace("\\", "/")};
+                        path.replace(rtd, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator)};
                 if (first == null)
                     first = getLastModifiedTime(path);
                 if (last == null)
@@ -360,9 +364,9 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
             }
             IJ.log("DebCici writing this box CSV");
             VitimageUtils.writeStringTabInCsv2(objCSV,
-                    new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", "/"));
+                    new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
             System.out
-                    .println("Written : " + new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", "/"));
+                    .println("Written : " + new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
             IJ.log("DebCici ok");
         }
         IJ.log("DebCici writing the main CSV");
@@ -371,7 +375,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         mainCSV[0] = new String[]{"First observation time", first.toString(), "NA"};
         mainCSV[1] = new String[]{"Last observation time", last.toString(), "NA"};
         VitimageUtils.writeStringTabInCsv2(mainCSV,
-                new File(outputDir, "A_main_inventory.csv").getAbsolutePath().replace("\\", "/"));
+                new File(outputDir, "A_main_inventory.csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
         System.out.println("Written : " + new File(outputDir, "A_main_inventory.csv").getAbsolutePath());
         IJ.log("DebCici Ok. Inventory should be finished.");
     }
@@ -438,9 +442,9 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      * @return The number of occurrences of the substring in the main string.
      */
     public static int nbOccurences(String substring, String mainString) {
-        if (mainString == null || mainString.length() < 1)
+        if (mainString == null || mainString.isEmpty())
             return 0;
-        if (substring == null || substring.length() < 1)
+        if (substring == null || substring.isEmpty())
             return 0;
         int count = 0;
         int index = 0;
@@ -515,7 +519,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         double valMin = ip.getMinThreshold();
 
         // Gathering results
-        return new double[]{subsamplingFactor, Math.max(dx, dy), x0 + dx / 2, y0 + dy / 2, valMin * 0.2,
+        return new double[]{subsamplingFactor, Math.max(dx, dy), x0 + (double) dx / 2, y0 + (double) dy / 2, valMin * 0.2,
                 valMin * 1.8};
     }
 
@@ -569,6 +573,147 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      * This method starts the inventory process for a directory that is already
      * tidy, meaning it contains subdirectories each containing a series of images.
      * <p>
+     * Such that:
+     * InputDir
+     * |_Object1
+     * |__Image1
+     * |__Image2
+     * |__Image3
+     * |_Object2
+     * |__Image1
+     * |__Image2
+     * |__Image3
+     *
+     * @param inputDir0  The directory to create an inventory of.
+     * @param outputDir0 The directory where the inventory will be stored.
+     */
+    public static void startInventoryOfAlreadyTidyDir(String inputDir0, String outputDir0, Map<String, String> map) {
+        String inputDir = inputDir0.replace("\\", File.separator + File.separator).replace("/", File.separator);
+        String outputDir = outputDir0.replace("\\", File.separator + File.separator).replace("/", File.separator);
+        int standartHeight = 0;
+        int standartWidth = 0;
+
+        // List the data
+        String[] spec = new File(inputDir).list(); // List of subdirectories
+        Arrays.sort(Objects.requireNonNull(spec)); // Sort the list of subdirectories
+        int N = spec.length; // Count the number of subdirectories
+        int header = 7; // Header size for the main CSV file
+        LocalDateTime first = null; // First observation time
+        LocalDateTime last = null; // Last observation time
+        String[][] mainCSV = new String[N + header][3]; // Main CSV file
+        mainCSV[2] = new String[]{"Number of different objects", "NA", "NA"}; // Number of different objects
+        mainCSV[3] = new String[]{"Number of different images", "NA", "NA"}; // Number of different images
+        mainCSV[4] = new String[]{"Data dir", inputDir, "NA"}; // Data directory
+        mainCSV[5] = new String[]{"Inventory dir", outputDir, "NA"}; // Inventory directory
+        mainCSV[6] = new String[]{"Misc ", "NA", "NA"}; // Miscellaneous
+        int incrImg = 0; // Incremental image count
+        // For each subdirectory (referred to as an "object"), create a separate CSV
+
+        System.out.println("Recap : " + spec.length + " objects" + " in " + inputDir + " to be processed");
+        // file
+        for (int n = 0; n < N; n++) {
+            // Registered in the old csv
+            mainCSV[7 + n] = new String[]{"Object", "" + n, spec[n]};
+            String[] obs = new File(inputDir, spec[n]).list(); // List of images in the subdirectory
+            System.out.println("File " + new File(inputDir, spec[n]).getAbsolutePath());
+            System.out.println("Processing " + spec[n] + " with " + Objects.requireNonNull(obs).length + " images");
+
+            //obs = sortFilesByModificationOrder(new File(inputDir, spec[n]).getAbsolutePath(), obs);
+            obs = sortFilesByName(new File(inputDir, spec[n]).getAbsolutePath(), obs);
+            int Nobj = obs.length;
+            int[] NobjStack = new int[Nobj];
+            // check if the images are stacks of images or single images
+            int index = 0;
+            for (String ob : obs) {
+                ImagePlus img = IJ.openImage(new File(inputDir, spec[n] + "/" + ob).getAbsolutePath());
+                NobjStack[index] = img.getStackSize();
+                index++;
+            }
+            incrImg += Arrays.stream(NobjStack).sum();
+
+            // Create the new csv
+            String[][] objCSV = new String[Nobj + 1][4];
+            String pathDir = new File(inputDir, spec[n]).getAbsolutePath(); // Path to the subdirectory
+            String path0 = new File(pathDir, obs[0]).getAbsolutePath(); // Path to the first image in the subdirectory
+            objCSV[0] = new String[]{"Num_obs", "DateThour(24h-format)", "Hours_since_series_start",
+                    "Relative_path_to_the_img"};
+            // For each image in the subdirectory, add a row to the CSV file if the image is stacked, iterate over the labels of each stack
+            for (int no = 0; no < Nobj; no++) {
+                String path = new File(pathDir, obs[no]).getAbsolutePath(); //
+                //FileTime ft = getLastModifiedTime(path);
+                ImagePlus img = new ImagePlus(path);
+                standartWidth = img.getWidth();
+                standartHeight = img.getHeight();
+                for (int numStack = 0; numStack < NobjStack[no]; numStack++) {
+                    String rtd = new File(inputDir).getAbsolutePath();
+                    objCSV[no + 1] = new String[]{"" + no, Objects.requireNonNull(img).getStack().getSliceLabel(numStack + 1),
+                            "" + VitimageUtils.dou(hoursBetween(path0, path)),
+                            path.replace(rtd, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator)};
+
+                    // pattern for localdateTime yyyy-mm-ddThh:mm:ss
+                    Pattern pattern = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
+                    Matcher matcher = pattern.matcher(Objects.requireNonNull(img).getStack().getSliceLabel(numStack + 1));
+                    if (matcher.find()) {
+                        String dateTime = matcher.group().split("T")[0] + " " + matcher.group().split("T")[1];
+                        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                        if (first == null)
+                            first = localDateTime;
+                        if (last == null)
+                            last = localDateTime;
+                        if (Objects.requireNonNull(first).isAfter(localDateTime))
+                            first = localDateTime;
+                        if (Objects.requireNonNull(last).isBefore(localDateTime))
+                            last = localDateTime;
+                    }
+                }
+                VitimageUtils.writeStringTabInCsv2(objCSV,
+                        new File(outputDir, spec[n + no] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)); // Write the CSV file
+                /* OLD
+                String rtd = new File(inputDir).getAbsolutePath();
+                objCSV[no + 1] = new String[]{"" + no, Objects.requireNonNull(ft).toString(),
+                        "" + VitimageUtils.dou(hoursBetween(path0, path)),
+                        path.replace(rtd, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator)};
+                if (first == null)
+                    first = getLastModifiedTime(path);
+                if (last == null)
+                    last = getLastModifiedTime(path);
+                if (Objects.requireNonNull(first).compareTo(ft) > 0)
+                    first = getLastModifiedTime(path);
+                if (Objects.requireNonNull(last).compareTo(ft) < 0)
+                    last = getLastModifiedTime(path);*/
+            }
+        }
+        // Get a subscaling factor for the images (getting close to 2048x2048 if bigger), or oversampling if smaller (inverse)
+        if (standartWidth > 2048 || standartHeight > 2048) { // TODO : chose the best scaling factor
+            map.put("scalingFactor", "" + Double.max(standartWidth, standartHeight) / 2048.0);
+        } else {
+            map.put("scalingFactor", "" + Double.min(standartWidth, standartHeight) / 2048.0);
+        }
+
+        map.put("xMinCrop", "" + (Math.round(PipelineParamHandler.xMinCrop / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("yMinCrop", "" + (Math.round(PipelineParamHandler.yMinCrop / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("dxCrop", "" + (Math.round(PipelineParamHandler.dxCrop / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("dyCrop", "" + (Math.round(PipelineParamHandler.dyCrop / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("marginRegisterLeft", "" + (Math.round(PipelineParamHandler.marginRegisterLeft / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("marginRegisterRight", "" + (Math.round(PipelineParamHandler.marginRegisterRight / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("marginRegisterUp", "" + (Math.round(PipelineParamHandler.marginRegisterUp / Double.parseDouble((map.get("scalingFactor"))))));
+        map.put("marginRegisterDown", "" + (Math.round(PipelineParamHandler.marginRegisterDown / Double.parseDouble((map.get("scalingFactor"))))));
+
+
+        // Update the main CSV file with the total number of objects and images
+        mainCSV[0] = new String[]{"First observation time", Objects.requireNonNull(first).toString(), "NA"};
+        mainCSV[1] = new String[]{"Last observation time", Objects.requireNonNull(last).toString(), "NA"};
+        mainCSV[2][1] = "" + N;
+        mainCSV[3][1] = "" + incrImg;
+        VitimageUtils.writeStringTabInCsv2(mainCSV,
+                new File(outputDir, "A_main_inventory.csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
+        System.out.println("Inventory of tidy dir ok");
+    }
+
+    /**
+     * This method starts the inventory process for a directory that is already
+     * tidy, meaning it contains subdirectories each containing a series of images.
+     * <p>
      * Such that :
      * InputDir
      * |_Object1
@@ -584,8 +729,8 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      * @param outputDir0 The directory where the inventory will be stored.
      */
     public static void startInventoryOfAlreadyTidyDir(String inputDir0, String outputDir0) {
-        String inputDir = inputDir0.replace("\\", "/");
-        String outputDir = outputDir0.replace("\\", "/");
+        String inputDir = inputDir0.replace("\\", File.separator + File.separator).replace("/", File.separator);
+        String outputDir = outputDir0.replace("\\", File.separator + File.separator).replace("/", File.separator);
 
         // List the data
         String[] spec = new File(inputDir).list(); // List of subdirectories
@@ -630,7 +775,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
                 String rtd = new File(inputDir).getAbsolutePath();
                 objCSV[no + 1] = new String[]{"" + no, Objects.requireNonNull(ft).toString(),
                         "" + VitimageUtils.dou(hoursBetween(path0, path)),
-                        path.replace(rtd, "").substring(1).replace("\\", "/")};
+                        path.replace(rtd, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator)};
                 if (first == null)
                     first = getLastModifiedTime(path);
                 if (last == null)
@@ -641,7 +786,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
                     last = getLastModifiedTime(path);
             }
             VitimageUtils.writeStringTabInCsv2(objCSV,
-                    new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", "/")); // Write the CSV file
+                    new File(outputDir, spec[n] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)); // Write the CSV file
             // for
             // the subdirectory
         }
@@ -651,9 +796,10 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         mainCSV[2][1] = "" + N;
         mainCSV[3][1] = "" + incrImg;
         VitimageUtils.writeStringTabInCsv2(mainCSV,
-                new File(outputDir, "A_main_inventory.csv").getAbsolutePath().replace("\\", "/"));
+                new File(outputDir, "A_main_inventory.csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
         System.out.println("Inventory of tidy dir ok");
     }
+
 
     /**
      * This method sorts an array of filenames based on their modification time.
@@ -699,11 +845,11 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
     static String[] sortFilesByModificationOrder(String[] tab) {
         String[] ret = Arrays.copyOf(tab, tab.length);
         // Convert the file paths to File objects
-        File[] fTab = Arrays.stream(ret).map(s -> new File(s)).toArray(File[]::new);
+        File[] fTab = Arrays.stream(ret).map(File::new).toArray(File[]::new);
         // Sort the File objects by their modification time
         Arrays.sort(fTab, Comparator.comparingLong(File::lastModified));
         // Convert the File objects back to file paths
-        return (Arrays.stream(fTab)).map(f -> f.getAbsolutePath()).toArray(String[]::new);
+        return (Arrays.stream(fTab)).map(File::getAbsolutePath).toArray(String[]::new);
     }
 
     /**
@@ -715,10 +861,10 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      */
     static String[] getRelativePathOfAllImageFilesInDirByTimeOrder(String rootDir) {
         String rdt = new File(rootDir).getAbsolutePath(); // Without the / at the end
-        File[] init = Arrays.stream(searchImagesInDir(rootDir)).map(x -> new File(x)).toArray(File[]::new);
+        File[] init = Arrays.stream(Objects.requireNonNull(searchImagesInDir(rootDir))).map(File::new).toArray(File[]::new);
         Arrays.sort(init, Comparator.comparingLong(File::lastModified));
-        return (Stream.of(init).map(f -> f.getAbsolutePath())
-                .map(s -> s.replace(rdt, "").substring(1).replace("\\", "/"))).toArray(String[]::new);
+        return (Stream.of(init).map(File::getAbsolutePath)
+                .map(s -> s.replace(rdt, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator))).toArray(String[]::new);
     }
 
     /**
@@ -729,7 +875,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      */
     static String[] getRelativePathOfAllImageFilesInDir(String rootDir) {
         String rdt = new File(rootDir).getAbsolutePath(); // Without the / at the end
-        return Arrays.stream(searchImagesInDir(rootDir)).map(p -> p.replace(rdt, "").substring(1).replace("\\", "/"))
+        return Arrays.stream(Objects.requireNonNull(searchImagesInDir(rootDir))).map(p -> p.replace(rdt, "").substring(1).replace("\\", File.separator + File.separator).replace("/", File.separator))
                 .toArray(String[]::new);
     }
 
@@ -743,7 +889,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         try {
             Stream<Path> paths = Files.find(Paths.get(rootDir), Integer.MAX_VALUE,
                     (path, file) -> file.isRegularFile());
-            String[] tab = paths.map(p -> p.toString()).filter(s -> isImagePath(s)).toArray(String[]::new);
+            String[] tab = paths.map(Path::toString).filter(Plugin_RootDatasetMakeInventory::isImagePath).toArray(String[]::new);
             paths.close();
             return tab;
         } catch (IOException e) {
@@ -791,7 +937,7 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
      */
     public static double hoursBetween(String path1, String path2) {
         return VitimageUtils
-                .dou((getLastModifiedTime(path2).toMillis() - getLastModifiedTime(path1).toMillis()) / (3600 * 1000.0));
+                .dou((Objects.requireNonNull(getLastModifiedTime(path2)).toMillis() - Objects.requireNonNull(getLastModifiedTime(path1)).toMillis()) / (3600 * 1000.0));
     }
 
     /**
@@ -816,31 +962,31 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
 
         // Test for data dir with subdirs containing image series ressource/data
         String inputDir = "C:\\Users\\loaiu\\OneDrive - Université Nice Sophia " +
-				"Antipolis\\MAM5\\S2\\Stage\\Travaux\\Git_clones\\RootSystemTracker\\src\\main\\resources\\data";
+                "Antipolis\\MAM5\\S2\\Stage\\Travaux\\Git_clones\\RootSystemTracker\\src\\main\\resources\\data";
         String outputDir = "C:\\Users\\loaiu\\OneDrive - Université Nice Sophia " +
-				"Antipolis\\MAM5\\S2\\Stage\\Travaux\\Git_clones\\RootSystemTracker\\src\\main\\resources\\data" +
-				"\\output";
+                "Antipolis\\MAM5\\S2\\Stage\\Travaux\\Git_clones\\RootSystemTracker\\src\\main\\resources\\data" +
+                "\\output";
         // run function
         IJ.log("Starting RootDatasetMakeInventory version " + versionFlag);
 
         int choice = VitiDialogs.getIntUI(
                 "Select 1 for a data input dir with subdirs containing image series, or 2 for a messy bunch of dirs " +
-						"and subdirs containing images (tif, png, or jpg), each one with a QR code describing the " +
-						"object ",
+                        "and subdirs containing images (tif, png, or jpg), each one with a QR code describing the " +
+                        "object ",
                 1);
         System.out.println("Choice=" + choice);
         if (choice < 1 || choice > 2) {
             IJ.showMessage("Critical fail : malicious choice (" + choice + "). Stopping now.");
             return;
         }
-        inputDir = VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK").replace("\\", "/");
+        inputDir = VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK").replace("\\", File.separator + File.separator).replace("/", File.separator);
         System.out.println("Input dir=" + inputDir);
 
         // outputDir will be the current dir
         outputDir = VitiDialogs.chooseDirectoryNiceUI(
                 "Build and choose data output dir. Suggested : next to the first one, with name Inventory_of_(name of" +
-						" the original folder)",
-                "OK").replace("\\", "/");
+                        " the original folder)",
+                "OK").replace("\\", File.separator + File.separator).replace("/", File.separator);
 
         if (new File(outputDir).list().length > 0) {
             IJ.showMessage("Critical fail : output dir is not empty. Stopping now.");
@@ -876,26 +1022,26 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
         String inputDir = "";
         if (developerMode)
             inputDir = "/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Third_dataset_2022_11" +
-					"/Source_data_after_renumbering/ML2";
+                    "/Source_data_after_renumbering/ML2";
         int choice = VitiDialogs.getIntUI(
                 "Select 1 for a data input dir with subdirs containing image series, or 2 for a messy bunch of dirs " +
-						"and subdirs containing images (tif, png, or jpg), each one with a QR code describing the " +
-						"object ",
+                        "and subdirs containing images (tif, png, or jpg), each one with a QR code describing the " +
+                        "object ",
                 1);
         if (choice < 1 || choice > 2) {
             IJ.showMessage("Critical fail : malicious choice (" + choice + "). Stopping now.");
             return;
         }
-        inputDir = VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK").replace("\\", "/");
+        inputDir = VitiDialogs.chooseDirectoryNiceUI("Choose this input data dir", "OK").replace("\\", File.separator + File.separator).replace("/", File.separator);
         String outputDir = "";
         if (developerMode)
             outputDir = "/media/rfernandez/DATA_RO_A/Roots_systems/Data_BPMP/Third_dataset_2022_11" +
-					"/Source_data_after_renumbering/ML2";
+                    "/Source_data_after_renumbering/ML2";
         else
             outputDir = VitiDialogs.chooseDirectoryNiceUI(
                     "Build and choose data output dir. Suggested : next to the first one, with name Inventory_of_" +
-							"(name of the original folder)",
-                    "OK").replace("\\", "/");
+                            "(name of the original folder)",
+                    "OK").replace("\\", File.separator + File.separator).replace("/", File.separator);
         if (new File(outputDir).list().length > 0) {
             IJ.showMessage("Critical fail : output dir is not empty. Stopping now.");
             return;

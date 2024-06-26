@@ -5,13 +5,31 @@ import io.github.rocsg.fijiyama.common.VitimageUtils;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 
 public class PipelineParamHandler {
     // Constants for no parameter values
     final static int NO_PARAM_INT = -999999999;
     final static double NO_PARAM_DOUBLE = -99999999;
+    // Subsampling factor
+    public static double subsamplingFactor = 4;
+    // Crop parameters
+    /*int xMinCrop = 1;
+    int yMinCrop = 1;
+    int dxCrop = 430;
+    int dyCrop = 500;*/
+    static int xMinCrop = (int) ((int) 1400.0 / subsamplingFactor);
+    static int yMinCrop = (int) (350.0 / subsamplingFactor);
+    static int dxCrop = (int) ((int) (10620.0 - 1400.0) / subsamplingFactor);
+    static int dyCrop = (int) ((int) (8783.0 - 350.0) / subsamplingFactor);
+    // Margin for registration
+    static int marginRegisterLeft = (int) ((int) 20.0 / subsamplingFactor);
+    static int marginRegisterUp = (int) ((int) (1341.0 - 350.0) / subsamplingFactor);
+    static int marginRegisterRight = (int) ((int) 20.0 / subsamplingFactor);
+    static int marginRegisterDown = dyCrop - 1;
     // Name of the main CSV file
     public final String mainNameCsv = "InfoSerieRootSystemTracker.csv";
     // Number of plants in the box
@@ -20,8 +38,6 @@ public class PipelineParamHandler {
     public int sizeFactorForGraphRendering = 6;
     // Memory saving mode, if 1, don't save very big debug images
     public int memorySaving = 0;
-    // Subsampling factor
-    public int subsamplingFactor = 4;
     // Tolerance distance for Beucker simplification
     public double toleranceDistanceForBeuckerSimplification = 0.9;
     // Times of the images
@@ -75,35 +91,21 @@ public class PipelineParamHandler {
     double minDistanceBetweenLateralInitiation = 4;
     // Minimum lateral stucked to other lateral
     double minLateralStuckedToOtherLateral = 30;
-
-    // Crop parameters
-    /*int xMinCrop = 1;
-    int yMinCrop = 1;
-    int dxCrop = 430;
-    int dyCrop = 500;*/
-     int xMinCrop = (int) 1400.0 / subsamplingFactor;
-    int yMinCrop = (int) 350.0 / subsamplingFactor;
-    int dxCrop =  (int) (10620.0 - 1400.0) / subsamplingFactor;
-    int dyCrop = (int) (8783.0 - 350.0) / subsamplingFactor;
     // Maximum linear
     int maxLinear = 4;
     // Type of experiment
     String typeExp = "OhOh"; // "Simple"
-    // Margin for registration
-    int marginRegisterLeft = (int) 20.0 / subsamplingFactor;
-    int marginRegisterUp = (int) (1341.0 - 350.0) / subsamplingFactor;
-    int marginRegisterRight = (int) 20.0 / subsamplingFactor;
-    int marginRegisterDown = dyCrop  - 1;
     // Flag to apply full pipeline image after image
     boolean applyFullPipelineImageAfterImage = true;
     // Names of the images
     String[] imgNames;
     // Steps of the images
     int[] imgSteps;
+    // Acquisition times
+    double[][] acqTimes;
+    boolean[] isStacked;
     // Array of parameters
     private String[][] params;
-    // Acquisition times
-    private double[][] acqTimes;
     // Unit of measurement
     private String unit = "µm";
 
@@ -129,11 +131,11 @@ public class PipelineParamHandler {
         }
 
         // Normalize the directory paths by replacing backslashes with forward slashes
-        this.inventoryDir = inventoryDir.replace("\\", "/");
-        this.outputDir = outputDir.replace("\\", "/");
+        this.inventoryDir = String.valueOf(Paths.get(inventoryDir).toAbsolutePath().normalize());
+        this.outputDir = String.valueOf(Paths.get(outputDir).toAbsolutePath().normalize());
 
         // Construct the path to the parameter file
-        this.pathToParameterFile = new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", "/");
+        this.pathToParameterFile = new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator);
 
         // Check if the parameter file exists
         if (new File(this.pathToParameterFile).exists()) {
@@ -160,8 +162,23 @@ public class PipelineParamHandler {
      * @param processingDir The directory where the output files will be written.
      */
     public PipelineParamHandler(String processingDir) {
-        this.outputDir = processingDir.replace("\\", "/");
+        this.outputDir = processingDir.replace("\\", File.separator + File.separator).replace("/", File.separator);
         readParameters();
+    }
+
+    /**
+     * Configuration function for testing
+     * @param config The configuration map
+     */
+    public static void configurePipelineParams(Map<String, String> config) {
+        PipelineParamHandler.subsamplingFactor = Double.parseDouble(config.getOrDefault("scalingFactor", "4"));
+        PipelineParamHandler.xMinCrop = Integer.parseInt(config.getOrDefault("xMinCrop", "0"));
+        PipelineParamHandler.dxCrop = Integer.parseInt(config.getOrDefault("dxCrop", "2305"));
+        PipelineParamHandler.yMinCrop = Integer.parseInt(config.getOrDefault("yMinCrop", "0"));
+        PipelineParamHandler.dyCrop = Integer.parseInt(config.getOrDefault("dyCrop", "2108"));
+        PipelineParamHandler.marginRegisterLeft = Integer.parseInt(config.getOrDefault("marginRegisterLeft", "0"));
+        PipelineParamHandler.marginRegisterUp = Integer.parseInt(config.getOrDefault("marginRegisterUp", "0"));
+        PipelineParamHandler.marginRegisterDown = Integer.parseInt(config.getOrDefault("marginRegisterDown", "0"));
     }
 
     // Main method
@@ -208,11 +225,11 @@ public class PipelineParamHandler {
         IJ.log(outputDir);
         // Read the CSV file into a string array
         params = VitimageUtils
-                .readStringTabFromCsv(new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", "/"));
+                .readStringTabFromCsv(new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
 
         // Log the name of the opened CSV file
         IJ.log("The main CSV is opened with name : |"
-                + new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", "/") + "|");
+                + new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator) + "|");
 
         // Read parameters from the CSV file
         inventoryDir = getString("inventoryDir");
@@ -237,7 +254,7 @@ public class PipelineParamHandler {
         typicalSpeed = getDouble("typicalSpeed");
         penaltyCost = getDouble("penaltyCost");
         nbMADforOutlierRejection = getDouble("nbMADforOutlierRejection");
-        subsamplingFactor = getInt("subsamplingFactor");
+        subsamplingFactor = getDouble("subsamplingFactor");
         nbData = getInt("nbData");
         typicalHourDelay = getDouble("typicalHourDelay");
 
@@ -254,13 +271,17 @@ public class PipelineParamHandler {
             imgSteps[i] = getInt("Img_" + i + "_step");
             IJ.log("We have inventoryDir=" + inventoryDir);
             IJ.log("We have outputDir=" + outputDir);
+
             System.out.println("And making inventory of |"
-                    + new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", "/") + "|");
+                    + new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator) + "|");
+
             IJ.log("Did inventory of "
-                    + (new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", "/")));
-            IJ.log("Testing " + (new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", "/")));
+                    + (new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)));
+            IJ.log("Testing " + (new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator)));
+
             String[][] paramsImg = VitimageUtils.readStringTabFromCsv(
-                    new File(inventoryDir, imgNames[i] + ".csv").getAbsolutePath().replace("\\", "/"));
+                    new File(inventoryDir + File.separator, imgNames[i] + ".csv").getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
+
             IJ.log("And the String tab initialized is null ? " + (paramsImg == null));
             IJ.log("Or it has a number of lines = " + (Objects.requireNonNull(paramsImg).length));
             IJ.log("Or imgSerieSize is null ? " + (imgSerieSize == null));
@@ -309,8 +330,8 @@ public class PipelineParamHandler {
         addParam("## Parameters for RootSystemTracker experiment ##", "", "");
 
         // Add various parameters to the params array
-        addParam("inventoryDir", inventoryDir, "");
-        addParam("outputDir", outputDir, "");
+        addParam("inventoryDir", inventoryDir.replace("\\", "\\\\"), "");
+        addParam("outputDir", outputDir.replace("\\", "\\\\"), "");
 
         addParam("nbData", nbData, "");
         addParam("numberPlantsInBox", numberPlantsInBox, "");
@@ -434,8 +455,8 @@ public class PipelineParamHandler {
             Arrays.sort(Objects.requireNonNull(listImgs));
 
             for (int i = 0; i < nbData; i++) {
-                imgNames[i] = listImgs[i].replace(".csv", "").replace("\\", "/");
-                imgSteps[i] = 0;
+                imgNames[i] = listImgs[i].replace(".csv", "").replace("\\", File.separator + File.separator).replace("/", File.separator);
+                imgSteps[i] = 0; // TODO change default value
             }
         }
         for (int i = 0; i < nbData; i++) {
@@ -443,13 +464,13 @@ public class PipelineParamHandler {
             addParam("Img_" + i + "_step", imgSteps[i], "");
         }
         VitimageUtils.writeStringTabInCsv2(params,
-                new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", "/"));
+                new File(outputDir, mainNameCsv).getAbsolutePath().replace("\\", File.separator + File.separator).replace("/", File.separator));
     }
 
     public String getString(String tit) {
         for (String[] param : params)
             if (param[0].equals(tit))
-                return param[1].replace("\\", "/");
+                return param[1].replace("\\", File.separator + File.separator).replace("/", File.separator);
         // IJ.showMessage("Parameter not found : "+tit+" in param file of "+outputDir);
         return "";
     }
@@ -470,11 +491,11 @@ public class PipelineParamHandler {
         return NO_PARAM_INT;
     }
 
-    public int getyMinCrop() {
+    public static int getyMinCrop() {
         return yMinCrop;
     }
 
-    public int getxMinCrop() {
+    public static int getxMinCrop() {
         return xMinCrop;
     }
 

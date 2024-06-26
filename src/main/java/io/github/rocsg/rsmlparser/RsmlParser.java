@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static io.github.rocsg.rstplugin.PipelineParamHandler.configurePipelineParams;
 import static io.github.rocsg.rstutils.BlockMatchingRegistrationRootModel.setupAndRunRsmlBlockMatchingRegistration;
 
 public class RsmlParser {
@@ -277,13 +278,12 @@ public class RsmlParser {
      * Function to get the information described in the rsml files
      * <p>
      * It checks for the different rsml files similarity, takes into account the unique ones
-     * And iterate over the unique ones to get the information used to describe the roots
+     * And iterates over the unique ones to get the information used to describe the roots
      *
      * @param folderPath The path to the folder containing the rsml files
      * @return A TreeMap with the date as key and the list of rsml infos as value
-     * @throws IOException If an I/O error occurs
      */
-    public static Map<LocalDate, List<IRootModelParser>> getRSMLsinfos(Path folderPath) throws IOException {
+    public static Map<LocalDate, List<IRootModelParser>> getRSMLsinfos(Path folderPath) {
         // check the uniqueness of the rsml files
         Stack<String> keptRsmlFiles = checkUniquenessRSMLs(folderPath);
 
@@ -445,8 +445,8 @@ class RootModelGraph {
     List<ItkTransform> transforms;
 
     public RootModelGraph() throws IOException {
-        this("D:\\loaiu\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output-Copie\\Process\\B73_R04_01\\Transforms_2\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output-Copie\\Process\\B73_R04_01\\11_stack.tif", "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output-Copie\\Process\\B73_R04_01\\22_registered_stack.tif",
-                "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output-Copie\\Process\\B73_R04_01\\12_stack_cropped.tif");
+        this("D:\\loaiu\\MAM5\\Stage\\data\\UC3\\Rootsystemtracker\\Original_Data\\B73_R04_01\\", "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output-Copie\\Process\\B73_R04_01\\Transforms_2\\", "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output\\Inventory\\", "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output\\Process\\", "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output-Copie\\Process\\B73_R04_01\\11_stack.tif", "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output-Copie\\Process\\B73_R04_01\\22_registered_stack.tif",
+                "D:\\loaiu\\MAM5\\Stage\\data\\TestParser\\Output-Copie\\Process\\B73_R04_01\\12_stack_cropped.tif");
     }
 
     /**
@@ -464,12 +464,23 @@ class RootModelGraph {
      * @param outputPathPPH   The path to the output PipelineParamHandler
      * @throws IOException If an I/O error occurs
      */
-    public RootModelGraph(String path2RSMLs, String transformerPath, String inputPathPPH, String outputPathPPH, String originalScaledImagePath, String registeredImagePath, String cropedImage) throws IOException {
+    public RootModelGraph(String path2RSMLs, String transformerPath, String inputPathPPH, String outputPathPPH, String originalScaledImagePath, String registeredImagePath, String croppedImage) throws IOException {
         this.rootModels = new ArrayList<>();
         this.graphs = new ArrayList<>();
         transforms = new ArrayList<>();
 
         // Getting the resizer factor
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put("scalingFactor", "4");
+        configMap.put("xMinCrop", "350");
+        configMap.put("yMinCrop", "87");
+        configMap.put("dxCrop", "2305");
+        configMap.put("dyCrop", "2108");
+        configMap.put("marginRegisterLeft", "5");
+        configMap.put("marginRegisterUp", "248");
+        configMap.put("marginRegisterDown", "5");
+
+        configurePipelineParams(configMap);
         pph = new PipelineParamHandler(inputPathPPH, outputPathPPH);
 
         // Reading all RSMLs and getting the RootModels
@@ -479,22 +490,22 @@ class RootModelGraph {
         FSR sr = new FSR();
         sr.initialize();
         RootModel rms = new RootModel();
-        rms = (RootModel) rms.createRootModels(result, pph.subsamplingFactor);
+        rms = (RootModel) rms.createRootModels(result, (float) PipelineParamHandler.subsamplingFactor);
 
         ImagePlus refImage = new ImagePlus(registeredImagePath);
         image = refImage;
 
         // Read all the transforms and apply them
         ImagePlus imgInitSize = new ImagePlus(originalScaledImagePath);
-        //displayOnImage(createGraphFromRM(rms), imgInitSize, true).show();
+        displayOnImage(createGraphFromRM(rms), imgInitSize, true).show();
 
         readAndApplyTransforms(transformerPath, rms, refImage, imgInitSize);
         //ImagePlus img2 = displayOnImage(createGraphFromRM(rms), refImage);
         //img2.show();
 
         rms.adjustRootModel();
-        //ImagePlus img3 = displayOnImage(createGraphFromRM(rms), refImage);
-        //img3.show();
+        ImagePlus img3 = displayOnImage(createGraphFromRM(rms), refImage);
+        img3.show();
 
         //setupAndRunRsmlBlockMatchingRegistration(rms, refImage);
 
@@ -526,6 +537,8 @@ class RootModelGraph {
 
         interpolatePointsBezier(rms, displayOnImage(createGraphFromRM(rms), refImage, insertionPoints));*/
         System.out.println("RootModelGraph : " + rms);
+
+        displayOnImage(createGraphFromRM(rms), refImage).show();
         //interpolatePointsSplineFitter(rms, imag.duplicate());
 
         //interpolatePointsCurveFitter(rms, imag.duplicate());
@@ -789,7 +802,8 @@ class RootModelGraph {
      * @param imgInitSize     The ImagePlus image of the initial size
      * @throws IOException If an I/O error occurs
      */
-    private void readAndApplyTransforms(String transformerPath, RootModel rms, ImagePlus res2, ImagePlus imgInitSize) throws IOException {
+    private void
+    readAndApplyTransforms(String transformerPath, RootModel rms, ImagePlus res2, ImagePlus imgInitSize) throws IOException {
 
         // Define these as class variables if the method is called multiple times
         final Pattern indexPattern = Pattern.compile("_(\\d+)\\.");
@@ -819,15 +833,14 @@ class RootModelGraph {
         Point3d[] oldPos = new Point3d[1];
         Point3d[] newPos = new Point3d[1];
         oldPos[0] = new Point3d(0, 0, 0);
-        newPos[0] = new Point3d(-pph.getxMinCrop(), -pph.getyMinCrop(), 0);
+        newPos[0] = new Point3d(-PipelineParamHandler.getxMinCrop(), -PipelineParamHandler.getyMinCrop(), 0);
         ItkTransform linearTransform = ItkTransform.estimateBestTranslation3D(oldPos, newPos);
 
 
         for (ItkTransform transform : this.transforms) {
-            rms.applyTransformToGeometry(linearTransform, transforms.indexOf(transform) + 1);
             rms.applyTransformToGeometry(transform, transforms.indexOf(transform) + 1);
         }
-        rms.applyTransformToGeometry(linearTransform, transforms.size() + 1);
+        rms.applyTransformToGeometry(linearTransform);
     }
 
     private void applySingleTransform(ItkTransform transform, RootModel rms) {

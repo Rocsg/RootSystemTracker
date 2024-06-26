@@ -46,7 +46,7 @@ public class RootModelGraph2 {
         FSR sr = new FSR();
         sr.initialize();
         RootModel rms = new RootModel();
-        rms = (RootModel) rms.createRootModels(result, pph.subsamplingFactor);
+        rms = (RootModel) rms.createRootModels(result, (float) PipelineParamHandler.subsamplingFactor);
 
     }
 

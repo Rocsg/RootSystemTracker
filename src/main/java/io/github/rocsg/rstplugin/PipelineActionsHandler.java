@@ -3,17 +3,12 @@ package io.github.rocsg.rstplugin;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
-import ij.ImageStack;
 import ij.gui.GenericDialog;
-import ij.gui.Plot;
 import ij.plugin.Duplicator;
-import ij.plugin.Histogram;
 import ij.plugin.RGBStackMerge;
-import ij.plugin.Scaler;
 import ij.process.ImageProcessor;
-import ij.process.ImageStatistics;
-import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.common.Timer;
+import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
 import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
@@ -26,10 +21,10 @@ import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
 import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
 import org.apache.commons.io.FileUtils;
+import org.itk.simple.SmoothingRecursiveGaussianImageFilter;
 import org.jgrapht.GraphPath;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
-import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -38,8 +33,9 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
-import java.util.List;
-import java.util.stream.IntStream;
+
+import static io.github.rocsg.rstplugin.PipelineParamHandler.configurePipelineParams;
+
 
 public class PipelineActionsHandler {
     // Flag indicating the pipeline has finished processing
@@ -59,38 +55,75 @@ public class PipelineActionsHandler {
     // The maximum Y-coordinate for the stamp, relative to the crop
     public static final int yMaxStamp = 50; // TODO. It is relative value Y, after the crop
     private static final boolean needUpscale = false;
+    private static final String inputFolder = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Input\\";
+    private static final String outputFolder = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\";
+    private static final String outputFolderProcess = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
+    private static final String inventoryFolder = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
     // Timer object for tracking time-related operations in the pipeline
     public static Timer t;
 
     public static void main(String[] args) {
+        // SimpleITK test
+        testSimpleITK();
 
-        String inputFolderPath0 = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
-        String outputFolderPath0 = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
+        // Parse configuration from arguments
+        Map<String, String> config = parseArgs(args);
 
-        // empty inputFolderPath and outputFolderPath from all content
-        File inputFolder = new File(inputFolderPath0);
-        File outputFolder1 = new File(outputFolderPath0);
-        /*try {
-            FileUtils.cleanDirectory(inputFolder);
-            FileUtils.cleanDirectory(outputFolder1);
-        } catch (IOException e) {
-        }*/
+        // Initialize input and output paths
+        String inputFolderPath = config.getOrDefault("input", inputFolder);
+        String outputFolderPath = config.getOrDefault("output", outputFolder);
+        String outputFolderPath0 = config.getOrDefault("processOutput", outputFolderProcess);
+        String inventoryFolderPath = config.getOrDefault("inventoryOutput", inventoryFolder);
+        // Create output directories if they don't exist
+        createOutputDirectory(outputFolderPath);
+        createOutputDirectory(outputFolderPath0);
+        createOutputDirectory(inventoryFolderPath);
 
-        // Inventory
-        System.out.println("Current directory: " + System.getProperty("user.dir"));
-        // Define the path to the output folder
-        String inputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Input\\";
-        String outputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
+        // Inventory step
+        if (config.containsKey("inventoryOutput")) {
+            Plugin_RootDatasetMakeInventory.startInventoryOfAlreadyTidyDir(inputFolderPath, inventoryFolderPath, config);
+        }
 
-        // Create a File object for the output folder
-        File outputFolder = new File(outputFolderPath);
-        //create the output folder if it does not exist
+        // Process step
+        configurePipelineParams(config);
+        PipelineParamHandler pph = new PipelineParamHandler(inventoryFolderPath, outputFolderPath0);
+
+        // imagej
+        IJ.log("Starting the pipeline");
+        ImageJ ij = new ImageJ();
+
+        t = new Timer();
+        for (int i = 1; i < 9; i++) {
+            pph.imgSteps[0] = i;
+            doStepOnImg(i, 0, pph);
+        }
+
+        System.exit(0);
+    }
+
+    private static Map<String, String> parseArgs(String[] args) {
+        Map<String, String> config = new HashMap<>();
+        for (String arg : args) {
+            String[] splitArg = arg.split("=", 2);
+            if (splitArg.length == 2) {
+                config.put(splitArg[0].toLowerCase(), splitArg[1]);
+            }
+        }
+        if (config.isEmpty()) {
+            config.put("input", inputFolder);
+            config.put("output", outputFolder);
+            config.put("processOutput", outputFolderProcess);
+            config.put("inventoryOutput", inventoryFolder);
+        }
+        return config;
+    }
+
+    private static void createOutputDirectory(String path) {
+        File outputFolder = new File(path);
         if (!outputFolder.exists()) {
             outputFolder.mkdir();
         }
-        // Check if the output folder is not empty
         if (Objects.requireNonNull(outputFolder.list()).length > 0) {
-            // Use a FileVisitor to delete all files in the output folder
             try {
                 Files.walkFileTree(outputFolder.toPath(), new SimpleFileVisitor<Path>() {
                     @Override
@@ -105,170 +138,28 @@ public class PipelineActionsHandler {
                         return FileVisitResult.CONTINUE;
                     }
                 });
-                // Create again the output empty folder
                 outputFolder.mkdir();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        Plugin_RootDatasetMakeInventory.startInventoryOfAlreadyTidyDir(inputFolderPath, outputFolderPath);
-
-        // Process
-        // Define the path to the output folder
-        inputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
-        outputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
-
-        outputFolder = new File(outputFolderPath);
-        //create the output folder if it does not exist
-        if (!outputFolder.exists()) {
-            outputFolder.mkdir();
-        }
-
-        File outputFolderPath01 = new File(outputFolderPath0);
-        if (!outputFolderPath01.exists()) {
-            outputFolderPath01.mkdir();
-        }
-        // get number of folders in inputFolder
-        int nbData = 4;
-        int numAction2Do = 3;
-        // Initialize the PipelineParamHandler object with valid parameters
-        ImageJ ij = new ImageJ();
-        PipelineParamHandler pph = new PipelineParamHandler(inputFolderPath, outputFolderPath);
-        t = new Timer();
-        pph.subsamplingFactor = 4;
-        pph.xMinCrop = 89 * pph.subsamplingFactor;
-        pph.dxCrop = 387 * pph.subsamplingFactor - pph.xMinCrop;
-        pph.yMinCrop = 154 * pph.subsamplingFactor;
-        pph.dyCrop = 408 * pph.subsamplingFactor - pph.yMinCrop;
-        pph.marginRegisterLeft = 0;
-        pph.marginRegisterUp = 170 * pph.subsamplingFactor - pph.yMinCrop;
-        pph.marginRegisterDown = pph.dyCrop - 10;
-        double[][] dtime = new double[1][IJ.openImage("D:\\loaiu\\MAM5\\Stage\\data\\helene\\Input\\OnlyBox\\Test8bit.tif\\").getStackSize()];
-        for (int i = 0; i < dtime.length; i++) {
-            for (int j = 0; j < dtime[i].length; j++) {
-                dtime[i][j] = j * 8;
-            }
-        }
-        pph.setAcqTimesForTest(dtime);
-        /*ImagePlus stack = IJ.openImage("D:\\loaiu\\MAM5\\Stage\\data\\helene\\Input\\OnlyBox\\Test8bit.tif\\");
-        // image to negative
-        stack.getProcessor().invert();
-        stack = Scaler.resize(stack, stack.getWidth() * pph.subsamplingFactor, stack.getHeight() * pph.subsamplingFactor, stack.getStackSize(), "bicubic");
-        //stack.show();
-
-        ImagePlus imgInit = VitimageUtils.cropImage(stack, pph.xMinCrop, pph.yMinCrop, 0, pph.dxCrop, pph.dyCrop, stack.getStackSize());
-        //imgInit.show();
-
-        IJ.saveAsTiff(imgInit, "D:\\loaiu\\MAM5\\Stage\\data\\helene\\Output\\Process\\11_stack.tif");*/
-
-        for (int i = 3; i < 9; i++) {
-            pph.imgSteps[0] = i;
-            doStepOnImg(i, 0, pph);
-        }
-        /*UC2 - pph.marginRegisterLeft = (int) 20.0 / pph.subsamplingFactor;
-        pph.marginRegisterUp = (int) (1341.0 - 350.0) / pph.subsamplingFactor;
-        IntStream.range(0, numAction2Do).forEach(i -> {
-            IntStream.range(0, 2).parallel().forEach(j -> {
-                // Call the doNextStep method
-                doNextStep(j, pph);
-            });
-        });
-
-        pph.dxCrop =  (int) (10921.0 - 1400.0) / pph.subsamplingFactor;
-
-        pph.marginRegisterLeft = (int) 20.0 / pph.subsamplingFactor;
-        pph.marginRegisterUp = (int) (1341.0 - 350.0) / pph.subsamplingFactor;
-        IntStream.range(0, numAction2Do).forEach(i -> {
-            // Call the doNextStep method
-            doNextStep(2, pph);
-        });
-
-        pph.marginRegisterLeft = (int) 40.0 / pph.subsamplingFactor;
-        pph.marginRegisterRight = (int) 60.0 / pph.subsamplingFactor;
-        pph.marginRegisterUp = (int) (400.0 - 350.0) / pph.subsamplingFactor;
-        IntStream.range(0, numAction2Do).forEach(i -> {
-            // Call the doNextStep method
-            doNextStep(3, pph);
-        });*:
-
-        System.exit(0);
-       /* // Call the stackData method
-        stackData(0, pph);
-        // Call the Register method
-        boolean result = PipelineActionsHandler.registerSerie(0, outputFolderPath0, pph);
-
-        System.out.println("Result of registration: " + result);*/
     }
 
     /**
-     * This method allows the user to select the first and last steps and images to
-     * process in the pipeline.
-     * It presents a dialog to the user with options to select the steps and images.
-     * If the user chooses to process everything, it returns default values.
-     * If the user chooses to refine the selection, it returns the user's
-     * selections.
-     *
-     * @param pph The PipelineParamHandler object that contains the pipeline
-     *            parameters.
-     * @return An array of integers representing the first and last steps and images
-     *         to process, and the order of processing.
-     *
-     *         public static int[] selectFirstAndLast(PipelineParamHandler pph) {
-     *         if (VitiDialogs.getYesNoUI("Process everything box after box (select
-     *         no to refine)?",
-     *         "Process everything box after box (select no to refine)?"))
-     *         return new int[] { 0, flagFinished, 0, pph.nbData - 1, 0 };
-     *         else {
-     *         String[] actions = new String[] { "Step 0: setup part 1", "Step
-     *         1:image stacking",
-     *         "Step 2: stack registration",
-     *         "Step 3 : mask computation, leaves removal", "Step 4: spatio-temporal
-     *         segmentation",
-     *         "Step 5 : graph computation", "Step 6: RSML building until
-     *         expertize",
-     *         "Step 7: RSML building after expertize", "Step 8: Movie building" };
-     *         String[] order = new String[] { "Box after box", "Step after step" };
-     *         GenericDialog gd = new GenericDialog("Expert mode for
-     *         RootSystemTracker");
-     *         gd.addMessage("Choose the steps to execute");
-     *         gd.addChoice("First step to run", actions, actions[0]);
-     *         gd.addChoice("Last step to run", actions, actions[0]);
-     *         gd.addMessage("Choose the indices of box to be processed (from 0 to "
-     *         + (pph.nbData - 1) + ")");
-     *         gd.addNumericField("First box index to process", 0, 0, 6, "");
-     *         gd.addNumericField("Last box index to process", pph.nbData - 1, 0, 6,
-     *         "");
-     *         gd.addMessage("Choose the order : box after box (all steps) or step
-     *         after step (all boxes)");
-     *         gd.addChoice("Order", order, order[0]);
-     *         gd.showDialog();
-     *         if (gd.wasCanceled())
-     *         return new int[] { 0, flagFinished, 0, flagLastImage, 0 };
-     *         int st1 = gd.getNextChoiceIndex();
-     *         int st2 = gd.getNextChoiceIndex();
-     *         int im1 = (int) Math.round(gd.getNextNumber());
-     *         int im2 = (int) Math.round(gd.getNextNumber());
-     *         int ord = gd.getNextChoiceIndex();
-     *         if (st1 < 0)
-     *         st1 = 0;
-     *         if (st2 < 0)
-     *         st2 = 0;
-     *         if (st2 > flagFinished)
-     *         st1 = flagFinished;
-     *         if (st1 > st2)
-     *         st1 = st2;
-     *         if (im1 < 0)
-     *         im1 = 0;
-     *         if (im2 < 0)
-     *         im2 = 0;
-     *         if (im2 > flagLastImage)
-     *         st1 = flagLastImage;
-     *         if (im1 > im2)
-     *         im1 = im2;
-     *         return new int[] { st1, st2, im1, im2, ord };
-     *         }
-     *         }
+     * Testing if the SimpleITK library is loaded correctly
      */
+    private static void testSimpleITK() {
+        try {
+            // test loading import org.itk.simple.*;
+            SmoothingRecursiveGaussianImageFilter itkGauss = new SmoothingRecursiveGaussianImageFilter();
+            itkGauss.delete();
+        } catch (UnsatisfiedLinkError e) {
+            System.err.println("La bibliothèque SimpleITKJava n'est pas chargée");
+            System.err.println(e);
+            System.exit(0);
+        }
+    }
+
     /**
      * This function allows the user to select the first and last steps and the way
      * to process boxes/images to process in a pipeline.
@@ -518,26 +409,26 @@ public class PipelineActionsHandler {
         String[][] csvDataImg = VitimageUtils.readStringTabFromCsv(new File(pph.inventoryDir, pph.imgNames[indexImg] + ".csv").getAbsolutePath());
         int N = csvDataImg.length - 1;
 
-        //Open, stack and time stamp the corresponding images
-        ImagePlus[] tabImg = new ImagePlus[N];
-        for (int n = 0; n < N; n++) {
-            String date = csvDataImg[1 + n][1];
-            double hours = Double.parseDouble(csvDataImg[1 + n][2]);
-            IJ.log("Opening image " + new File(mainDataDir, csvDataImg[1 + n][3]).getAbsolutePath());
-            tabImg[n] = IJ.openImage(new File(mainDataDir, csvDataImg[1 + n][3]).getAbsolutePath());
-            tabImg[n].getStack().setSliceLabel(date + "_ = h0 + " + hours + " h", 1);
-        }
-        ImagePlus stack = VitimageUtils.slicesToStack(tabImg);
-        if (stack == null || stack.getStackSize() == 0) {
-            IJ.showMessage("In PipelineSteps.stackData : no stack imported ");
-            return false;
+        ImagePlus stack = new ImagePlus(new File(mainDataDir, csvDataImg[1][3]).getAbsolutePath());
+        if (stack.getStackSize() < 2) {
+            //Open, stack and time stamp the corresponding images
+            ImagePlus[] tabImg = new ImagePlus[N];
+            for (int n = 0; n < N; n++) {
+                String date = csvDataImg[1 + n][1];
+                double hours = Double.parseDouble(csvDataImg[1 + n][2]);
+                IJ.log("Opening image " + new File(mainDataDir, csvDataImg[1 + n][3]).getAbsolutePath());
+                tabImg[n] = IJ.openImage(new File(mainDataDir, csvDataImg[1 + n][3]).getAbsolutePath());
+                tabImg[n].getStack().setSliceLabel(date + "_ = h0 + " + hours + " h", 1);
+            }
+            stack = VitimageUtils.slicesToStack(tabImg);
+            if (stack == null || stack.getStackSize() == 0) {
+                IJ.showMessage("In PipelineSteps.stackData : no stack imported ");
+                return false;
+            }
         }
 
         //Size conversion and saving. No bitdepth conversion to handle here, supposing that everything is 8-bit there
-        if (needUpscale) {
-            stack = VitimageUtils.resize(stack, stack.getWidth() * pph.subsamplingFactor, stack.getHeight() * pph.subsamplingFactor, stack.getStackSize());
-        } else
-            stack = VitimageUtils.resize(stack, stack.getWidth() / pph.subsamplingFactor, stack.getHeight() / pph.subsamplingFactor, stack.getStackSize());
+        stack = VitimageUtils.resize(stack, (int) (stack.getWidth() / PipelineParamHandler.subsamplingFactor), (int) (stack.getHeight() / PipelineParamHandler.subsamplingFactor), stack.getStackSize());
         IJ.saveAsTiff(stack, new File(outputDataDir, "11_stack.tif").getAbsolutePath());
         return true;
     }
@@ -553,18 +444,24 @@ public class PipelineActionsHandler {
      * @return A boolean indicating whether the operation was successful.
      */
     public static boolean registerSerie(int indexImg, String outputDataDir, PipelineParamHandler pph) {
-        ImagePlus stack =IJ.openImage(new File(outputDataDir, "11_stack.tif").getAbsolutePath());
-        int N = stack.getStackSize();
-        ImagePlus imgInit = stack.duplicate();
+        ImagePlus imgInit = IJ.openImage(new File(outputDataDir, "11_stack.tif").getAbsolutePath());
+        int N = imgInit.getStackSize();
+        if (imgInit.getBitDepth() == 24) {
+            // converting to 32, 64, 16 or 8 bits (the closest to the original bit depth)
+            // stack.getProcessor().convertToColorProcessor();
+            ImageProcessor ip = imgInit.getProcessor().convertToByte(true);
+            // convert but keep the original colors
+            ip = imgInit.getProcessor().convertToFloatProcessor();
+            imgInit.setProcessor(ip);
+        }
         //ImagePlus imgInit = VitimageUtils.cropImage(imgInit2, pph.xMinCrop, pph.yMinCrop, 0, pph.dxCrop, pph.dyCrop, N);
         IJ.save(imgInit, new File(outputDataDir, "12_stack_cropped.tif").getAbsolutePath());
         ImagePlus imgOut = imgInit.duplicate();
         IJ.run(imgOut, "32-bit", "");
-
         //Create mask
         ImagePlus mask = new Duplicator().run(imgInit, 1, 1, 1, 1, 1, 1);
         mask = VitimageUtils.nullImage(mask);
-        mask = VitimageUtils.drawRectangleInImage(mask, pph.marginRegisterLeft, pph.marginRegisterUp, pph.dxCrop - pph.marginRegisterLeft - pph.marginRegisterRight, pph.marginRegisterDown, 255);
+        mask = VitimageUtils.drawRectangleInImage(mask, 0, 0, mask.getWidth() - 1, mask.getHeight() - 1, 255);
         IJ.saveAsTiff(mask, new File(outputDataDir, "20_mask_for_registration.tif").getAbsolutePath());
 
         ImagePlus[] tabImg = VitimageUtils.stackToSlices(imgInit);
@@ -572,9 +469,13 @@ public class PipelineActionsHandler {
         ImagePlus[] tabImgSmall = VitimageUtils.stackToSlices(imgInit);
         ItkTransform[] tr = new ItkTransform[N];
         ItkTransform[] trComposed = new ItkTransform[N];
+        /* CROP
         for (int i = 0; i < tabImgSmall.length; i++) {
-            tabImgSmall[i] = VitimageUtils.cropImage(tabImgSmall[i], 0, 0, 0, tabImgSmall[i].getWidth(), (tabImgSmall[i].getHeight() * 2) / 3, 1);
-        }
+
+            tabImgSmall[i].setRoi(0, 0, tabImgSmall[i].getWidth(), (tabImgSmall[i].getHeight() * 2) / 3);
+            tabImgSmall[i] = tabImgSmall[i].crop();
+
+        }*/
         int count = 0;
 
         //First step : daisy-chain rigid registration
@@ -596,13 +497,13 @@ public class PipelineActionsHandler {
             bm.mask = mask.duplicate();
             bm.defaultCoreNumber = VitimageUtils.getNbCores();
             bm.minBlockVariance /= 20;//Test for helene, before there was "4"
-            boolean viewRegistrations = false;//Useful for debugging
+            boolean viewRegistrations = true;//Useful for debugging
             if (viewRegistrations) {
                 bm.displayRegistration = 2;
                 bm.adjustZoomFactor(((512.0)) / tabImg[n].getWidth());
                 bm.flagSingleView = true;
             }
-            bm.displayR2 = false;
+            bm.displayR2 = true;
             tr[n] = bm.runBlockMatching(trRoot, false);
             if (viewRegistrations) {
                 bm.closeLastImages();
@@ -639,17 +540,6 @@ public class PipelineActionsHandler {
             itkTransform.writeMatrixTransformToFile(transformPath1 + File.separator + "transform_" + count + ".txt");
         }
 
-        // exit
-        //System.exit(0);
-
-        // loading transforms from .txt files
-        /*trComposed = new ItkTransform[N];
-        for (int i = 0; i < N - 1; i++) {
-            trComposed[i] = new ItkTransform();
-            trComposed[i] = ItkTransform.readTransformFromFile(new File(outputDataDir, "Transforms_1" + File.separator + "transform_" + (i + 1) + ".txt").getAbsolutePath());
-        }*/
-
-
         //Second step : daisy-chain dense registration
         ImagePlus result2 = null;
         ArrayList<ImagePlus> listAlreadyRegistered = new ArrayList<ImagePlus>();
@@ -659,8 +549,8 @@ public class PipelineActionsHandler {
             ImagePlus imgRef = listAlreadyRegistered.get(listAlreadyRegistered.size() - 1);
             imageRefRecc[n1] = imgRef;
             RegistrationAction regAct2 = new RegistrationAction().defineSettingsFromTwoImages(tabImg[0], tabImg[0], null, false);
-            regAct2.setLevelMaxNonLinear(1);//Avant Helene il y a vait 1
-            regAct2.setLevelMinNonLinear(0);//Avant Helene il y avait -1
+            regAct2.setLevelMaxNonLinear(1);
+            regAct2.setLevelMinNonLinear(-1);
             regAct2.setIterationsBMNonLinear(4);
             regAct2.typeTrans = Transform3DType.DENSE;
             regAct2.strideX = 4;
@@ -674,10 +564,10 @@ public class PipelineActionsHandler {
             BlockMatchingRegistration bm2 = BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, tabImg2[n1], regAct2);
             bm2.mask = mask.duplicate();
             bm2.defaultCoreNumber = VitimageUtils.getNbCores();
-            bm2.minBlockVariance = 0.8;//Avant Helene il y avait 10
+            bm2.minBlockVariance = 10;
             bm2.minBlockScore = 0.10;
-            bm2.displayR2 = false;
-            boolean viewRegistrations = false;
+            bm2.displayR2 = true;
+            boolean viewRegistrations = true;
             if (viewRegistrations) {
                 bm2.displayRegistration = 2;
                 bm2.adjustZoomFactor(512.0 / tabImg[n1].getWidth());
@@ -913,18 +803,18 @@ public class PipelineActionsHandler {
         ImagePlus mask = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
         // Dilate the mask image
         mask = MorphoUtils.dilationCircle2D(mask, 9);
-        // Open the dates image
+        // Open the date image
         ImagePlus dates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
         // Read the graph from a file
         SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipeline
                 .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
-        // Compute the distance transform of the dates image
+        // Compute the distance transform of the date image
         ImagePlus distOut = MorphoUtils.getDistOut(dates, false);
         // Open the registered image
         ImagePlus reg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
 
         // Refine the graph
-        RootModel rm = RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(graph, distOut, pph, indexImg);
+        RootModel rm = RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(Objects.requireNonNull(graph), distOut, pph, indexImg);
         // Clean the RSML
         rm.cleanWildRsml();
         // Resample flying roots
@@ -984,7 +874,7 @@ public class PipelineActionsHandler {
             rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath());
         }
         // Draw distance or time
-        ImagePlus skeletonTime = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 3);
+        ImagePlus skeletonTime = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, Objects.requireNonNull(graph), false, true, 3);
         ImagePlus skeletonDay = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 2);
         ImagePlus allTimes = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, false, 1);
 
@@ -1239,6 +1129,7 @@ public class PipelineActionsHandler {
     }
 
     // TODO : give a geometrical meaning to the various params
+
     /**
      * This method is used to process an image and return a modified version of it.
      * The processing involves a series of morphological operations and thresholding.
@@ -1429,80 +1320,81 @@ public class PipelineActionsHandler {
      * The function is designed to work with 3D images, iterating over each pixel in each slice of the image stack.
      * It returns an ImagePlus object where each pixel's value is the index of the first significant downward rupture in the corresponding pixel's intensity values over time.
      *
-     * @param imgs An array of ImagePlus objects representing the time series of images.
+     * @param imgs          An array of ImagePlus objects representing the time series of images.
      * @param maskLeavesOut An array of ImagePlus objects representing masks that exclude certain regions from the analysis.
-     * @param minThreshold The minimum difference in intensity values to be considered a significant rupture.
+     * @param minThreshold  The minimum difference in intensity values to be considered a significant rupture.
      * @return An ImagePlus object where each pixel's value is the index of the first significant downward rupture in the corresponding pixel's intensity values over time.
-     *
-    public static ImagePlus indRuptureDownOfImageArrayDouble(ImagePlus[] imgs, ImagePlus[] maskLeavesOut,
-                                                             int minThreshold) {
-        // Get the dimensions of the images
-        int xM = imgs[0].getWidth();
-        int yM = imgs[0].getHeight();
-        int zM = imgs[0].getStackSize();
-
-        // Initialize the output image with the same dimensions as the input images
-        ImagePlus retInd = VitimageUtils.nullImage(imgs[0].duplicate());
-
-        // Initialize arrays to hold the pixel values of the images and masks
-        float[] valsInd;
-        float[][] valsImg = new float[imgs.length][];
-        float[][] valsMask = new float[imgs.length][];
-
-        // Initialize arrays to hold the pixel values to be detected and masked
-        double[] valsToDetect;
-        double[] valsToMask;
-
-        // Iterate over each slice in the image stack
-        for (int z = 0; z < zM; z++) {
-            // Get the pixel values of the current slice in the output image
-            valsInd = (float[]) retInd.getStack().getProcessor(z + 1).getPixels();
-
-            // Get the pixel values of the current slice in each input image and mask
-            for (int i = 0; i < imgs.length; i++) {
-                valsImg[i] = (float[]) imgs[i].getStack().getProcessor(z + 1).getPixels();
-                valsMask[i] = (float[]) maskLeavesOut[((i < 2) ? 0 : i - 1)].getStack().getProcessor(z + 1).getPixels();
-            }
-
-            // Iterate over each pixel in the current slice
-            for (int x = 0; x < xM; x++) {
-                for (int y = 0; y < yM; y++) {
-                    // Initialize the last significant rupture index to 0
-                    int last = 0;
-
-                    // Initialize the arrays to hold the pixel values to be detected and masked
-                    valsToDetect = new double[imgs.length];
-                    valsToMask = new double[imgs.length];
-
-                    // Get the pixel values to be detected and masked
-                    for (int i = 0; i < imgs.length; i++) {
-                        valsToDetect[i] = valsImg[i][xM * y + x];
-                        valsToMask[i] = valsMask[i][xM * y + x];
-
-                        // Update the last significant rupture index if the current mask pixel value is less than 1
-                        if (valsToMask[i] < 1)
-                            last = i;
-                    }
-
-                    // Debugging flag ?
-                    boolean blabla = x == 377 && y == 133;
-
-                    // Create a new array with the pixel values up to the last significant rupture index
-                    double[] newTab = new double[last + 1];
-                    System.arraycopy(valsToDetect, 0, newTab, 0, last + 1);
-
-                    // Calculate the index of the first significant downward rupture
-                    int rupt = ruptureDetectionDown(newTab, minThreshold, blabla);
-
-                    // Set the pixel value in the output image to the rupture index
-                    valsInd[xM * y + x] = rupt;
-                }
-            }
-        }
-
-        // Return the output image
-        return retInd;
-    }*/
+     * <p>
+     * public static ImagePlus indRuptureDownOfImageArrayDouble(ImagePlus[] imgs, ImagePlus[] maskLeavesOut,
+     * int minThreshold) {
+     * // Get the dimensions of the images
+     * int xM = imgs[0].getWidth();
+     * int yM = imgs[0].getHeight();
+     * int zM = imgs[0].getStackSize();
+     * <p>
+     * // Initialize the output image with the same dimensions as the input images
+     * ImagePlus retInd = VitimageUtils.nullImage(imgs[0].duplicate());
+     * <p>
+     * // Initialize arrays to hold the pixel values of the images and masks
+     * float[] valsInd;
+     * float[][] valsImg = new float[imgs.length][];
+     * float[][] valsMask = new float[imgs.length][];
+     * <p>
+     * // Initialize arrays to hold the pixel values to be detected and masked
+     * double[] valsToDetect;
+     * double[] valsToMask;
+     * <p>
+     * // Iterate over each slice in the image stack
+     * for (int z = 0; z < zM; z++) {
+     * // Get the pixel values of the current slice in the output image
+     * valsInd = (float[]) retInd.getStack().getProcessor(z + 1).getPixels();
+     * <p>
+     * // Get the pixel values of the current slice in each input image and mask
+     * for (int i = 0; i < imgs.length; i++) {
+     * valsImg[i] = (float[]) imgs[i].getStack().getProcessor(z + 1).getPixels();
+     * valsMask[i] = (float[]) maskLeavesOut[((i < 2) ? 0 : i - 1)].getStack().getProcessor(z + 1).getPixels();
+     * }
+     * <p>
+     * // Iterate over each pixel in the current slice
+     * for (int x = 0; x < xM; x++) {
+     * for (int y = 0; y < yM; y++) {
+     * // Initialize the last significant rupture index to 0
+     * int last = 0;
+     * <p>
+     * // Initialize the arrays to hold the pixel values to be detected and masked
+     * valsToDetect = new double[imgs.length];
+     * valsToMask = new double[imgs.length];
+     * <p>
+     * // Get the pixel values to be detected and masked
+     * for (int i = 0; i < imgs.length; i++) {
+     * valsToDetect[i] = valsImg[i][xM * y + x];
+     * valsToMask[i] = valsMask[i][xM * y + x];
+     * <p>
+     * // Update the last significant rupture index if the current mask pixel value is less than 1
+     * if (valsToMask[i] < 1)
+     * last = i;
+     * }
+     * <p>
+     * // Debugging flag ?
+     * boolean blabla = x == 377 && y == 133;
+     * <p>
+     * // Create a new array with the pixel values up to the last significant rupture index
+     * double[] newTab = new double[last + 1];
+     * System.arraycopy(valsToDetect, 0, newTab, 0, last + 1);
+     * <p>
+     * // Calculate the index of the first significant downward rupture
+     * int rupt = ruptureDetectionDown(newTab, minThreshold, blabla);
+     * <p>
+     * // Set the pixel value in the output image to the rupture index
+     * valsInd[xM * y + x] = rupt;
+     * }
+     * }
+     * }
+     * <p>
+     * // Return the output image
+     * return retInd;
+     * }
+     */
     public static ImagePlus indRuptureDownOfImageArrayDouble(ImagePlus[] imgs, ImagePlus[] maskLeavesOut, int minThreshold) {
         int xM = imgs[0].getWidth();
         int yM = imgs[0].getHeight();

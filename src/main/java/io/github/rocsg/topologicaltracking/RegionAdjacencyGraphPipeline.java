@@ -272,7 +272,7 @@ public class RegionAdjacencyGraphPipeline {
         FSR sr = (new FSR());
         sr.initialize();
         RootModel rm = new RootModel();
-        rm.pixelSize = pph.originalPixelSize * pph.subsamplingFactor;
+        rm.pixelSize = (float) (pph.originalPixelSize * PipelineParamHandler.subsamplingFactor);
         double[] hoursExtremities = pph.getHoursExtremities(indexImg);
         hoursExtremities[0] = hoursExtremities[1];
         rm.setHoursFromPph(pph.getHoursExtremities(indexImg));

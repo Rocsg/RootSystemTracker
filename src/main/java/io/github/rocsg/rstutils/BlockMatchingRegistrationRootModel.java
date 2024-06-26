@@ -29,12 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistration {
 
     private static final double EPSILON = 1.0E-8;
-    private final String info = "";
     /**
      * The is rsml.
      */
     static ImagePlus realImageRef;
     static ImagePlus realImageMov;
+    private final String info = "";
     public boolean isRsml = false;
     // tool copy
     boolean waitBeforeStart = false;
@@ -294,79 +294,6 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         return bm.rM;
     }
 
-    public RootModel setupAndRunRsmlBlockMatchingRegistration(RootModel rootModel, ImagePlus imageRef) {
-        ImagePlus imgRef = imageRef;
-        imgRef = VitimageUtils.resize(imgRef, imgRef.getWidth(), imgRef.getHeight(), imgRef.getStackSize());
-        // the number of blocks will be the number of blocks of an image of size determined by the boundaries of the rootmodel
-
-        int topLeftX = Integer.MAX_VALUE; // TODO assuming no initial transform
-        int topLeftY = Integer.MAX_VALUE;
-        int bottomRightX = Integer.MIN_VALUE;
-        int bottomRightY = Integer.MIN_VALUE;
-        for (Root root : rootModel.rootList) {
-            Node firstNode = root.firstNode;
-            while (firstNode != null) {
-                topLeftX = (int) Math.min(topLeftX, firstNode.x);
-                topLeftY = (int) Math.min(topLeftY, firstNode.y);
-                bottomRightX = (int) Math.max(bottomRightX, firstNode.x);
-                bottomRightY = (int) Math.max(bottomRightY, firstNode.y);
-                firstNode = firstNode.child;
-            }
-        }
-
-        // extract the corresponding part of the image and assign them to imgRef and imgMov (+- blockSize if possible)
-        realImageRef = imgRef.duplicate();
-        int beginX = Math.max(topLeftX - this.blockSizeX, 0);
-        int beginY = Math.max(topLeftY - this.blockSizeY, 0);
-        int dimX = Math.min(bottomRightX + this.blockSizeX, imgRef.getWidth()) - beginX;
-        int dimY = Math.min(bottomRightY + this.blockSizeY, imgRef.getHeight()) - beginY;
-        int beginZ = 0;
-        int dimZ = imgRef.getStackSize() - 1;
-        imgRef = VitimageUtils.cropImage(imgRef, beginX, beginY, beginZ, dimX, dimY, dimZ);
-
-        // creating a linear transform for the crop issue for the root model
-        Point3d[] oldPos = new Point3d[1];
-        Point3d[] newPos = new Point3d[1];
-        oldPos[0] = new Point3d(topLeftX, topLeftY, 0);
-        newPos[0] = new Point3d(0, 0, 0);
-        ItkTransform linearTransform = ItkTransform.estimateBestTranslation3D(oldPos, newPos);
-
-        rootModel.applyTransformToGeometry(linearTransform);
-
-        System.out.println("imgRef = " + imgRef + " width=" + imgRef.getWidth() + " height=" + imgRef.getHeight());
-
-        rootModel.refineDescription(10);
-        rootModel.attachLatToPrime();
-        ImagePlus imgMov = multiPlongement(imgRef, rootModel, false); // TODO Faire attention à la présence de RSML ancienement plongemenet
-        //imgMov.show();
-        RegistrationAction regAct = RegistrationAction.defineSettingsForRSML(imgRef);
-        //regAct.typeAutoDisplay = 2;
-        BlockMatchingRegistration br = BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
-        BlockMatchingRegistrationRootModel bm = new BlockMatchingRegistrationRootModel(br, rootModel);
-
-        boolean display = true;
-        boolean multiRsml = false;
-        if (!display) bm.imageJOutputActivated = false;
-        //bm.waitBeforeStart=false;
-        // bm.updateViews(0, 0, 0, "Start");
-        bm.displayRegistration = display ? 2 : 0;
-        bm.minBlockVariance = 0.05;
-        bm.minBlockScore = 0.01;
-        bm.adjustZoomFactor(512.0 / imgRef.getWidth());
-        bm.defaultCoreNumber = multiRsml ? 1 : VitimageUtils.getNbCores() / 2;
-        ItkTransform itkTransform = bm.runBlockMatching(null, false);
-
-        // save the transformation
-        bm.closeLastImages();
-        bm.freeMemory();
-        RootModel rt = bm.rM;
-        bm = null;
-        imgRef = null;
-        imgMov = null;
-        regAct = null;
-        return rt;
-    }
-
     public static ImagePlus multiPlongement(ImagePlus ref, RootModel rootModel, boolean addCrosses) {
         return rootModel.createGrayScaleImages(ref, 1, false, addCrosses, 1);
     }
@@ -518,6 +445,83 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                 img = null;
             }
         }
+    }
+
+    public RootModel setupAndRunRsmlBlockMatchingRegistration(RootModel rootModel, ImagePlus imageRef) {
+        ImagePlus imgRef = imageRef;
+        imgRef = VitimageUtils.resize(imgRef, imgRef.getWidth(), imgRef.getHeight(), imgRef.getStackSize());
+        // the number of blocks will be the number of blocks of an image of size determined by the boundaries of the rootmodel
+
+        int topLeftX = Integer.MAX_VALUE; // TODO assuming no initial transform
+        int topLeftY = Integer.MAX_VALUE;
+        int bottomRightX = Integer.MIN_VALUE;
+        int bottomRightY = Integer.MIN_VALUE;
+        for (Root root : rootModel.rootList) {
+            Node firstNode = root.firstNode;
+            while (firstNode != null) {
+                topLeftX = (int) Math.min(topLeftX, firstNode.x);
+                topLeftY = (int) Math.min(topLeftY, firstNode.y);
+                bottomRightX = (int) Math.max(bottomRightX, firstNode.x);
+                bottomRightY = (int) Math.max(bottomRightY, firstNode.y);
+                firstNode = firstNode.child;
+            }
+        }
+
+        // extract the corresponding part of the image and assign them to imgRef and imgMov (+- blockSize if possible)
+        realImageRef = imgRef.duplicate();
+        int beginX = Math.max(topLeftX - this.blockSizeX, 0);
+        int beginY = Math.max(topLeftY - this.blockSizeY, 0);
+        int dimX = Math.min(bottomRightX + this.blockSizeX, imgRef.getWidth()) - beginX;
+        int dimY = Math.min(bottomRightY + this.blockSizeY, imgRef.getHeight()) - beginY;
+        int beginZ = 0;
+        int dimZ = imgRef.getStackSize() - 1;
+        imgRef = VitimageUtils.cropImage(imgRef, beginX, beginY, beginZ, dimX, dimY, dimZ);
+
+        // creating a linear transform for the crop issue for the root model
+        Point3d[] oldPos = new Point3d[1];
+        Point3d[] newPos = new Point3d[1];
+        oldPos[0] = new Point3d(topLeftX, topLeftY, 0);
+        newPos[0] = new Point3d(0, 0, 0);
+        ItkTransform linearTransform = ItkTransform.estimateBestTranslation3D(oldPos, newPos);
+
+        rootModel.applyTransformToGeometry(linearTransform);
+
+        System.out.println("imgRef = " + imgRef + " width=" + imgRef.getWidth() + " height=" + imgRef.getHeight());
+
+        rootModel.refineDescription(10);
+        rootModel.attachLatToPrime();
+        ImagePlus imgMov = multiPlongement(imgRef, rootModel, false); // TODO Faire attention à la présence de RSML ancienement plongemenet
+        //imgMov.show();
+        RegistrationAction regAct = RegistrationAction.defineSettingsForRSML(imgRef);
+        //regAct.typeAutoDisplay = 2;
+        BlockMatchingRegistration br = BlockMatchingRegistration.setupBlockMatchingRegistration(imgRef, imgMov, regAct);
+        BlockMatchingRegistrationRootModel bm = new BlockMatchingRegistrationRootModel(br, rootModel);
+
+        boolean display = false;
+        boolean multiRsml = false;
+        if (!display) bm.imageJOutputActivated = false;
+        //bm.waitBeforeStart=false;
+        // bm.updateViews(0, 0, 0, "Start");
+        bm.displayRegistration = display ? 2 : 0;
+        bm.minBlockVariance = 0.05;
+        bm.minBlockScore = 0.01;
+        bm.adjustZoomFactor(512.0 / imgRef.getWidth());
+        bm.defaultCoreNumber = multiRsml ? 1 : VitimageUtils.getNbCores() / 2;
+        ItkTransform itkTransform = bm.runBlockMatching(null, false);
+
+        // save the transformation
+        bm.closeLastImages();
+        bm.freeMemory();
+        RootModel rt = bm.rM;
+        bm = null;
+        imgRef = null;
+        imgMov = null;
+        regAct = null;
+
+        // inverse the linear transform
+        linearTransform = ItkTransform.estimateBestTranslation3D(newPos, oldPos);
+        rt.applyTransformToGeometry(linearTransform);
+        return rt;
     }
 
     /**
@@ -1049,7 +1053,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                 timesIter[lev][iter][9] = VitimageUtils.dou((System.currentTimeMillis() - t0) / 1000.0);
 
 
-                // Selection step 1 : select correspondences by score
+                // Selection step 1: select correspondences by score
                 ItkTransform transEstimated = null;
                 int nbPts1 = listCorrespondances.size();
                 Object[] ret = getCorrespondanceListAsTrimmedPointArray(listCorrespondances, this.successiveVoxSizes[lev], this.percentageBlocksSelectedByScore, 100, transEstimated);

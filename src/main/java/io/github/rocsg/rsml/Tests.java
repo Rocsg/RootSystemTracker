@@ -37,7 +37,6 @@ public class Tests {
     /**
      * The main method.
      *
-     * @param args the args
      */
 /*	public static void main(String[]args) {
 		ImageJ ij=new ImageJ();
