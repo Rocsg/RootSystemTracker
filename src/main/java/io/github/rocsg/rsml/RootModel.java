@@ -1881,37 +1881,6 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
     public Object[] getClosestNode(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
-        double t = pt.z;
-        AtomicReference<Double> squareDistMin = new AtomicReference<>(Double.MAX_VALUE);
-        AtomicReference<Node> nodeMin = new AtomicReference<>();
-        nodeMin.set(null);
-        AtomicReference<Root> rootMin = new AtomicReference<>();
-        rootMin.set(null);
-
-        rootList.parallelStream().forEach(r -> {
-            //if (r.childList == null || r.childList.isEmpty()) continue;
-            Node n = r.firstNode;
-            while (n != null) {
-                double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                if (/*(n.birthTime <= pt.z) && */(squareDist < squareDistMin.get())) {
-                    squareDistMin.set(squareDist);
-                    // if it is not the same node
-                    if (squareDist == 0) continue;
-                    rootMin.set(r);
-                    nodeMin.set(n);
-                }
-                n = n.child;
-            }
-        });
-        if (nodeMin != null && rootMin != null && nodeMin.get().birthTime <= t) {
-            return new Object[]{nodeMin.get(), rootMin.get()};
-        } else {
-            return null;
-        }
-    }
-    /*public Object[] getClosestNode(Point3d pt) {
-        double x = pt.x;
-        double y = pt.y;
         double distMin = 1E18;
         Node nodeMin = null;
         Root rootMin = null;
@@ -1928,7 +1897,7 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
             }
         }
         return new Object[]{nodeMin, rootMin};
-    }*/
+    }
 
     /**
      * Gets the closest node in primary.
@@ -1963,31 +1932,22 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
     public Object[] getClosestNodeInPrimary(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
-        double t = pt.z;
-        AtomicReference<Double> squareDistMin = new AtomicReference<>(Double.MAX_VALUE);
-        AtomicReference<Node> nodeMin = new AtomicReference<>();
-        AtomicReference<Root> rootMin = new AtomicReference<>();
-
-        rootList.parallelStream().forEach(r -> {
-            //if (r.childList == null || r.childList.isEmpty()) continue;
-            if (r.order <= 1) {
-                Node n = r.firstNode;
-                while (n != null) {
-                    double squareDist = (x - n.x) * (x - n.x) + (y - n.y) * (y - n.y);
-                    if ((n.birthTime <= pt.z) && (squareDist < squareDistMin.get())) {
-                        squareDistMin.set(squareDist);
-                        rootMin.set(r);
-                        nodeMin.set(n);
-                    }
-                    n = n.child;
+        double distMin = 1E18;
+        Node nodeMin = null;
+        Root rootMin = null;
+        for (Root r : rootList) {
+            Node n = r.firstNode;
+            while (n != null) {
+                double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+                if (dist < distMin && n.birthTime <= pt.z && r.order == 1) {
+                    distMin = dist;
+                    rootMin = r;
+                    nodeMin = n;
                 }
+                n = n.child;
             }
-        });
-        if (rootMin != null && nodeMin.get().birthTime <= t) {
-            return new Object[]{nodeMin.get(), rootMin.get()};
-        } else {
-            return null;
         }
+        return new Object[]{nodeMin, rootMin};
     }
 
     /**

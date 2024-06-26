@@ -20,8 +20,8 @@ public class TestPipelineParamHandler {
         prev_test.globalTestNoRun();
 
         // Define the path to the output folder
-        String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
-        String outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
+        String inputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
+        String outputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
 
         File outputFolder = new File(outputFolderPath);
         //create the output folder if it does not exist

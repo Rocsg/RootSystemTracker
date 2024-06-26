@@ -24,8 +24,8 @@ public class TestRootDatasetMakeInventory {
         System.out.println("Current directory: " + System.getProperty("user.dir"));
 
         // Define the path to the output folder
-        String inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Input\\";
-        String outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\data\\Test\\Output\\Inventory\\";
+        String inputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Input\\";
+        String outputFolderPath = "D:\\loaiu\\MAM5\\Stage\\data\\Test\\Output\\Process\\";
 
         // Create a File object for the output folder
         File outputFolder = new File(outputFolderPath);
