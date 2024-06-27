@@ -1,170 +1,157 @@
 package io.github.rocsg.rstutils;
 
-import java.util.ArrayList;
-
-import io.github.rocsg.fijiyama.common.Timer;
-import io.github.rocsg.fijiyama.registration.TransformUtils;
-import io.github.rocsg.fijiyama.common.VitimageUtils;
-import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
-import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
-import io.github.rocsg.fijiyama.registration.ItkTransform;
-import io.github.rocsg.fijiyama.registration.Transform3DType;
-import io.github.rocsg.fijiyama.rsml.Root;
-import io.github.rocsg.fijiyama.rsml.RootModel;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
+import io.github.rocsg.fijiyama.common.VitimageUtils;
 
 public class Tests {
 
-	public static void main(String []args) {
-		runTestGaps();
-	}
+    public static void main(String[] args) {
+        runTestGaps();
+    }
 
-	
-	public static void runTestGaps() {
-		ImageJ ij=new ImageJ();
-		String imgPathIn="/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/Gaps_1.tif";
-		String imgPathOut="/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/ResultGaps_1.tif";
-		String imgPathOut2="/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/Result2Gaps_1.tif";
-		ImagePlus img=IJ.openImage(imgPathIn);
-		img.show();
-		img=VitimageUtils.convertByteToFloatWithoutDynamicChanges(img);
-		img.setDisplayRange(0, 255);
-		img=VitimageUtils.gaussianFiltering(img, 3, 3, 0);
-		double valueUp=170;
-		double valueMiddle=130;
-		double valueDown=0;
-		//10 end mid, 15 mid down 23 start up   37 end up   43 mid down  47 start mid 57 end mid
-		int X=117;
-		int x0down0=42;
-		int x1down0=50;
-		int x0down1=X-x1down0;
-		int x1down1=X-x0down0;
-		double[]pattern=new double[X];
-		for(int i=0;i<X;i++)pattern[i]=valueMiddle;
-		for(int i=x0down0 ; i<=x1down0;i++)pattern[i]=valueDown;
-		for(int i=x0down1 ; i<=x1down1;i++)pattern[i]=valueDown;
-		for(int i=x1down0+1 ; i<x0down1;i++)pattern[i]=valueUp;
-		for(int i=0;i<X;i++)System.out.println("i="+i+" : "+pattern[i]);
-		
-		int W=img.getWidth();
-		int H=img.getHeight();
-		int X0=200;
-		int X1=W-200;
-		int Y0=200;
-		int Y1=H-200;
-		
-		ImagePlus imgRes=img.duplicate();
-		double[]valsImg=new double[X];
 
-		for(int z=0;z<img.getStackSize()/2;z++) {
-			IJ.log(""+z);
-			float[]valsSource=(float [])img.getStack().getProcessor(z+1).getPixels();
-			float[]valsDest=(float [])imgRes.getStack().getProcessor(z+1).getPixels();
-			for(int x=X0;x<X1;x++)for(int y=Y0;y<Y1;y++) {
-				for(int i=0;i<X;i++)valsImg[i]=valsSource[(y+i-X/2)*W+x];
-				double val=correlationCoefficient(valsImg,pattern);
-				valsDest[y*W+x]=(float)val;//(float) (0.5*valsSource[y*W+x]);//
-			}			
-		}
+    public static void runTestGaps() {
+        ImageJ ij = new ImageJ();
+        String imgPathIn = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/Gaps_1.tif";
+        String imgPathOut = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/ResultGaps_1.tif";
+        String imgPathOut2 = "/home/rfernandez/Bureau/A_Test/RootSystemTracker/Cici_V3/TestGaps/Result2Gaps_1.tif";
+        ImagePlus img = IJ.openImage(imgPathIn);
+        img.show();
+        img = VitimageUtils.convertByteToFloatWithoutDynamicChanges(img);
+        img.setDisplayRange(0, 255);
+        img = VitimageUtils.gaussianFiltering(img, 3, 3, 0);
+        double valueUp = 170;
+        double valueMiddle = 130;
+        double valueDown = 0;
+        //10 end mid, 15 mid down 23 start up   37 end up   43 mid down  47 start mid 57 end mid
+        int X = 117;
+        int x0down0 = 42;
+        int x1down0 = 50;
+        int x0down1 = X - x1down0;
+        int x1down1 = X - x0down0;
+        double[] pattern = new double[X];
+        for (int i = 0; i < X; i++) pattern[i] = valueMiddle;
+        for (int i = x0down0; i <= x1down0; i++) pattern[i] = valueDown;
+        for (int i = x0down1; i <= x1down1; i++) pattern[i] = valueDown;
+        for (int i = x1down0 + 1; i < x0down1; i++) pattern[i] = valueUp;
+        for (int i = 0; i < X; i++) System.out.println("i=" + i + " : " + pattern[i]);
 
-		double[]pattern2=new double[] {-0.01646,-0.01333,-0.01004,-0.00735,-0.01370,-0.01850,-0.02276,-0.02765,-0.03272,-0.03556,-0.03859,-0.03970,-0.04042,-0.04201,-0.04293,-0.04086,-0.03761,-0.01561,0.03729,0.09401,0.14953,0.22567,0.30522,0.36592,0.38790,0.36905,0.31766,0.22793,0.13069,0.03164,-0.09360,-0.22026,-0.32244,-0.37713,-0.38337,-0.37950,-0.37428,-0.36669,-0.35502,-0.34598,-0.33873,-0.32867,-0.29258,-0.21574,-0.11000,0.04267,0.23277,0.43660,0.62085,0.74449,0.77959,0.76684,0.71922,0.63593,0.48617,0.30215,0.10157,-0.08395,-0.21650,-0.26510,-0.28427,-0.30011,-0.31382,-0.32119,-0.33043,-0.34289,-0.35312,-0.36370,-0.36916,-0.34226,-0.25218,-0.15106,-0.03768,0.08019,0.18427,0.23923,0.27082,0.29548,0.29859,0.25378,0.20030,0.13544,0.06681,0.01337,-0.00359,-0.00946,-0.01375,-0.01938,-0.02222,-0.02557,-0.02961,-0.03163,-0.03666,-0.03995,-0.03273,-0.02401,-0.01591,-0.00672,0.00357,0.01137,0.01274};;
-		X=pattern2.length;
-		ImagePlus imgRes2=imgRes.duplicate();
-		for(int z=0;z<img.getStackSize()/2;z++) {
-			IJ.log(""+z);
-			valsImg=new double[X];
-			float[]valsSource=(float [])imgRes.getStack().getProcessor(z+1).getPixels();
-			float[]valsDest=(float [])imgRes2.getStack().getProcessor(z+1).getPixels();
-			for(int x=X0;x<X1;x++)for(int y=Y0;y<Y1;y++) {
-				for(int i=0;i<X;i++)valsImg[i]=valsSource[(y+i-X/2)*W+x];
-				double val=correlationCoefficient(valsImg,pattern2);
-			//	if((x+y)%107==0)IJ.log(""+val);
-				valsDest[y*W+x]=(float)val;//(float) (0.5*valsSource[y*W+x]);//
-			}			
-		}
+        int W = img.getWidth();
+        int H = img.getHeight();
+        int X0 = 200;
+        int X1 = W - 200;
+        int Y0 = 200;
+        int Y1 = H - 200;
 
-		IJ.saveAsTiff(imgRes2, imgPathOut2);
-		imgRes2=selectOnlyMaxY(imgRes2,40);
-		imgRes=selectOnlyMaxY(imgRes,40);
+        ImagePlus imgRes = img.duplicate();
+        double[] valsImg = new double[X];
+
+        for (int z = 0; z < img.getStackSize() / 2; z++) {
+            IJ.log("" + z);
+            float[] valsSource = (float[]) img.getStack().getProcessor(z + 1).getPixels();
+            float[] valsDest = (float[]) imgRes.getStack().getProcessor(z + 1).getPixels();
+            for (int x = X0; x < X1; x++)
+                for (int y = Y0; y < Y1; y++) {
+                    for (int i = 0; i < X; i++) valsImg[i] = valsSource[(y + i - X / 2) * W + x];
+                    double val = correlationCoefficient(valsImg, pattern);
+                    valsDest[y * W + x] = (float) val;//(float) (0.5*valsSource[y*W+x]);//
+                }
+        }
+
+        double[] pattern2 = new double[]{-0.01646, -0.01333, -0.01004, -0.00735, -0.01370, -0.01850, -0.02276, -0.02765, -0.03272, -0.03556, -0.03859, -0.03970, -0.04042, -0.04201, -0.04293, -0.04086, -0.03761, -0.01561, 0.03729, 0.09401, 0.14953, 0.22567, 0.30522, 0.36592, 0.38790, 0.36905, 0.31766, 0.22793, 0.13069, 0.03164, -0.09360, -0.22026, -0.32244, -0.37713, -0.38337, -0.37950, -0.37428, -0.36669, -0.35502, -0.34598, -0.33873, -0.32867, -0.29258, -0.21574, -0.11000, 0.04267, 0.23277, 0.43660, 0.62085, 0.74449, 0.77959, 0.76684, 0.71922, 0.63593, 0.48617, 0.30215, 0.10157, -0.08395, -0.21650, -0.26510, -0.28427, -0.30011, -0.31382, -0.32119, -0.33043, -0.34289, -0.35312, -0.36370, -0.36916, -0.34226, -0.25218, -0.15106, -0.03768, 0.08019, 0.18427, 0.23923, 0.27082, 0.29548, 0.29859, 0.25378, 0.20030, 0.13544, 0.06681, 0.01337, -0.00359, -0.00946, -0.01375, -0.01938, -0.02222, -0.02557, -0.02961, -0.03163, -0.03666, -0.03995, -0.03273, -0.02401, -0.01591, -0.00672, 0.00357, 0.01137, 0.01274};
+        ;
+        X = pattern2.length;
+        ImagePlus imgRes2 = imgRes.duplicate();
+        for (int z = 0; z < img.getStackSize() / 2; z++) {
+            IJ.log("" + z);
+            valsImg = new double[X];
+            float[] valsSource = (float[]) imgRes.getStack().getProcessor(z + 1).getPixels();
+            float[] valsDest = (float[]) imgRes2.getStack().getProcessor(z + 1).getPixels();
+            for (int x = X0; x < X1; x++)
+                for (int y = Y0; y < Y1; y++) {
+                    for (int i = 0; i < X; i++) valsImg[i] = valsSource[(y + i - X / 2) * W + x];
+                    double val = correlationCoefficient(valsImg, pattern2);
+                    //	if((x+y)%107==0)IJ.log(""+val);
+                    valsDest[y * W + x] = (float) val;//(float) (0.5*valsSource[y*W+x]);//
+                }
+        }
+
+        IJ.saveAsTiff(imgRes2, imgPathOut2);
+        imgRes2 = selectOnlyMaxY(imgRes2, 40);
+        imgRes = selectOnlyMaxY(imgRes, 40);
 /*		imgRes=MorphoUtils.dilationLine2D(imgRes, 2, true);
 		imgRes=MorphoUtils.erosionLine2D(imgRes, 2, true);
 		imgRes=MorphoUtils.dilationLine2D(imgRes, 5, true);
 		imgRes=MorphoUtils.erosionLine2D(imgRes, 5, true);
 		imgRes=MorphoUtils.dilationLine2D(imgRes, 10, true);
 		imgRes=MorphoUtils.erosionLine2D(imgRes, 10, true);*/
-		img.setTitle("Source");
-		img.show();
-		img.setDisplayRange(0, 255);
-		imgRes.setTitle("Res");
-		imgRes.show();
-		imgRes.setDisplayRange(-1, 1);
-		imgRes2.setTitle("Res2");
-		imgRes2.show();
-		imgRes2.setDisplayRange(-1, 1);
-	}
+        img.setTitle("Source");
+        img.show();
+        img.setDisplayRange(0, 255);
+        imgRes.setTitle("Res");
+        imgRes.show();
+        imgRes.setDisplayRange(-1, 1);
+        imgRes2.setTitle("Res2");
+        imgRes2.show();
+        imgRes2.setDisplayRange(-1, 1);
+    }
 
-	
-	public static ImagePlus selectOnlyMaxY(ImagePlus img,int radius) {
-		ImagePlus res=img.duplicate();
-		int W=img.getWidth();
-		int H=img.getHeight();
-		for(int z=0;z<img.getStackSize()/2;z++) {
-			IJ.log(""+z);
-			float[]valsSource=(float [])img.getStack().getProcessor(z+1).getPixels();
-			float[]valsDest=(float [])res.getStack().getProcessor(z+1).getPixels();
-			for(int x=0;x<W;x++)for(int y=radius;y<H-radius;y++) {
-				boolean isMax=true;
-				for(int i=-radius;i<=radius;i++) {
-					if(valsSource[(y)*W+x]<valsSource[(y+i)*W+x]){isMax=false;}
-				}
-				valsDest[y*W+x]=isMax ? 1 : 0;//(float) (0.5*valsSource[y*W+x]);//
-			}			
-		}
-		return res;
-	}	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/**
-	 * Correlation coefficient.
-	 *
-	 * @param X the x
-	 * @param Y the y
-	 * @return the double
-	 */
-	public static double correlationCoefficient(double X[], double Y[]) { 
-		double epsilon=10E-20;
-		if(X.length !=Y.length ) {return 0;}
-		int n=X.length;
-		double sum_X = 0, sum_Y = 0, sum_XY = 0; 
-		double squareSum_X = 0, squareSum_Y = 0; 	
-		for (int i = 0; i < n; i++) { 
-			sum_X = sum_X + X[i]; 		
-			sum_Y = sum_Y + Y[i]; 
-			sum_XY = sum_XY + X[i] * Y[i]; 
-			squareSum_X = squareSum_X + X[i] * X[i]; 
-			squareSum_Y = squareSum_Y + Y[i] * Y[i]; 
-		} 
-		if(squareSum_X<epsilon || squareSum_Y<epsilon )return 0;
-		// use formula for calculating correlation  
-		// coefficient. 
-		double result=(n * sum_XY - sum_X * sum_Y)/ (Math.sqrt((n * squareSum_X - sum_X * sum_X) * (n * squareSum_Y - sum_Y * sum_Y)));
-		if(Math.abs((n * squareSum_X - sum_X * sum_X))<10E-10)return 0; //cas Infinity
-		if(Math.abs((n * squareSum_Y - sum_Y * sum_Y))<10E-10)return 0; //cas Infinity
-		return result;
-	} 
+
+    public static ImagePlus selectOnlyMaxY(ImagePlus img, int radius) {
+        ImagePlus res = img.duplicate();
+        int W = img.getWidth();
+        int H = img.getHeight();
+        for (int z = 0; z < img.getStackSize() / 2; z++) {
+            IJ.log("" + z);
+            float[] valsSource = (float[]) img.getStack().getProcessor(z + 1).getPixels();
+            float[] valsDest = (float[]) res.getStack().getProcessor(z + 1).getPixels();
+            for (int x = 0; x < W; x++)
+                for (int y = radius; y < H - radius; y++) {
+                    boolean isMax = true;
+                    for (int i = -radius; i <= radius; i++) {
+                        if (valsSource[(y) * W + x] < valsSource[(y + i) * W + x]) {
+                            isMax = false;
+                        }
+                    }
+                    valsDest[y * W + x] = isMax ? 1 : 0;//(float) (0.5*valsSource[y*W+x]);//
+                }
+        }
+        return res;
+    }
+
+
+    /**
+     * Correlation coefficient.
+     *
+     * @param X the x
+     * @param Y the y
+     * @return the double
+     */
+    public static double correlationCoefficient(double X[], double Y[]) {
+        double epsilon = 10E-20;
+        if (X.length != Y.length) {
+            return 0;
+        }
+        int n = X.length;
+        double sum_X = 0, sum_Y = 0, sum_XY = 0;
+        double squareSum_X = 0, squareSum_Y = 0;
+        for (int i = 0; i < n; i++) {
+            sum_X = sum_X + X[i];
+            sum_Y = sum_Y + Y[i];
+            sum_XY = sum_XY + X[i] * Y[i];
+            squareSum_X = squareSum_X + X[i] * X[i];
+            squareSum_Y = squareSum_Y + Y[i] * Y[i];
+        }
+        if (squareSum_X < epsilon || squareSum_Y < epsilon) return 0;
+        // use formula for calculating correlation
+        // coefficient.
+        double result = (n * sum_XY - sum_X * sum_Y) / (Math.sqrt((n * squareSum_X - sum_X * sum_X) * (n * squareSum_Y - sum_Y * sum_Y)));
+        if (Math.abs((n * squareSum_X - sum_X * sum_X)) < 10E-10) return 0; //cas Infinity
+        if (Math.abs((n * squareSum_Y - sum_Y * sum_Y)) < 10E-10) return 0; //cas Infinity
+        return result;
+    }
 
 	/*
 	RhizoTrackPipeline rtp;
@@ -537,8 +524,6 @@ public class Tests {
 	*/
 
 
-
-	
 }
 
 
