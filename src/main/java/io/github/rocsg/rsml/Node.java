@@ -80,13 +80,13 @@ public class Node {
      * @param y     the y
      * @param d     the d
      * @param n     the n
-     * @param after the after
+     * @param isAfter the after
      */
-    public Node(float x, float y, float d, Node n, boolean after) {
+    public Node(float x, float y, float d, Node n, boolean isAfter) {
         this.x = x;
         this.y = y;
         this.diameter = d;
-        if (after) {
+        if (isAfter) {
             parent = n;
             if (parent != null) parent.child = this;
             child = null;

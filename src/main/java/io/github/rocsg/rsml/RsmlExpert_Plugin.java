@@ -213,7 +213,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private String stackPath;
     private String rsmlPath;
     private boolean toResize = true;
-    private String version = "v1.6.1 Identifiant-unique-2 - Release candidate";
+    private String version = "v2.0.0";
 
     /**
      * Instantiates a new rsml expert plugin.
@@ -1614,90 +1614,87 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     }
 
     /**
-     * This method extends a branch in the RootModel.
-     * It first checks if there are at least two points provided for the branch.
-     * Then it finds the closest node in the branch to the first point.
-     * It checks if the points are in the correct time order and if any time slices are missed.
-     * If all checks pass, it creates a new Node for each point and links them together to form a branch.
-     * The new branch is then added to the RootModel.
+     * Extend branch in model.
      *
-     * @param tabPt an array of Point3d objects representing the points of the new branch
-     * @param rm    the RootModel object to which the new branch will be added
-     * @return an array of Strings containing information about the operation, or null if the operation was not
-     * successful
+     * @param tabPt the array of 3D points
+     * @param rm the root model
+     * @return array of strings containing formatted information, or null if unsuccessful
      */
     public String[] extendBranchInModel(Point3d[] tabPt, RootModel rm) {
+        // Format and return initial information about the branch extension
         String[] infos = formatInfos("EXTENDBRANCH", tabPt);
 
+        // Ensure there are at least 2 points to form a branch
         if (tabPt.length < 2) return null;
 
+        // Get the closest node to the first point in the list
         Object[] obj = rm.getClosestNode(tabPt[0]);
         if (obj == null) {
             IJ.showMessage("The branch has not yet appeared. Abort.");
             return null;
         }
+
+        // Extract the node and root from the closest node result
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
-        System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
+        System.out.println("Extending branch from:\n --> Node " + n + "\n --> Of root " + r);
 
+        // Check if the node is the last node of the root
         if (n != r.lastNode) {
             IJ.showMessage("Please select the last point of the branch you want to extend. Abort.");
             return null;
         }
 
+        // Validate the birth time of the node
         if (n.birthTime != (tabPt[0].z < 1 ? 0 : tabPt[0].z)) {
             IJ.showMessage("Please select the first point of the branch you want to extend at the right time. Abort.");
             return null;
         }
 
-        // Check if the points are in the correct time order and if any time slices are missed
+        // Validate the chronological order and continuity of the points
         for (int l = 0; l < tabPt.length - 1; l++) {
-
             if (tabPt[l].z > tabPt[l + 1].z) {
                 IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
-
             if (tabPt[l] == null || tabPt[l + 1] == null) {
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
             }
-
             if ((tabPt[l + 1].z - tabPt[l].z) > 1) {
-                IJ.showMessage("You gave points that does not follow in time, there is a gap. Abort.");
+                IJ.showMessage("You gave points that do not follow in time, there is a gap. Abort.");
                 return null;
             }
         }
 
-        // Create a map to store points by time
+        // Create a map to store points by time for future use
         TreeMap<Double, List<Point3d>> pointsByTime = new TreeMap<>();
-
         for (Point3d pt : tabPt) {
             pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
         }
 
-        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
-        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
+        // Save the parent of the original node
+        Node nPar = n.parent; // assuming branch has at least 2 points
 
-        // replace the first point of the list of the first time by n
-        pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
-        Node nPar = n;
+        // Create a new first node for the branch
+        Node nFirst = new Node(n.x, n.y, nPar, true);
+        nFirst.birthTime = n.birthTime;
+        nFirst.birthTimeHours = n.birthTimeHours;
+        nPar.child = nFirst;
+        Node nn = null;
 
-        List<Node> recordedNodes = new ArrayList<Node>();
-        recordedNodes.add(n);
+        // Iterate over the points to create new nodes and link them
+        for (int i = 1; i < tabPt.length; i++) {
+            nn = new Node((float) tabPt[i].x, (float) tabPt[i].y, nFirst, true);
+            nn.birthTime = (float) tabPt[i].z;
+            nFirst.child = nn;
+            nFirst = nn;
+        }
 
-        // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
-
-        r.lastNode = nPar;
+        // Update the last node of the root and update the timing
+        r.lastNode = nFirst;
         r.updateTiming();
-
-        // free memory
-        pointsByTime.clear();
-        extremityLast.clear();
-        extremityFirst.clear();
-        recordedNodes.clear();
 
         return infos;
     }
@@ -1823,8 +1820,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     continue;
                 }
 
-                //System.out.println(" --> " + pt);
-                // Create a new Node for the current point and link it to the previous node
                 Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
 
                 nn.parent = nPar;
