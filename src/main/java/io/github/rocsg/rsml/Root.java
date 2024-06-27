@@ -3,14 +3,12 @@ package io.github.rocsg.rsml;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
-import mdbtools.libmdb.mem;
 
 import java.awt.*;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.*;
-
 
 /**
  * @author Xavier Draye - Universit� catholique de Louvain
@@ -204,6 +202,8 @@ public class Root implements Comparable<Root> {
      */
     public float dpi, pixelSize;
 
+    /*For converting between rsmls and temporal rsmls*/
+    String label;
     /**
      * Constructor
      * Used when opening a xml file.
@@ -248,9 +248,6 @@ public class Root implements Comparable<Root> {
         readRSML(parentDOM, rm, parentRoot, origin, timeLapseModel);
     }
 
-   
-    
-
     /**
      * Instantiates a new root.
      *
@@ -266,7 +263,7 @@ public class Root implements Comparable<Root> {
         markList = new Vector<Mark>();
         this.rootID = rootID;
         if (parentRoot != null) {
-            attachParent(parentRoot);
+            attachParent(parentRoot); // appel setParentNode sur lui même ???, comment on créé la seconde racine sachant que firstnode et lastnode sont nuls ???
             parentRoot.attachChild(this);
         }
         nextRootKey++;
@@ -363,6 +360,17 @@ public class Root implements Comparable<Root> {
         Node nStop = this.lastNode;
         Node curNode = nStart;
         ArrayList<Node> listNode = new ArrayList<Node>();
+
+        // for all the points, if the root is of order 1 and there are severa times at 1, set all of them (but the last one) to 0
+        if (this.order == 1) {
+            Node n = nStart;
+            while (n.child != null && n.child.birthTime == 1) {
+                n.birthTime = 0;
+                n.birthTimeHours = 0;
+                n = n.child;
+            }
+        }
+
         // Loop through all nodes in the root and add them to the list
         while (curNode != null) {
             listNode.add(curNode);
@@ -389,7 +397,7 @@ public class Root implements Comparable<Root> {
         }
 
 
-        
+
 
 
         Node prev = null;
@@ -445,6 +453,8 @@ public class Root implements Comparable<Root> {
                 tabNode[i].birthTimeHours = (float) estTimeHours;
             }
         }
+
+
     }
 
     /**
@@ -563,10 +573,25 @@ public class Root implements Comparable<Root> {
                     n1 = n2;
                     n2 = n1.child;
                 }
-            } else {//no need to suppress this node
+            } else {
+                //no need to suppress this node
                 //System.out.println("  Exact");
-                n1 = n2;
-                n2 = n1.child;
+                if (n2 == null) {//last node
+                    //  System.out.println("   Last node");
+                    if (n1 == firstNode) {//also the first node
+                        //  System.out.println("     First node");
+                        return false;//technically the calling function should raise this flag and should suppress this root
+                    } else {//last node but not first node
+                        //System.out.println("     Not first node");
+                        lastNode = n1.parent;
+                        n1.parent.child = null;
+                        n1 = null;
+                    }
+                }
+                else {
+                    n1 = n2;
+                    n2 = n1.child;
+                }
             }
         }
         return true;
@@ -1408,6 +1433,16 @@ public class Root implements Comparable<Root> {
         if (childList.size() > 0) updateChildren();
     }
 
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public void setGeometry(List<Node> nodes) {
+        this.firstNode = nodes.get(0);
+        this.lastNode = nodes.get(nodes.size() - 1);
+        this.nNodes = nodes.size();
+    }
+
     /**
      * Automatically set distance from parent apex.
      */
@@ -1476,13 +1511,12 @@ public class Root implements Comparable<Root> {
      * @return true if there is at least one child, false if not.
      */
     public boolean setFirstChild() {
-        if (childList.size() == 0) {
+        if (childList.isEmpty()) {
             firstChild = null;
             return false;
         }
         Root fc = childList.get(0);
-        for (int i = 0; i < childList.size(); i++) {
-            Root c = childList.get(i);
+        for (Root c : childList) {
             if (c.getDistanceFromApex() > fc.getDistanceFromApex()) fc = c;
         }
         firstChild = fc;
@@ -1495,13 +1529,12 @@ public class Root implements Comparable<Root> {
      * @return true if there is at least one child, false if not.
      */
     public boolean setLastChild() {
-        if (childList.size() == 0) {
+        if (childList.isEmpty()) {
             lastChild = null;
             return false;
         }
         Root fc = childList.get(0);
-        for (int i = 0; i < childList.size(); i++) {
-            Root c = childList.get(i);
+        for (Root c : childList) {
             if (c.getDistanceFromApex() < fc.getDistanceFromApex()) fc = c;
         }
         lastChild = fc;
@@ -2159,7 +2192,7 @@ public class Root implements Comparable<Root> {
      * @param po the new po accession
      */
     public void setPoAccession(int po) {
-        this.poIndex = (rootID.length() == 0) ? 0 : po;
+        this.poIndex = (rootID.isEmpty()) ? 0 : po;
     }
 
     /**
@@ -2221,5 +2254,4 @@ public class Root implements Comparable<Root> {
         else if (this.firstNode.x < arg0.firstNode.x) return -1;
         else return 1;
     }
-
 }
