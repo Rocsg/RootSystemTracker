@@ -210,7 +210,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
     private boolean toResize = true;
 
-    private String version = "v1.6.1 Identifiant-unique-2 - Release candidate";
+    private String version = "v2.0.0 Kangouroo enchante - Release candidate";
 
     private boolean isDevModeActivated=false;
     /**

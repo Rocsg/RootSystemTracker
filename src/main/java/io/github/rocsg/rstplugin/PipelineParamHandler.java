@@ -88,7 +88,7 @@ public class PipelineParamHandler {
     // Type of experiment
     String typeExp = "Simple";
     // Margin for registration
-    int marginRegisterLeft = 420;
+    int marginRegisterLeft = 20;
     int marginRegisterUp = 0;
     int marginRegisterRight = 20;
     // Flag to apply full pipeline image after image
@@ -183,9 +183,13 @@ public class PipelineParamHandler {
         return typeExp.contains("Split_V01");
     }
 
+
     public boolean isGaps() {
-        return typeExp.contains("Gaps_V01");
+        
+        return typeExp.contains("HaveNoSurface_");
+
     }
+
 
     public String[] getImgNames() {
         return imgNames;

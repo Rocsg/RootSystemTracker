@@ -1543,7 +1543,6 @@ public class Root implements Comparable<Root> {
      * Set the parentNode, which is the closest node in the parent from the base node of root.
      */
     public void setParentNode() {
-
         Node n = firstNode;
         Root p = getParent();
         if (p == null) {
