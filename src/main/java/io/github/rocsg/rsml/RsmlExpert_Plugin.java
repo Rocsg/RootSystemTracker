@@ -1432,23 +1432,15 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Check if there are at least two points provided for the branch
         if (tabPt.length < 2) return null;
 
-        // Looking at the different times for which there is a given point and check if there is no gap and if it does not change
-        // the time order
-        //boolean[] extremity = new boolean[tabPt.length];
-
-        // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
-
             if (tabPt[l].z > tabPt[l + 1].z) {
                 IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
             }
-
             if (tabPt[l] == null || tabPt[l + 1] == null) {
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
             }
-
             if ((tabPt[l + 1].z - tabPt[l].z) > 1) {
                 IJ.showMessage("You gave points that does not follow in time, there is a gap. Abort.");
                 return null;
@@ -1473,18 +1465,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
         Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
 
-        // Print each time, number of points and points
-        /*for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("Time : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                System.out.println(" --> " + extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt)));
-            }
-        }*/
 
-        // Create a new primary root from the points provided
-
-        // Get first point (first time, first point on the list)
         Point3d pt0 = pointsByTime.get(pointsByTime.firstKey()).get(0);
         Node n = new Node((float) pt0.x, (float) pt0.y, null, false);
         // if it is an extremity, we set the birth time to the exact time
@@ -1617,7 +1598,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * Extend branch in model.
      *
      * @param tabPt the array of 3D points
-     * @param rm the root model
+     * @param rm    the root model
      * @return array of strings containing formatted information, or null if unsuccessful
      */
     public String[] extendBranchInModel(Point3d[] tabPt, RootModel rm) {
@@ -1668,12 +1649,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             }
         }
 
-        // Create a map to store points by time for future use
-        TreeMap<Double, List<Point3d>> pointsByTime = new TreeMap<>();
-        for (Point3d pt : tabPt) {
-            pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
-        }
-
         // Save the parent of the original node
         Node nPar = n.parent; // assuming branch has at least 2 points
 
@@ -1688,6 +1663,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         for (int i = 1; i < tabPt.length; i++) {
             nn = new Node((float) tabPt[i].x, (float) tabPt[i].y, nFirst, true);
             nn.birthTime = (float) tabPt[i].z;
+            nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) tabPt[i].z];
             nFirst.child = nn;
             nFirst = nn;
         }
@@ -1703,7 +1679,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * Extend branch in model.
      *
      * @param tabPt the array of 3D points
-     * @param rm the root model
+     * @param rm    the root model
      * @return array of strings containing formatted information, or null if unsuccessful
      */
     public String[] backExtendBranchInModel(Point3d[] tabPt, RootModel rm) {
@@ -1786,13 +1762,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         for (int i = 1; i < tabPt.length - 1; i++) {
             nn = new Node((float) tabPt[i].x, (float) tabPt[i].y, nFirst, true);
             nn.birthTime = (float) tabPt[i].z;
+            nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) tabPt[i].z];
             nFirst.child = nn;
             nFirst = nn;
         }
 
-        // Ignore - Handle the last point - Not relevant for selection
-
-        // Notable case where we only have 2 points added
         if (nn == null) nn = newFirst;
 
         // Replace the original first node with a new one and reconnect the root structure
@@ -1811,11 +1785,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
     private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremityFirst, Map<Double, List<Boolean>> extremityLast, List<Node> recordedNodes, Node nPar) {
         for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            //System.out.println("\nTime : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
 
             for (Point3d pt : entry.getValue()) {
-                // Skip the very first point of the first time slice
-                // if the coordinates of pt are equal to the coordinates of the par node, continue
+
                 if ((nPar != null) && (nPar.x == (float) pt.x) && (nPar.y == (float) pt.y) && (nPar.birthTime == (float) pt.z)) {
                     continue;
                 }
@@ -1826,7 +1798,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 // Avoid repeating the same node
                 if (recordedNodes.contains(nn))
                     continue;
-
 
                 // If the current point is an extremity, set its birth time and birth time in the past hours
                 if (extremityLast.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
