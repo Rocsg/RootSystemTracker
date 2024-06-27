@@ -52,7 +52,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
 //		setupAndRunRsmlBlockMatchingRegistration("/home/rfernandez/Bureau/A_Test/BPMP/Reproduction_01_avec_reseau_morgan/Train/20200826-AC-PIP_azote_Seq 6_Boite 00005_IdentificationFailed-Visu.jpg");
         String dir = "/home/rfernandez/Bureau/DATA/Data_Morgan/myData/train/";
         String img = "20200826-AC-PIP_azote_Seq 4_Boite 00109_IdentificationFailed-Visu.jpg";
-        setupAndRunRsmlBlockMatchingRegistration(dir + img, true, true);
+       // io.github.rocsg.fijiyama.registration.BlockMatchingRegistration.setupAndRunRsmlBlockMatchingRegistration(dir + img, true, true);
     }
 
     /**

@@ -6,6 +6,7 @@ package io.github.rocsg.rsml;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 
 import java.awt.geom.Point2D;
+import java.util.List;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -58,6 +59,7 @@ public class Node {
      * The needs refresh.
      */
     boolean needsRefresh;
+    public boolean isInsertionPoint = false;
 
     /**
      * The b cross 23.
@@ -77,13 +79,13 @@ public class Node {
      * @param y     the y
      * @param d     the d
      * @param n     the n
-     * @param after the after
+     * @param isAfter the after
      */
-    public Node(float x, float y, float d, Node n, boolean after) {
+    public Node(float x, float y, float d, Node n, boolean isAfter) {
         this.x = x;
         this.y = y;
         this.diameter = d;
-        if (after) {
+        if (isAfter) {
             parent = n;
             if (parent != null) parent.child = this;
             child = null;
@@ -94,8 +96,6 @@ public class Node {
         }
         needsRefresh = true;
     }
-
-    
 
     /**
      * Instantiates a new node.
@@ -292,6 +292,20 @@ public class Node {
         }
     }
 
+    public void getInfosFromParser(Point2D position, float diameter, float orientation, float dpi) {
+        x = (float) position.getX() * dpi;
+        y = (float) position.getY() * dpi;
+        this.diameter = diameter * dpi;
+        theta = orientation;
+        if (parent != null) {
+            float dx = x - parent.x;
+            float dy = y - parent.y;
+            parent.theta = vectToTheta(dx, dy);
+            parent.length = (float) Math.sqrt(dx * dx + dy * dy);
+        }
+        needsRefresh = true;
+    }
+
     /**
      * Read the node information from and RSML file.
      *
@@ -302,11 +316,11 @@ public class Node {
     public void readRSML(org.w3c.dom.Node parentDOM, org.w3c.dom.Node diamDOM, float dpi) {
 
         org.w3c.dom.Node nn = parentDOM.getAttributes().getNamedItem("x");
-        if (nn != null) x = Float.valueOf(nn.getNodeValue()).floatValue() * dpi;
+        if (nn != null) x = Float.parseFloat(nn.getNodeValue()) * dpi;
         nn = parentDOM.getAttributes().getNamedItem("y");
-        if (nn != null) y = Float.valueOf(nn.getNodeValue()).floatValue() * dpi;
+        if (nn != null) y = Float.parseFloat(nn.getNodeValue()) * dpi;
         if (diamDOM != null) {
-            diameter = Float.valueOf(diamDOM.getFirstChild().getNodeValue()).floatValue() * dpi;
+            diameter = Float.parseFloat(diamDOM.getFirstChild().getNodeValue()) * dpi;
         } else {
             diameter = 2;
         }
@@ -349,7 +363,14 @@ public class Node {
      * @return the string
      */
     public String toString() {
-        return ("Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null));
+        String str = "Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null);
+        if (this.child != null) str += "\n \t Child x=" + this.child.x + " y=" + this.child.y + " t=" + this.child.birthTime + " hours=" + this.child.birthTimeHours;
+        if (this.parent != null) str += "\n \t Parent x=" + this.parent.x + " y=" + this.parent.y + " t=" + this.parent.birthTime + " hours=" + this.parent.birthTimeHours;
+        return str;
+    }
+
+    public boolean getNodeType() {
+        return false;
     }
 }
 
