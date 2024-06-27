@@ -887,6 +887,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 System.gc();
             }
         });
+        exec.shutdown();
     }
 
     /**

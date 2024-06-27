@@ -459,6 +459,17 @@ public class Root implements Comparable<Root>, IRootParser {
         Node nStop = this.lastNode;
         Node curNode = nStart;
         ArrayList<Node> listNode = new ArrayList<Node>();
+
+        // for all the points, if the root is of order 1 and there are severa times at 1, set all of them (but the last one) to 0
+        if (this.order == 1) {
+            Node n = nStart;
+            while (n.child != null && n.child.birthTime == 1) {
+                n.birthTime = 0;
+                n.birthTimeHours = 0;
+                n = n.child;
+            }
+        }
+
         // Loop through all nodes in the root and add them to the list
         while (curNode != null) {
             listNode.add(curNode);
@@ -541,6 +552,8 @@ public class Root implements Comparable<Root>, IRootParser {
                 tabNode[i].birthTimeHours = (float) estTimeHours;
             }
         }
+
+
     }
 
     /**
