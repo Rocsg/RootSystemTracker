@@ -462,21 +462,13 @@ public class PipelineActionsHandler {
         stack = VitimageUtils.resize(stack, stack.getWidth() / pph.subsamplingFactor,
                 stack.getHeight() / pph.subsamplingFactor, stack.getStackSize());
 
-        // Get the width and height of the first image in the stack
-        int originalWidth = tabImg[0].getWidth();
-        int originalHeight = tabImg[0].getHeight();
+        VitimageUtils.printImageResume(stack, "target geometry");
+        VitimageUtils.printImageResume(tabImg[0], "original geometry");
 
         // Replace the subsampling factor with the original width and height
-        System.out.println("originalWidth = " + originalWidth + " originalHeight = " + originalHeight + " N = " + N);
-        System.out.println("Image type = " + stack.getType());
-        System.out.println("Image size = " + stack.getWidth() + "x" + stack.getHeight() + "x" + N);
-        stack = VitimageUtils.resize(stack, originalWidth, originalHeight, stack.getStackSize());
+        //stack = VitimageUtils.resize(stack, originalWidth, originalHeight, stack.getStackSize());
         IJ.saveAsTiff(stack, new File(outputDataDir, "11_stack.tif").getAbsolutePath());
         System.out.println("Stack saved in " + new File(outputDataDir, "11_stack.tif").getAbsolutePath());
-        System.out.println("Image type = " + stack.getType());
-        System.out.println("Image size = " + stack.getWidth() + "x" + stack.getHeight() + "x" + N);
-        System.out.println("Image title = " + stack.getTitle());
-        // Convert the image to 32-bit grayscale
         return true;
     }
 
@@ -552,6 +544,7 @@ public class PipelineActionsHandler {
             regAct.setLevelMinLinear(0);
             regAct.strideX = 8;
             regAct.strideY = 8;
+//            regAct.levelMaxLinear++;
             regAct.neighX = 3;
             regAct.neighY = 3;
             regAct.selectLTS = 90;
@@ -655,6 +648,9 @@ public class PipelineActionsHandler {
      */
     public static boolean computeMasksAndRemoveLeaves(int indexImg, String outputDataDir, PipelineParamHandler pph) {
         // Open the registered image
+        
+        
+        
         ImagePlus imgReg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
 
         // Compute the mask for the area of interest at the first time point

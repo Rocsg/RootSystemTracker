@@ -215,6 +215,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private boolean toResize = true;
     private String version = "v2.0.0";
 
+
+    private String version = "v2.0.0 Kangouroo enchante - Release candidate";
+
+    private boolean isDevModeActivated=false;
+
     /**
      * Instantiates a new rsml expert plugin.
      */
