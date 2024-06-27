@@ -1950,6 +1950,49 @@ public class RootModel extends WindowAdapter implements IRootModelParser {
         return new Object[]{nodeMin, rootMin};
     }
 
+    public Object[] getClosesNodeParentOrder(Point3d pt, Root currentRoot) {
+        double x = pt.x;
+        double y = pt.y;
+        double distMin = 1E18;
+        if (currentRoot.order == 1) return new Object[]{null, null};
+        int parentOrder = currentRoot.order - 1;
+        Node nodeMin = null;
+        Root rootMin = null;
+        for (Root r : rootList) {
+            if (r.order != parentOrder) continue;
+            Node n = r.firstNode;
+            while (n != null) {
+                double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+                if (dist < distMin && n.birthTime <= pt.z) {
+                    distMin = dist;
+                    rootMin = r;
+                    nodeMin = n;
+                }
+                n = n.child;
+            }
+        }
+        return new Object[]{nodeMin, rootMin};
+    }
+
+    public Object[] getClosesNodeInCurrentRoot(Point3d pt, Root currentRoot, List<Node> notTheseNode) {
+        double x = pt.x;
+        double y = pt.y;
+        double distMin = 1E18;
+        Node nodeMin = null;
+        Root rootMin = null;
+        Node n = currentRoot.firstNode;
+        while (n != null) {
+            double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+            if (dist < distMin && n.birthTime <= pt.z && !notTheseNode.contains(n)) {
+                distMin = dist;
+                rootMin = currentRoot;
+                nodeMin = n;
+            }
+            n = n.child;
+        }
+        return new Object[]{nodeMin, rootMin};
+    }
+
     /**
      * Gets the closest root.
      *

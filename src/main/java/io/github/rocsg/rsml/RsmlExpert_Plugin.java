@@ -3,6 +3,7 @@
  */
 package io.github.rocsg.rsml;
 
+import com.sun.management.OperatingSystemMXBean;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
@@ -881,6 +882,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     closeAllViews();
                     if (isDevModeActivated) System.exit(0);
                 }
+
+                // free the memory
+                System.gc();
             }
         });
     }
@@ -1623,7 +1627,9 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     public String[] extendBranchInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("EXTENDBRANCH", tabPt);
+
         if (tabPt.length < 2) return null;
+
         Object[] obj = rm.getClosestNode(tabPt[0]);
         if (obj == null) {
             IJ.showMessage("The branch has not yet appeared. Abort.");
@@ -1633,7 +1639,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Root r = (Root) obj[1];
 
         System.out.println("Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
-//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");//            return null;//        }
+
         if (n != r.lastNode) {
             IJ.showMessage("Please select the last point of the branch you want to extend. Abort.");
             return null;
@@ -1675,20 +1681,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // replace the first point of the list of the first time by n
         pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
-
-        // Print each time, number of points and points
-        /*for (Map.Entry<Double, java.util.List<Point3d>> entry : pointsByTime.entrySet()) {
-            System.out.println("Time : " + entry.getKey() + " -> " + entry.getValue().size() + " points");
-            for (Point3d pt : entry.getValue()) {
-                System.out.println(" --> " + pt);
-                System.out.println(" --> " + extremity.get(entry.getKey()).get(entry.getValue().indexOf(pt)));
-            }
-        }*/
-
-        // Create a new primary root from the points provided
-
-        // Link the points at time 0 (or 1) from the first one entered by the user to the last one
-        // Create a new Node for each point and link them together to form a branch
         Node nPar = n;
 
         List<Node> recordedNodes = new ArrayList<Node>();
@@ -1698,21 +1690,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
 
         r.lastNode = nPar;
-
-
-/*         Node n0=r.firstNode;
-        while(n0.child!=null){
-            System.out.println(n0);
-            n0=n0.child;
-        }
-        System.out.println(n0);*/
         r.updateTiming();
-       /*  n0=r.firstNode;
-        while(n0.child!=null){
-            System.out.println(n0);
-            n0=n0.child;
-        }
-        System.out.println(n0);*/
 
         // free memory
         pointsByTime.clear();
@@ -1726,64 +1704,18 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     /**
      * Extend branch in model.
      *
-     * @param tabPt the tab pt
-     * @return true, if successful
+     * @param tabPt the array of 3D points
+     * @param rm the root model
+     * @return array of strings containing formatted information, or null if unsuccessful
      */
     public String[] backExtendBranchInModel(Point3d[] tabPt, RootModel rm) {
+        // Format and return initial information about the branch extension
         String[] infos = formatInfos("BACKEXTENDBRANCH", tabPt);
-        /*if (tabPt.length < 2) return null;
-        int N = tabPt.length;
-        Object[] obj = rm.getClosestNode(tabPt[0]);
-        BEWARE WHEN UNCOMMENTING THIS BLOCK WE SHOULD WRITE A TEST OF NULLITY OF OBJ
-        Node n = (Node) obj[0];
-        Root r = (Root) obj[1];
-        System.out.println("Back extending branch from :\n --> Node " + n + "\n --> Of root " + r);
 
-        boolean[] extremity = new boolean[N];
-        if (n != r.firstNode) {
-            IJ.showMessage("Please select the first point of the branch you want to extend. Abort.");
-            return null;
-        }
-        for (Point3d point3d : tabPt) {
-            if (point3d.z != 1) {
-                IJ.showMessage("Please only select points anterior in the first slice (anterior to dynamic imaging)");
-                return null;
-            }
-        }
-
-
-        Node nFirst = new Node((float) tabPt[N - 1].x, (float) tabPt[N - 1].y, null, true);
-        nFirst.birthTime = (float) 0;
-        nFirst.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[0];
-        Node nPar = nFirst;
-        extremity[N - 1] = true;
-
-
-        int decr = N - 2;
-        while (decr > 0) {
-            Node nn = new Node((float) tabPt[decr].x, (float) tabPt[decr].y, nPar, true);
-            nn.parent = nPar;
-            nPar.child = nn;
-            //if(extremity[decr]) {
-            nn.birthTime = (float) 0;
-            nn.birthTimeHours = (float) ((float) rm.hoursCorrespondingToTimePoints[0]);
-			/*}
-			else {
-				nn.birthTime=(float) (tabPt[decr].z);
-				nn.birthTimeHours=(float) (0.5*rm.hoursCorrespondingToTimePoints[(int) tabPt[decr].z]+0.5*nPar.birthTime);
-			}
-            System.out.println("\nJust added the node " + nn + " \n  with parent=" + nPar);
-            decr--;
-            nPar = nn;
-        }
-
-        nPar.child = r.firstNode;
-        r.firstNode.parent = nPar;
-        r.firstNode = nFirst;
-        r.updateTiming();*/
+        // Ensure there are at least 2 points to form a branch
         if (tabPt.length < 2) return null;
 
-        System.out.println("Toto1");
+        // Print the original points
         for (Point3d pt : tabPt) System.out.println(pt);
 
         // Reverse the order of the points
@@ -1792,41 +1724,40 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             tabPt[i] = tabPt[tabPt.length - 1 - i];
             tabPt[tabPt.length - 1 - i] = temp;
         }
-        System.out.println("Toto2");
+
+        // Print the reversed points
         for (Point3d pt : tabPt) System.out.println(pt);
 
+        // Get the closest node to the last point in the reversed list
         Object[] obj = rm.getClosestNode(tabPt[tabPt.length - 1]);
 
+        // If no closest node is found, abort the operation
         if (obj == null) {
             IJ.showMessage("The branch has not yet appeared. Abort.");
             return null;
         }
 
+        // Extract the node and root from the closest node result
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
 
-        System.out.println("Back-Extending branch from :\n --> Node " + n + "\n --> Of root " + r);
+        System.out.println("Back-Extending branch from:\n --> Node " + n + "\n --> Of root " + r);
 
-//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
-//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
-//            return null;
-//        }
-
-        if ((n != r.firstNode)) {
+        // Check if the node is the first node of the root
+        if (n != r.firstNode) {
             IJ.showMessage("The node clicked seems not to be the first node of the corresponding root\n" +
                     "Please select the first point of the branch you want to extend. Abort.");
             return null;
         }
 
-
+        // Validate the birth time of the node
         if ((n.birthTime == 0 ? 1 : n.birthTime) != tabPt[tabPt.length - 1].z) {
             IJ.showMessage("Please select the first point of the branch you want to extend at the right time. Abort.");
             return null;
         }
 
-        // Check if the points are in the correct time order and if any time slices are missed
+        // Validate the chronological order and continuity of the points
         for (int l = 0; l < tabPt.length - 1; l++) {
-
             if (tabPt[l].z > tabPt[l + 1].z) {
                 IJ.showMessage("You gave points that are not in chronological order. Abort.");
                 return null;
@@ -1835,62 +1766,50 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
             }
-
             if ((tabPt[l + 1].z - tabPt[l].z) > 1) {
-                IJ.showMessage("You gave points that does not follow in time, there is a gap. Abort.");
+                IJ.showMessage("You gave points that do not follow in time, there is a gap. Abort.");
                 return null;
             }
         }
 
-        // Create a map to store points by time
-        TreeMap<Double, List<Point3d>> pointsByTime = new TreeMap<>();
+        // Save the position and child of the original first node of the root
+        Point3d oldFirst = new Point3d(r.firstNode.x, r.firstNode.y, r.firstNode.birthTime);
+        Node childSon = r.firstNode.child;  // assuming root has at least 2 points
 
-        for (Point3d pt : tabPt) {
-            pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
-        }
-
-        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
-        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
-
-        Object[] obj2 = rm.getClosestNode(tabPt[0]);
-
-        // replace the first point of the list of the first time by n
-        // Last point of last time slice gets the first point of the branch
-        //pointsByTime.get(pointsByTime.lastKey()).set(pointsByTime.get(pointsByTime.lastKey()).size() - 1, new Point3d(n.x, n.y, n.birthTime));
-
-        // if the first point is the first node of a primary root and that it is defined at time 0, set the time of all the reccorded nodes to 0
+        // Create a new first node for the root
         Node nFirst = new Node((float) tabPt[0].x, (float) tabPt[0].y, null, true);
-        nFirst.birthTime = ((n.birthTime == 0) && (r.order == 1)) ? 0 : (float) tabPt[0].z;
-
-        List<Node> recordedNodes = new ArrayList<Node>();
-        recordedNodes.add(nFirst);
-
-        Node nPar = nFirst;
-
-        // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
-
-        nPar.child = r.firstNode;
-        r.firstNode.parent = nPar;
+        nFirst.birthTime = (float) tabPt[0].z;
+        nFirst.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) tabPt[0].z];
         r.firstNode = nFirst;
+        Node newFirst = nFirst;
+        Node nn = null;
 
-        if (nFirst.birthTime == 0) {
-            for (Node n0 : recordedNodes) {
-                n0.birthTime = 0;
-                n0.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[0];
-            }
+        // Iterate over the points to create new nodes and link them
+        for (int i = 1; i < tabPt.length - 1; i++) {
+            nn = new Node((float) tabPt[i].x, (float) tabPt[i].y, nFirst, true);
+            nn.birthTime = (float) tabPt[i].z;
+            nFirst.child = nn;
+            nFirst = nn;
         }
 
+        // Ignore - Handle the last point - Not relevant for selection
+
+        // Notable case where we only have 2 points added
+        if (nn == null) nn = newFirst;
+
+        // Replace the original first node with a new one and reconnect the root structure
+        Node remake = new Node((float) oldFirst.x, (float) oldFirst.y, nn, true);
+        remake.birthTime = (float) oldFirst.z;
+        remake.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) oldFirst.z];
+        nn.child = remake;
+        remake.child = childSon;
+        r.parentNode = (Node) rm.getClosesNodeParentOrder(new Point3d(r.firstNode.x, r.firstNode.y, r.firstNode.birthTime), r)[0];
+
+        // Update the root timing and clear the points' map
         r.updateTiming();
-
-        // free memory
-        pointsByTime.clear();
-        extremityLast.clear();
-        extremityFirst.clear();
-        recordedNodes.clear();
-
         return infos;
     }
+
 
     private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremityFirst, Map<Double, List<Boolean>> extremityLast, List<Node> recordedNodes, Node nPar) {
         for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
@@ -1913,7 +1832,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                     continue;
 
 
-                // If the current point is an extremity, set its birth time and birth time in hours
+                // If the current point is an extremity, set its birth time and birth time in the past hours
                 if (extremityLast.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
                     nn.birthTime = (float) pt.z + (float) 0.0;
                     nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
@@ -2512,7 +2431,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         long memoryFullSize = 0;
         String[] str = new String[]{"", ""};
         try {
-            memoryFullSize = (((com.sun.management.OperatingSystemMXBean) ManagementFactory
+            memoryFullSize = (((OperatingSystemMXBean) ManagementFactory
                     .getOperatingSystemMXBean()).getTotalPhysicalMemorySize()) / (1024 * 1024);
         } catch (Exception e) {
             return str;

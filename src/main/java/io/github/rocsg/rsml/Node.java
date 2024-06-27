@@ -364,7 +364,10 @@ public class Node {
      * @return the string
      */
     public String toString() {
-        return ("Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null));
+        String str = "Node : x=" + x + " y=" + y + " t=" + birthTime + " hours=" + birthTimeHours + " diam=" + diameter + " vx=" + vx + " vy=" + vy + " haschild ?" + (this.child != null) + " hasparent ?" + (this.parent != null);
+        if (this.child != null) str += "\n \t Child x=" + this.child.x + " y=" + this.child.y + " t=" + this.child.birthTime + " hours=" + this.child.birthTimeHours;
+        if (this.parent != null) str += "\n \t Parent x=" + this.parent.x + " y=" + this.parent.y + " t=" + this.parent.birthTime + " hours=" + this.parent.birthTimeHours;
+        return str;
     }
 
     public boolean getNodeType() {
