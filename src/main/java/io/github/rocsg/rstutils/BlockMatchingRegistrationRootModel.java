@@ -63,7 +63,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
      * @param multiRsml    the multi rsml
      * @return the root model
      */
-    public static RootModel setupAndRunRsmlBlockMatchingRegistration(String pathToImgRef, boolean display, boolean multiRsml) {
+    public static RootModel setupAndRunRsmlBlockMatchingRegistrationFast(String pathToImgRef, boolean display, boolean multiRsml) {
         ImagePlus imgRef = IJ.openImage(pathToImgRef);
         RootModel rootModel = new RootModel(VitimageUtils.withoutExtension(pathToImgRef) + ".rsml");
         rootModel.refineDescription(10);
@@ -208,7 +208,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                                 IJ.log("Skipping rsml cause output file already exists : " + filesList[1][imgInd]);
                                 continue;
                             }
-                            RootModel r = setupAndRunRsmlBlockMatchingRegistration(filesList[0][imgInd], display, true);
+                            RootModel r = setupAndRunRsmlBlockMatchingRegistrationFast(filesList[0][imgInd], display, true);
                             r.writeRSML(filesList[3][imgInd], dirOut);
                             ImagePlus img = IJ.openImage(filesList[0][imgInd]);
                             IJ.save(img, filesList[1][imgInd]);
@@ -229,7 +229,7 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
                     IJ.log("Skipping rsml cause output file already exists : " + filesList[1][i]);
                     continue;
                 }
-                RootModel r = setupAndRunRsmlBlockMatchingRegistration(filesList[0][i], display, false);
+                RootModel r = setupAndRunRsmlBlockMatchingRegistrationFast(filesList[0][i], display, false);
                 r.writeRSML(filesList[3][i], dirOut);
                 ImagePlus img = IJ.openImage(filesList[0][i]);
                 IJ.save(img, filesList[1][i]);

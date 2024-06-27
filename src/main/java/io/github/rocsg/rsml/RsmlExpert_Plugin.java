@@ -819,7 +819,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         currentModel.resampleFlyingRoots();
 
         // Update the current image with the modified model
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
 
         // Log the successful completion of the undo action
         addLog("Ok.", 2);
@@ -2102,7 +2102,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         System.arraycopy(infos, 0, tabModifs[nModifs], 0, infos.length);
 
         // Update the data in the current image based on the current model
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
 
         // Log that the image update was successful
         addLog("Ok.", 2);
@@ -2124,7 +2124,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         IJ.setTool("hand");
         addLog("Saving RSML", 0);
         this.currentModel.writeRSML3D(new File(dataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"), "", true, false);
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
         addLog("Ok.", 2);
         enable(all);
         disable(OK);
