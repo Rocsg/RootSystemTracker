@@ -347,6 +347,144 @@ public class Root implements Comparable<Root> {
         }
     }
 
+
+    /**
+     * This method updates the timing of the nodes in the root.
+     * It first creates a list of all nodes in the root.
+     * Then it identifies nodes that fall exactly on an observation timepoint.
+     * It calculates the distance to the previous and next exact nodes for each non-exact node.
+     * Finally, it estimates the birth time and birth time in hours for each non-exact node based on its distances to the previous and next exact nodes.
+     */
+    public void updateTimingModifiedForDebuggingRSMLExpert() {
+        boolean debug = true;
+        Node nStart = this.firstNode;
+        Node nStop = this.lastNode;
+        Node curNode = nStart;
+        ArrayList<Node> listNode = new ArrayList<Node>();
+
+        // for all the points, if the root is of order 1 and there are severa times at 1, set all of them (but the last one) to 0
+        if (this.order == 1) {
+            Node n = nStart;
+            while (n.child != null && n.child.birthTime == 1) {
+                n.birthTime = 0;
+                n.birthTimeHours = 0;
+                n = n.child;
+            }
+        }
+
+        // Loop through all nodes in the root and add them to the list
+        while (curNode != null) {
+            listNode.add(curNode);
+            curNode = curNode.child;
+        }
+        int N = listNode.size();
+        this.nNodes = N;
+        Node[] tabNode = listNode.toArray(new Node[N]);
+        Node[] tabNodePrev = listNode.toArray(new Node[N]);
+        Node[] tabNodeNext = listNode.toArray(new Node[N]);
+        boolean[] tabExact = new boolean[N];
+        double[] distToPrev = new double[N];
+        double[] distToNext = new double[N];
+
+        // Identify nodes that fall exactly on an observation timepoint
+        // Strategy: for each "tas" (group of consecutive nodes with same integer birthTime),
+        // only the LAST node of the tas keeps the exact birthTime, others are marked as non-exact for interpolation
+        if (debug) System.out.println("\n\nFIRST STEP: IDENTIFY EXACT NODES (last of each 'tas')");
+        for (int i = 0; i < N; i++) {
+            // Check if this node has an integer birthTime (within epsilon)
+            boolean hasIntegerTime = (Math.abs(tabNode[i].birthTime - Math.round(tabNode[i].birthTime)) < VitimageUtils.EPSILON);
+            
+            if (!hasIntegerTime) {
+                // Not an integer time, definitely not exact
+                tabExact[i] = false;
+            } else {
+                // Has integer time - check if it's the last of its "tas"
+                int currentTime = (int) Math.round(tabNode[i].birthTime);
+                
+                // Check if the NEXT node has the same integer birthTime
+                boolean nextHasSameTime = false;
+                if (i < N - 1) {
+                    boolean nextHasIntegerTime = (Math.abs(tabNode[i + 1].birthTime - Math.round(tabNode[i + 1].birthTime)) < VitimageUtils.EPSILON);
+                    if (nextHasIntegerTime) {
+                        int nextTime = (int) Math.round(tabNode[i + 1].birthTime);
+                        nextHasSameTime = (nextTime == currentTime);
+                    }
+                }
+                
+                // This node is "exact" only if it's the last of its tas (next node has different time or doesn't exist)
+                tabExact[i] = !nextHasSameTime;
+            }
+            
+            if (debug) System.out.println(" i=" + i + " birthTime=" + tabNode[i].birthTime + " isExact=" + tabExact[i] + " " + tabNode[i]);
+        }
+
+        if (debug) System.out.println("\n\nSECOND STEP: ESTABLISH FORWARD DISTANCES");
+
+
+        Node prev = null;
+        double dist = 0;
+        // Calculate the distance to the previous exact node for each non-exact node
+        for (int i = 0; i < N; i++) {
+            if (!tabExact[i]) {
+                if (i > 0) dist += Node.distanceBetween(tabNode[i], tabNode[i - 1]);
+                distToPrev[i] = dist;
+                tabNodePrev[i] = prev;
+            } else {
+                dist = 0;
+                prev = tabNode[i];
+            }
+        }
+
+        if (debug) System.out.println("\n\nTHIRD STEP, ESTABLISH BACKWARD");
+        dist = 0;
+        Node next = null;
+        // Calculate the distance to the next exact node for each non-exact node
+        for (int i = N - 1; i >= 0; i--) {
+            if (debug) System.out.println("  Processing node " + i + " : " + tabNode[i]);
+            if (!tabExact[i]) {
+                if (debug) System.out.println("   Non exact");
+                if (i < N - 1) dist += Node.distanceBetween(tabNode[i], tabNode[i + 1]);
+                distToNext[i] = dist;
+                tabNodeNext[i] = next;
+                if (debug) System.out.println("     Setting distance " + dist + " to next : " + next);
+            } else {
+                if (debug) System.out.println("   Exact");
+                dist = 0;
+                next = tabNode[i];
+            }
+        }
+
+        if (debug) System.out.println("\n\nFOURTH STEP, RE ESTIMATE TIME");
+        // Estimate the birth time and birth time in hours for each non-exact node
+        for (int i = 0; i < N; i++) {
+            if (!tabExact[i]) {
+                double estTime = 0;
+                double estTimeHours = 0;
+                double dh = tabNodeNext[i].birthTimeHours - tabNodePrev[i].birthTimeHours;
+                double dt = tabNodeNext[i].birthTime - tabNodePrev[i].birthTime;
+                double dl = distToNext[i] + distToPrev[i];
+                if (dl < VitimageUtils.EPSILON) {
+                    estTime = tabNodePrev[i].birthTime + dt / 2.0;
+                    estTimeHours = tabNodePrev[i].birthTimeHours + dh / 2.0;
+                } else {
+                    estTime = tabNodePrev[i].birthTime + dt * (distToPrev[i] / dl);
+                    estTimeHours = tabNodePrev[i].birthTimeHours + dh * (distToPrev[i] / dl);
+                }
+                tabNode[i].birthTime = (float) estTime;
+                tabNode[i].birthTimeHours = (float) estTimeHours;
+            }
+        }
+
+
+    }
+
+
+
+
+
+
+
+
     /**
      * This method updates the timing of the nodes in the root.
      * It first creates a list of all nodes in the root.
@@ -355,7 +493,7 @@ public class Root implements Comparable<Root> {
      * Finally, it estimates the birth time and birth time in hours for each non-exact node based on its distances to the previous and next exact nodes.
      */
     public void updateTiming() {
-        boolean debug = false;
+        boolean debug = true;
         Node nStart = this.firstNode;
         Node nStop = this.lastNode;
         Node curNode = nStart;

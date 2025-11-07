@@ -34,8 +34,10 @@ public class MovieBuilder {
     static double startingBlockRatio = 0.10;//time for a new root to appear, expressed as a ratio of the sequence
 	// length  //TODO : depends on parameters
     static boolean smartHandyStart = true;// Make a progressive start to make the movie more friendly
-    static double timeStep = 1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph
-	// .nTypicalHours
+    static double timeStep = -1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph
+	// .nTypicalHours 
+    //if set in main, be put in activation
+
     static int nTimeStepVirtualEnd = 4; //Make a progressive end to make the movie more friendly //TODO : depends on
 	// parameters
     static double deltaPixelsSpeedInterpolation = 4;// Compute the speed vectors over the interval [curPix-delta ;
@@ -71,6 +73,7 @@ public class MovieBuilder {
 
     public static boolean buildMovie(int indexImg, String outputDataDir, PipelineParamHandler pph) {
         tim = new Timer();
+        timeStep = 0.8;
         //timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a
 		// timestep (hours per keyframe, standard is 0.5)",0.5);
         //Prepare params
@@ -94,14 +97,15 @@ public class MovieBuilder {
 		// serie
         tim.print("Starting building mix mask ");
         ImagePlus maskFgBgGauss = generateFgBgMask(imgTimes);
-        //maskFgBgGauss.show();
-
+        
 
         //Mix using masks
         tim.print("Starting mixing root");
         ImagePlus mixFgBg = mixFgAndBgFromMaskAndStack(maskFgBgGauss, imgReg, maskUpLeaves);
         IJ.run(mixFgBg, "8-bit", "");
-        //mixFgBg.show();
+
+        mixFgBg.show();
+        VitimageUtils.waitFor(100000);
         maskFgBgGauss.setDisplayRange(0, 1);
         IJ.run(maskFgBgGauss, "8-bit", "");
 
@@ -130,7 +134,7 @@ public class MovieBuilder {
         //Assemble all info
         tim.print("\nStarting final assembling");
         mixFgBg = assembleRootGridAndFire(mixFgBg, maskFgBgGauss, imgGridAndFire[0], imgGridAndFire[1],
-				imgGridAndFire[2], imgGridAndFire[3], imgSkeleton, imgReg, true, true);//TODO or maybe there
+				imgGridAndFire[2], imgGridAndFire[3], imgSkeleton, imgReg, true, false);//TODO or maybe there
         tim.print("\nEnd. Now saving");
 
 
@@ -493,7 +497,8 @@ public class MovieBuilder {
             int incr = -1;
             byte[] im;
             //Show image N and trailer during 3 seconds
-            im = (byte[]) initReg.getStack().getPixels(1);
+
+            im = (byte[]) VitimageUtils.convertFloatToByteWithoutDynamicChanges(initReg).getStack().getPixels(1);
             for (int n = 0; n < 75; n++) {
                 incr++;
                 for (int xx = 0; xx < X; xx++)
@@ -515,7 +520,7 @@ public class MovieBuilder {
 
             //Show each image 1/2 second during 5 images, then each every 1/4 second
             for (int m = 1; m <= TN; m++) {
-                im = (byte[]) initReg.getStack().getPixels(m);
+                im = (byte[]) VitimageUtils.convertFloatToByteWithoutDynamicChanges(initReg).getStack().getPixels(m);
                 int lim = 20;
                 if (m > 5) lim = 12;
                 if (m > 10) lim = 7;
@@ -909,12 +914,12 @@ public class MovieBuilder {
                     //If we are in the upper part of the image, smoothly between t0Bg and t1Bg (at start between T0
 					// and T1)
                     if (toInt(tabMaskUp[indexSpace]) == 0) {
-                        if (deltaT <= t0Bg) valMixBg = tabInReg[T0][indexSpace];
+                        if (deltaT <= t0Bg) valMixBg = tabInReg[T0   +(T0>0 ? -1 : 0)    ][indexSpace];
                         else if (deltaT >= t1Bg) {
-                            valMixBg = tabInReg[((T0 + 1) > Nt - 1) ? T0 : (T0 + 1)][indexSpace];
+                            valMixBg = tabInReg[((T0 + 1) > Nt - 1) ? T0        : (T0 + 1        )][indexSpace];
                         } else {
                             delta = (deltaT - t0Bg) / deltaBg;
-                            valMixBg = delta * tabInReg[T0 + 1][indexSpace] + (1 - delta) * tabInReg[T0][indexSpace];
+                            valMixBg = delta * tabInReg[T0 + 1       ][indexSpace] + (1 - delta) * tabInReg[T0       ][indexSpace];
                         }
                     } else {
                         //If we are in the plant, don't care, and display the original image // TODO : faire un test
@@ -1039,7 +1044,8 @@ public class MovieBuilder {
     }
 
     public static void setSamplesT(PipelineParamHandler pph) {
-        timeStep = pph.getMovieTimeStep();
+
+        if(timeStep == -1) timeStep = pph.getMovieTimeStep();
         //VitimageUtils.getSystemNeededMemory()
         //timeStep=VitiDialogs.getDoubleUI("Propose a timestep (hours per keyframe, standard is 0.5)", "Propose a
 		// timestep (hours per keyframe, standard is 0.5)",0.5);

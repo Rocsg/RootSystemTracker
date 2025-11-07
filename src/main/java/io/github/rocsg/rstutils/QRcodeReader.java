@@ -104,6 +104,8 @@ public class QRcodeReader {
             double score = ar.get(i)[0];
             ImagePlus imgPti = VitimageUtils.cropImage(img, (int) x0, (int) y0, 0, sizeZone, sizeZone, 1);//w0, y0
             imgPti = VitimageUtils.thresholdImage(imgPti, tr, 1E10); //tr-deltaThresh/2 , tr+deltaThresh/2
+            imgPti.show();
+            VitimageUtils.waitFor(100000);
             textGet = decodeQRCode(imgPti);
             if (textGet.length() > 0) {
                 IJ.log("Number " + i + " is Ok.");

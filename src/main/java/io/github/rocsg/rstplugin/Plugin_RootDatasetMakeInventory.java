@@ -183,13 +183,14 @@ public class Plugin_RootDatasetMakeInventory extends PlugInFrame {
                 10);
 
         String[] allImgsPath = getRelativePathOfAllImageFilesInDir(inputDir);
+        System.out.println(inputDir);
         allImgsPath = sortFilesByModificationOrder(inputDir, allImgsPath);
         int NP = allImgsPath.length;
         String[] code = new String[NP];
         boolean reverse = VitiDialogs.getYesNoUI("Are the image mirrored ?", "Is mirrored ?");
         // double[]paramsQRcode=new double[] {4.0,472.0,2916,668,15.8,142.2};
         double[] paramsQRcode = askQRcodeParams(
-                new File(inputDir, allImgsPath[(Math.min(allImgsPath.length, 6))]).getAbsolutePath(), reverse);
+                new File(inputDir, allImgsPath[-1+(Math.min(allImgsPath.length, 6))]).getAbsolutePath(), reverse);
         IJ.log("02 startInventoryOfAMessyDirButAllTheImagesContainQRCodes in Plugin_RootData");
 
         // Initialize aggregator with original value

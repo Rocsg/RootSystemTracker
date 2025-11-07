@@ -100,6 +100,13 @@
           <systemPath>/home/rfernandez/.m2/repository/io/github/rocsg/fijiyama/4.0.10/fijiyama-4.0.10.jar</systemPath>
         </dependency>-->
 
+        <!-- https://mvnrepository.com/artifact/io.github.oliviercailloux/google-or-tools -->
+<!-- https://mvnrepository.com/artifact/com.google.ortools/ortools-java -->
+        <dependency>
+            <groupId>com.google.ortools</groupId>
+            <artifactId>ortools-java</artifactId>
+            <version>9.14.6206</version>
+        </dependency>
         <dependency>
             <groupId>sc.fiji</groupId>
             <artifactId>Fiji_Plugins</artifactId>

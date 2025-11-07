@@ -29,6 +29,8 @@ public class MorphoUtils {
     }
 
 
+
+
     public static ImagePlus dilationLine2D(ImagePlus img, int radius, boolean horizontal) {
         Strel3D str2 = null;
         if (horizontal) str2 = inra.ijpb.morphology.strel.LinearHorizontalStrel.fromRadius(radius);
@@ -78,7 +80,8 @@ public class MorphoUtils {
 
 
     public static ImagePlus computeGeodesicInsideComponent(ImagePlus imgSeg, double minValue) {
-        ImagePlus imgSegWithBorders = VitimageUtils.uncropImageFloat(imgSeg, 3, 3, 0, imgSeg.getWidth() + 6, imgSeg.getHeight() + 6, 1);
+        ImagePlus imgSegWithBorders = VitimageUtils.convertByteToFloatWithoutDynamicChanges(imgSeg);
+        imgSegWithBorders = VitimageUtils.uncropImageFloat(imgSegWithBorders, 3, 3, 0, imgSegWithBorders.getWidth() + 6, imgSegWithBorders.getHeight() + 6, 1);
         ImagePlus imgSeed = VitimageUtils.invertBinaryMask(imgSegWithBorders);
         ImagePlus imgSegWithBordersDil = MorphoUtils.dilationCircle2D(imgSegWithBorders, 1);
         imgSeed = VitimageUtils.binaryOperationBetweenTwoImages(imgSeed, imgSegWithBordersDil, 2);

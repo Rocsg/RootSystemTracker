@@ -826,7 +826,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 if (e.getSource() == buttonSwitch && buttonSwitch.isEnabled()) {
                     disable(SWITCH);
                     pointStart();
-                    actionSwitchPoint();
+                    actionSwitchFalseCross();
                     return;
                 }
                 if (e.getSource() == buttonCreatePrimary && buttonCreatePrimary.isEnabled()) {
@@ -1025,14 +1025,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     /**
      * Action switch point.
      */
-    public void actionSwitchPoint() {
+    public void actionSwitchFalseCross() {
         boolean did = false;
         addLog("Running action \"Switch cross\" ...", -1);
         addLog(" Resolve a X cross. Click on the first point of Root A before cross, and first point of Root B before cross.", 1);
         String[] infos = null;
         Point3d[] tabPt = getAndAdaptCurrentPoints(waitPoints(2));
         if (tabPt != null) {
-            infos = switchPointInModel(tabPt, currentModel);
+            infos = switchFalseCrossInModel(tabPt, currentModel);
             if (infos != null) did = true;
         }
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
@@ -1392,7 +1392,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * @param tabPt the tab pt
      * @return true, if successful
      */
-    public String[] switchPointInModel(Point3d[] tabPt, RootModel rm) {
+    public String[] switchFalseCrossInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("SWITCHPOINT", tabPt);
         Object[] obj1 = rm.getClosestNode(tabPt[0]);
         Object[] obj2 = rm.getClosestNode(tabPt[1]);
@@ -1678,7 +1678,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Update the last node of the root and update the timing
         r.lastNode = nFirst;
-        r.updateTiming();
+        r.updateTimingModifiedForDebuggingRSMLExpert();
 
         return infos;
     }

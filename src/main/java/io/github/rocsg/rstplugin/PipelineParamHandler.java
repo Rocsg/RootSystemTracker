@@ -1,6 +1,7 @@
 package io.github.rocsg.rstplugin;
 
 import ij.IJ;
+import ij.ImageJ;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 
 import java.io.File;
@@ -28,7 +29,7 @@ public class PipelineParamHandler {
     // Sizes of the image series
     public int[] imgSerieSize;
     // Original pixel size in µm
-    public int originalPixelSize = 19;
+    public double originalPixelSize = 19;
     // Typical hour delay
     public double typicalHourDelay = 8;
     // Minimum and maximum tree in x direction
@@ -116,6 +117,11 @@ public class PipelineParamHandler {
      * @param inventoryDir The directory where the inventory files are located.
      * @param outputDir    The directory where the output files will be written.
      */
+
+    
+
+
+
     public PipelineParamHandler(String inventoryDir, String outputDir) {
         // Check if a "NOT_FOUND.csv" file exists in the inventory directory
         if (new File(inventoryDir, "NOT_FOUND.csv").exists()) {
@@ -222,7 +228,7 @@ public class PipelineParamHandler {
         movieTimeStep = getDouble("movieTimeStep");
         numberPlantsInBox = getInt("numberPlantsInBox");
         minSizeCC = getInt("minSizeCC");
-        originalPixelSize = getInt("originalPixelSize");
+        originalPixelSize = getDouble("originalPixelSize");
         unit = getString("unit");
         sizeFactorForGraphRendering = getInt("sizeFactorForGraphRendering");
         rootTissueIntensityLevel = getDouble("rootTissueIntensityLevel");
@@ -403,6 +409,10 @@ public class PipelineParamHandler {
     public double getMeanSpeedLateral() {
         return getDouble("meanSpeedLateral");
     }
+
+    public double getTypicalSpeed() {
+        return getDouble("typicalSpeed");
+    }       
 
     public double getMovieTimeStep() {
         double d = getDouble("movieTimeStep");
