@@ -7,7 +7,6 @@ import ij.plugin.Duplicator;
 import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
-import io.github.rocsg.rsml.FSR;
 import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstplugin.PipelineParamHandler;
@@ -3097,9 +3096,6 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 System.out.println("Outgoing edge from CC 5555-3085 : to "+e.target+" , hidden = "+e.hidden+" , activated = "+e.activated+" , target order = "+e.target.order);
             }
         }
-        //Prepare output data storage
-        FSR sr = (new FSR());
-        sr.initialize();
         RootModel rm = new RootModel();
         rm.pixelSize = (float) (pph.originalPixelSize * pph.subsamplingFactor);
         double[] hoursExtremities = pph.getHoursExtremities(indexImg);

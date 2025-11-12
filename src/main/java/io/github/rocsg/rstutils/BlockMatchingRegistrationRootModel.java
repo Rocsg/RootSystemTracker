@@ -14,7 +14,6 @@ import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.Transform3DType;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
 import io.github.rocsg.rsml.RootModel;
-import io.github.rocsg.rsml.FSR;
 import math3d.Point3d;
 import org.itk.simple.DisplacementFieldTransform;
 import org.itk.simple.Image;
@@ -181,8 +180,6 @@ public class BlockMatchingRegistrationRootModel extends BlockMatchingRegistratio
         IJ.log("Expected total computation time = " + nMins + " minutes");
         Timer t = new Timer();
         int N = filesList[0].length;
-        FSR sr = (new FSR());
-        sr.initialize();
 
         if (display) multiThread = false;
 

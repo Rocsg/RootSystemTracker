@@ -4,67 +4,22 @@ import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 
-import java.awt.*;
-import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.*;
 
 /**
- * @author Xavier Draye - Universit� catholique de Louvain
- * @author Guillaume Lobet - Universit� de Li�ge
+ * Adapted from Xavier Draye - Université catholique de Louvain
+ * & Guillaume Lobet - Université de Liège
+ *
+ * @author Romain Fernandez, Loaï Gandeel
  * <p>
  * Root class.
  */
 
 
 public class Root implements Comparable<Root> {
-
-
-    /**
-     * The no name.
-     */
-    static String noName = FSR.prefs.get("root_ID", "root_");
-    /**
-     * The axis color.
-     */
-    static Color axisColor = Color.green;
-    /**
-     * The nodes color.
-     */
-    static Color nodesColor = Color.orange;
-    /**
-     * The borders color.
-     */
-    static Color bordersColor = Color.red;
-    /**
-     * The area color.
-     */
-    static Color areaColor = Color.yellow;
-    /**
-     * The ticks color.
-     */
-    static Color ticksColor = Color.yellow;
-    /**
-     * The tips color.
-     */
-    static Color tipsColor = Color.yellow;
-    /**
-     * The child tips color.
-     */
-    static Color childTipsColor = Color.green;
-    /**
-     * The child nodes color.
-     */
-    static Color childNodesColor = Color.green;
-    /**
-     * The child axis color.
-     */
-    static Color childAxisColor = Color.yellow;
-    /**
-     * The child borders color.
-     */
-    static Color childBordersColor = Color.orange;
+    static String noName = "000";
     /**
      * The next root key.
      */
@@ -97,34 +52,6 @@ public class Root implements Comparable<Root> {
      * The plant number.
      */
     public int plantNumber;
-    /**
-     * The borders GP.
-     */
-    public GeneralPath bordersGP = new GeneralPath();
-    /**
-     * The axis GP.
-     */
-    public GeneralPath axisGP = new GeneralPath();
-    /**
-     * The nodes GP.
-     */
-    public GeneralPath nodesGP = new GeneralPath();
-    /**
-     * The ticks GP.
-     */
-    public GeneralPath ticksGP = new GeneralPath();
-    /**
-     * The tips GP.
-     */
-    public GeneralPath tipsGP = new GeneralPath();
-    /**
-     * The convexhull GP.
-     */
-    public GeneralPath convexhullGP = new GeneralPath();
-    /**
-     * new.
-     */
-    public GeneralPath parallelsGP = new GeneralPath();
     /**
      * The n nodes.
      */
@@ -186,10 +113,6 @@ public class Root implements Comparable<Root> {
      */
     String parentName;
     /**
-     * The g M.
-     */
-    int gM = 0;
-    /**
      * The keep root.
      */
     ArrayList<Root> deletedRoot, keepRoot;
@@ -204,6 +127,7 @@ public class Root implements Comparable<Root> {
 
     /*For converting between rsmls and temporal rsmls*/
     String label;
+
     /**
      * Constructor
      * Used when opening a xml file.
@@ -291,16 +215,6 @@ public class Root implements Comparable<Root> {
         return ySource[indexLower] + dy;
     }
 
-    public void repairUnevenSituations() {
-        //Display all
-        Node n = firstNode;
-        while (n.child != null) {
-            System.out.println(n);
-            n = n.child;
-        }
-        //Detect if
-    }
-
     public void cleanNegativeTh() {
         Node n = firstNode;
         while (n.child != null) {
@@ -308,45 +222,9 @@ public class Root implements Comparable<Root> {
             if (n.birthTime < 1) n.birthTime = 0;
             n = n.child;
         }
-        if(n!=null){
-            if (n.birthTimeHours < 0) n.birthTimeHours = 0;
-            if (n.birthTime < 1) n.birthTime = 0;
-        }
+        if (n.birthTimeHours < 0) n.birthTimeHours = 0;
+        if (n.birthTime < 1) n.birthTime = 0;
     }
-
-    public void interpolateTime() {
-        Node n = firstNode;
-        //double dist0=firstNode.distance;
-        //double time0=firstNode.birthTime;
-        //double timehour0=firstNode.birthTimeHours;
-        ArrayList<Double> times = new ArrayList<Double>();
-        ArrayList<Double> timesHours = new ArrayList<Double>();
-        ArrayList<Double> dists = new ArrayList<Double>();
-        dists.add(n.distance);
-        times.add((double) n.birthTime);
-        timesHours.add((double) n.birthTimeHours);
-        while (n.child != null) {
-            n = n.child;
-            if (n.birthTime >= 0) {
-                dists.add(n.distance);
-                times.add((double) n.birthTime);
-                timesHours.add((double) n.birthTimeHours);
-            }
-        }
-        Double[] distsTab = dists.toArray(new Double[dists.size()]);
-        Double[] timesTab = times.toArray(new Double[times.size()]);
-        Double[] timesHoursTab = timesHours.toArray(new Double[timesHours.size()]);
-
-        n = firstNode;
-        while (n.child != null) {
-            n = n.child;
-            if (n.birthTime < 0) {
-                n.birthTime = (float) linearInterpolation(n.distance, distsTab, timesTab);
-                n.birthTimeHours = (float) linearInterpolation(n.distance, distsTab, timesHoursTab);
-            }
-        }
-    }
-
 
     /**
      * This method updates the timing of the nodes in the root.
@@ -356,9 +234,7 @@ public class Root implements Comparable<Root> {
      * Finally, it estimates the birth time and birth time in hours for each non-exact node based on its distances to the previous and next exact nodes.
      */
     public void updateTimingModifiedForDebuggingRSMLExpert() {
-        boolean debug = true;
         Node nStart = this.firstNode;
-        Node nStop = this.lastNode;
         Node curNode = nStart;
         ArrayList<Node> listNode = new ArrayList<Node>();
 
@@ -389,7 +265,6 @@ public class Root implements Comparable<Root> {
         // Identify nodes that fall exactly on an observation timepoint
         // Strategy: for each "tas" (group of consecutive nodes with same integer birthTime),
         // only the LAST node of the tas keeps the exact birthTime, others are marked as non-exact for interpolation
-        if (debug) System.out.println("\n\nFIRST STEP: IDENTIFY EXACT NODES (last of each 'tas')");
         for (int i = 0; i < N; i++) {
             // Check if this node has an integer birthTime (within epsilon)
             boolean hasIntegerTime = (Math.abs(tabNode[i].birthTime - Math.round(tabNode[i].birthTime)) < VitimageUtils.EPSILON);
@@ -415,11 +290,7 @@ public class Root implements Comparable<Root> {
                 tabExact[i] = !nextHasSameTime;
             }
             
-            if (debug) System.out.println(" i=" + i + " birthTime=" + tabNode[i].birthTime + " isExact=" + tabExact[i] + " " + tabNode[i]);
         }
-
-        if (debug) System.out.println("\n\nSECOND STEP: ESTABLISH FORWARD DISTANCES");
-
 
         Node prev = null;
         double dist = 0;
@@ -435,26 +306,20 @@ public class Root implements Comparable<Root> {
             }
         }
 
-        if (debug) System.out.println("\n\nTHIRD STEP, ESTABLISH BACKWARD");
         dist = 0;
         Node next = null;
         // Calculate the distance to the next exact node for each non-exact node
         for (int i = N - 1; i >= 0; i--) {
-            if (debug) System.out.println("  Processing node " + i + " : " + tabNode[i]);
             if (!tabExact[i]) {
-                if (debug) System.out.println("   Non exact");
                 if (i < N - 1) dist += Node.distanceBetween(tabNode[i], tabNode[i + 1]);
                 distToNext[i] = dist;
                 tabNodeNext[i] = next;
-                if (debug) System.out.println("     Setting distance " + dist + " to next : " + next);
             } else {
-                if (debug) System.out.println("   Exact");
                 dist = 0;
                 next = tabNode[i];
             }
         }
 
-        if (debug) System.out.println("\n\nFOURTH STEP, RE ESTIMATE TIME");
         // Estimate the birth time and birth time in hours for each non-exact node
         for (int i = 0; i < N; i++) {
             if (!tabExact[i]) {
@@ -478,13 +343,6 @@ public class Root implements Comparable<Root> {
 
     }
 
-
-
-
-
-
-
-
     /**
      * This method updates the timing of the nodes in the root.
      * It first creates a list of all nodes in the root.
@@ -493,9 +351,7 @@ public class Root implements Comparable<Root> {
      * Finally, it estimates the birth time and birth time in hours for each non-exact node based on its distances to the previous and next exact nodes.
      */
     public void updateTiming() {
-        boolean debug = true;
         Node nStart = this.firstNode;
-        Node nStop = this.lastNode;
         Node curNode = nStart;
         ArrayList<Node> listNode = new ArrayList<Node>();
 
@@ -531,12 +387,7 @@ public class Root implements Comparable<Root> {
                 tabExact[i]=false;
             }
             if(tabExact[i])memory=Math.round(tabNode[i].birthTime);
-            if (debug) System.out.println(" i=" + i + " isExact ?" + tabExact[i] + " " + tabNode[i]);
         }
-
-
-
-
 
         Node prev = null;
         double dist = 0;
@@ -552,26 +403,20 @@ public class Root implements Comparable<Root> {
             }
         }
 
-        if (debug) System.out.println("\n\nTHIRD STEP, ESTABLISH BACKWARD");
         dist = 0;
         Node next = null;
         // Calculate the distance to the next exact node for each non-exact node
         for (int i = N - 1; i >= 0; i--) {
-            if (debug) System.out.println("  Processing node " + i + " : " + tabNode[i]);
             if (!tabExact[i]) {
-                if (debug) System.out.println("   Non exact");
                 if (i < N - 1) dist += Node.distanceBetween(tabNode[i], tabNode[i + 1]);
                 distToNext[i] = dist;
                 tabNodeNext[i] = next;
-                if (debug) System.out.println("     Setting distance " + dist + " to next : " + next);
             } else {
-                if (debug) System.out.println("   Exact");
                 dist = 0;
                 next = tabNode[i];
             }
         }
 
-        if (debug) System.out.println("\n\nFOURTH STEP, RE ESTIMATE TIME");
         // Estimate the birth time and birth time in hours for each non-exact node
         for (int i = 0; i < N; i++) {
             if (!tabExact[i]) {
@@ -744,10 +589,6 @@ public class Root implements Comparable<Root> {
      */
     public int resampleFlyingPoints(double[] hoursCorrespondingToTimePoints) {
         int stamp = 1000000;
-        boolean debug = false;
-        if (debug) System.out.println("Root before update :");
-        if (debug) System.out.println(this.stringNodes());
-        if (debug) System.out.println("Processing flying points on root " + this);
         ArrayList<Node> ar = new ArrayList<Node>();
         Node nFirst = firstNode;
         Node nLast = lastNode;
@@ -758,6 +599,7 @@ public class Root implements Comparable<Root> {
         }
         int N = ar.size();
         Node[] tabNode = ar.toArray(new Node[N]);
+        assert nFirst != null;
         int tStart = (int) Math.ceil(nFirst.birthTime);
         int tStop = (int) Math.floor(nLast.birthTime);
         int[] indexT = new int[tStop + 1];
@@ -775,17 +617,16 @@ public class Root implements Comparable<Root> {
         for (int t = tStart; t <= tStop; t++) {
             if (isNotFlying[t]) continue;
             stamp += 1;
-            if (debug) System.out.println("\n\nDetected flying time : " + t);
             Node lastBef = null;
             for (int i = 0; i < N; i++) {
                 if (tabNode[i].birthTime < t) lastBef = tabNode[i];
             }
-            if (debug) System.out.println("Last bef detected=" + lastBef);
             Node firstAft = null;
             for (int i = N - 1; i >= 0; i--) {
                 if (tabNode[i].birthTime > t) firstAft = tabNode[i];
             }
-            if (debug) System.out.println("first aft detected=" + firstAft);
+            assert lastBef != null;
+            assert firstAft != null;
             double DT = lastBef.birthTime - firstAft.birthTime;
             double DX = lastBef.x - firstAft.x;
             double DY = lastBef.y - firstAft.y;
@@ -811,15 +652,106 @@ public class Root implements Comparable<Root> {
             }
             N = ar.size();
             tabNode = ar.toArray(new Node[N]);
-
-
-            if (debug) System.out.println("Adding node " + newNode);
-            if (debug) System.out.println("Root after update :");
-            if (debug) System.out.println(this.stringNodes());
-            if (debug) System.out.println();
         }
 
-        if (debug) System.out.println();
+        return stamp;
+    }
+
+    /**  improvement ?
+     * NEW ASSUMPTION, the root is not necessarily increasing its number of nodes, it can also stagnate.
+     * Resample flying points.
+     * Updating a tree-like data structure by finding any "flying points" (i.e. points that are not present in the tree at certain times)
+     * These points are then added to the tree at the appropriate time.
+     *
+     * @return the number of individual modifications applied during correction
+     */
+    public int resampleFlyingPoints2(double[] hoursCorrespondingToTimePoints) {
+        int stamp = 1000000;
+
+        // Collect all nodes into an array list
+        ArrayList<Node> nodeList = new ArrayList<>();
+        Node currentNode = firstNode;
+        while (currentNode != null) {
+            nodeList.add(currentNode);
+            currentNode = currentNode.child;
+        }
+
+        int N = nodeList.size();
+        Node[] tabNode = nodeList.toArray(new Node[N]);
+
+        // Determine the time range
+        int tStart = (int) Math.ceil(firstNode.birthTime);
+        int tStop = (int) Math.floor(lastNode.birthTime);
+
+        // Initialize arrays to track exact times and flying points
+        int[] indexT = new int[tStop + 1];
+        boolean[] tabExact = new boolean[N];
+        boolean[] isNotFlying = new boolean[tStop + 1];
+
+        HashSet<Integer> times = new HashSet<>();
+        // Mark exact times and non-flying points
+        for (int i = 0; i < N; i++) {
+            tabExact[i] = (Math.abs(tabNode[i].birthTime - Math.round(tabNode[i].birthTime)) < VitimageUtils.EPSILON);
+            times.add((int) tabNode[i].birthTime);
+            if (tabExact[i]) {
+                int tt = (int) Math.round(tabNode[i].birthTime);
+                indexT[tt] = i;
+                isNotFlying[tt] = true;
+            }
+        }
+
+        // Process each time point to detect flying points
+        // changes with time values!
+        for (int t : times) {
+            if (isNotFlying[t]) continue;
+
+            stamp += 1;
+
+            // Find the last node before time t
+            Node lastBef = null;
+            for (int i = 0; i < N; i++) {
+                if (tabNode[i].birthTime < t) lastBef = tabNode[i];
+            }
+
+            // Find the first node after time t
+            Node firstAft = null;
+            for (int i = N - 1; i >= 0; i--) {
+                if (tabNode[i].birthTime > t) firstAft = tabNode[i];
+            }
+
+            // Calculate the position of the new node
+            assert lastBef != null;
+            assert firstAft != null;
+            double DT = lastBef.birthTime - firstAft.birthTime;
+            double DX = lastBef.x - firstAft.x;
+            double DY = lastBef.y - firstAft.y;
+            double dt = t - lastBef.birthTime;
+            double dx = DX * dt / DT;
+            double dy = DY * dt / DT;
+
+            // Create a new node
+            Node newNode = new Node(lastBef.x + (float) dx, lastBef.y + (float) dy, lastBef, true);
+            newNode.birthTime = t;
+            newNode.birthTimeHours = (float) hoursCorrespondingToTimePoints[t];
+
+            // Link the new node into the tree
+            lastBef.child = newNode;
+            newNode.parent = lastBef;
+            newNode.child = firstAft;
+            firstAft.parent = newNode;
+            nNodes++;
+
+            // Update the node list
+            nodeList = new ArrayList<>();
+            currentNode = firstNode;
+            while (currentNode != null) {
+                nodeList.add(currentNode);
+                currentNode = currentNode.child;
+            }
+            N = nodeList.size();
+            tabNode = nodeList.toArray(new Node[N]);
+        }
+
         return stamp;
     }
 
@@ -838,7 +770,7 @@ public class Root implements Comparable<Root> {
     }
 
     /**
-     * Gets the AVG median diameter in range.
+     * Gets the AVG median diameter in range. -> Cette fonction existe !
      *
      * @param rangeMinL the range min L
      * @param rangeMaxL the range max L
@@ -851,7 +783,7 @@ public class Root implements Comparable<Root> {
         Node node = this.firstNode;
         int incr = 0;
         tab[incr++] = new double[]{0, node.diameter};
-        ar.add(Double.valueOf(node.diameter));
+        ar.add((double) node.diameter);
         while (node.child != null) {
             dist += node.getDistanceTo(node.child);
             node = node.child;
@@ -867,18 +799,6 @@ public class Root implements Comparable<Root> {
 
         return VitimageUtils.MADeStatsDoubleSided(tabFinal, null)[0];
 
-    }
-
-    /**
-     * Update nnodes.
-     */
-    public void updateNnodes() {
-        Node n = firstNode;
-        nNodes = 0;
-        while (n != null) {
-            nNodes++;
-            n = n.child;
-        }
     }
 
     /**
@@ -1001,9 +921,8 @@ public class Root implements Comparable<Root> {
      * @param type           the type
      * @param value          the value
      * @param markerPosition the marker position
-     * @return the mark
      */
-    public Mark addMark(int type, String value, float markerPosition) {
+    public void addMark(int type, String value, float markerPosition) {
         float lPos = lPosCmToPixels(markerPosition);
         if (type == Mark.ANCHOR) {
             float v = Float.parseFloat(value);
@@ -1011,7 +930,6 @@ public class Root implements Comparable<Root> {
                 setRulerAtOrigin(-(lPos - v / pixelSize));
             } else value = String.valueOf(Math.round(markerPosition * 100.0) / 100.0);
             anchor = new Mark(type, this, lPos, value);
-            return null;
         } else if (type == Mark.MDL) {
             for (int i = 0; i < markList.size(); i++) {
                 Mark ma = markList.get(i);
@@ -1020,53 +938,11 @@ public class Root implements Comparable<Root> {
             Mark m = new Mark(type, this, lPos, value);
             markList.add(m);
             MDL = m;
-            return m;
         } else {
             Mark m = new Mark(type, this, lPos, value);
             markList.add(m);
             // m.createGraphics();
-            return m;
         }
-    }
-
-    /**
-     * Add a mark to the root.
-     *
-     * @param m the m
-     */
-    public void addMark(Mark m) {
-        if (m.type == Mark.ANCHOR) {
-            anchor = m;
-        } else markList.add(m);
-    }
-
-
-    /**
-     * String nodes.
-     *
-     * @return the string
-     */
-    public String stringNodes() {
-        String res = "";
-        Node n = this.firstNode;
-        while (n != null) {
-            res += "\n" + n;
-            n = n.child;
-        }
-        return res;
-    }
-
-    /**
-     * /**
-     * compute the number of nodes inside the root.
-     */
-    public void calcNNodes() {
-        if (firstNode == null) {
-            nNodes = 0;
-            return;
-        }
-        nNodes = 1;
-        for (Node n = firstNode; (n = n.child) != null; nNodes++) ;
     }
 
 
@@ -1104,7 +980,7 @@ public class Root implements Comparable<Root> {
      * @param rootID the new root ID
      */
     public void setRootID(String rootID) {
-        this.rootID = (rootID.length() == 0) ? noName : rootID;
+        this.rootID = (rootID.isEmpty()) ? noName : rootID;
         updateChildren();
     }
 
@@ -1242,7 +1118,7 @@ public class Root implements Comparable<Root> {
         }
 
         nn = parentDOM.getAttributes().getNamedItem("po:accession");
-        if (nn != null) poIndex = rm.getIndexFromPo(nn.getNodeValue());
+        //if (nn != null) poIndex = rm.getIndexFromPo(nn.getNodeValue());
 
 
         // Get the diameter nodes
@@ -1360,7 +1236,7 @@ public class Root implements Comparable<Root> {
         }
 
         nn = parentDOM.getAttributes().getNamedItem("po:accession");
-        if (nn != null) poIndex = rm.getIndexFromPo(nn.getNodeValue());
+        //if (nn != null) poIndex = rm.getIndexFromPo(nn.getNodeValue());
 
 
         // Get the diameter nodes
@@ -1531,7 +1407,7 @@ public class Root implements Comparable<Root> {
     /**
      * Checks if is child.
      *
-     * @return true if the root is child
+     * @return 0 if not a child, >0 if child
      */
     public int isChild() {
         return isChild;
@@ -1545,7 +1421,7 @@ public class Root implements Comparable<Root> {
     public void attachParent(Root r) {
         parent = r;
         isChild(parent.isChild() + 1);
-        setParentNode();
+        ComputeParentNode();
         setDistanceFromBase();
         setDistanceFromApex();
         setInsertAngl();
@@ -1568,7 +1444,7 @@ public class Root implements Comparable<Root> {
             setParentName(parent.getRootID());
             setParentKey(parent.getRootKey());
         }
-        if (childList.size() > 0) updateChildren();
+        if (!childList.isEmpty()) updateChildren();
     }
 
     public void setLabel(String label) {
@@ -1579,6 +1455,7 @@ public class Root implements Comparable<Root> {
         this.firstNode = nodes.get(0);
         this.lastNode = nodes.get(nodes.size() - 1);
         this.nNodes = nodes.size();
+        if (!childList.isEmpty()) updateChildren();
     }
 
     /**
@@ -1645,31 +1522,26 @@ public class Root implements Comparable<Root> {
 
     /**
      * Set which child is the first one on the root (closest from the base).
-     *
-     * @return true if there is at least one child, false if not.
      */
-    public boolean setFirstChild() {
+    public void setFirstChild() {
         if (childList.isEmpty()) {
             firstChild = null;
-            return false;
+            return;
         }
         Root fc = childList.get(0);
         for (Root c : childList) {
             if (c.getDistanceFromApex() > fc.getDistanceFromApex()) fc = c;
         }
         firstChild = fc;
-        return true;
     }
 
     /**
      * Set which child is the last one on the root (closest from the apex).
-     *
-     * @return true if there is at least one child, false if not.
      */
-    public boolean setLastChild() {
+    public void setLastChild() {
         if (childList.isEmpty()) {
             lastChild = null;
-            return false;
+            return;
         }
         Root fc = childList.get(0);
         for (Root c : childList) {
@@ -1678,7 +1550,6 @@ public class Root implements Comparable<Root> {
         lastChild = fc;
         lastChild.setDistanceFromBase();
         addMark(Mark.MDL, "0", lPosPixelsToCm(lastChild.distanceFromBase));
-        return true;
     }
 
     /**
@@ -1713,7 +1584,7 @@ public class Root implements Comparable<Root> {
     /**
      * Set the parentNode, which is the closest node in the parent from the base node of root.
      */
-    public void setParentNode() {
+    public void ComputeParentNode() {
         Node n = firstNode;
         Root p = getParent();
         if (p == null) {
@@ -1889,7 +1760,7 @@ public class Root implements Comparable<Root> {
      * @return childDensity the child density inside the ramified region
      */
     public float getChildDensity() {
-        if (childList.size() > 0) {
+        if (!childList.isEmpty()) {
             float dist = lPosPixelsToCm(lastChild.getDistanceFromBase() - firstChild.getDistanceFromBase());
             if (dist != 0) return childList.size() / dist;
             else return 0;
@@ -1960,8 +1831,7 @@ public class Root implements Comparable<Root> {
     public float getAVGInterBranchDistance() {
         float n = 0;
         int m = 0;
-        for (int i = 0; i < childList.size(); i++) {
-            Root r = childList.get(i);
+        for (Root r : childList) {
             n += r.getInterBranch();
             m++;
         }
@@ -1980,7 +1850,7 @@ public class Root implements Comparable<Root> {
             n = n.child;
             double B = Math.pow(((n.parent.diameter * pixelSize) / 2), 2) * Math.PI;
             double b = Math.pow(((n.diameter * pixelSize) / 2), 2) * Math.PI;
-            vol += ((n.length * pixelSize) / 3) * (B + b + Math.sqrt(B * b));
+            vol += (float) (((n.length * pixelSize) / 3) * (B + b + Math.sqrt(B * b)));
         }
         return vol;
     }
@@ -1997,7 +1867,7 @@ public class Root implements Comparable<Root> {
             n = n.child;
             double B = n.parent.diameter * pixelSize * Math.PI;
             double b = n.diameter * pixelSize * Math.PI;
-            surf += (n.length * pixelSize) * ((B + b) / 2);
+            surf += (float) ((n.length * pixelSize) * ((B + b) / 2));
         }
         return surf;
     }
@@ -2009,13 +1879,13 @@ public class Root implements Comparable<Root> {
      */
     public float getChildrenSurface() {
         float surf = 0;
-        for (int i = 0; i < childList.size(); i++) {
-            Node n = childList.get(i).firstNode;
+        for (Root root : childList) {
+            Node n = root.firstNode;
             while (n.child != null) {
                 n = n.child;
                 double B = n.parent.diameter * pixelSize * Math.PI;
                 double b = n.diameter * pixelSize * Math.PI;
-                surf += (n.length * pixelSize) * ((B + b) / 2);
+                surf += (float) ((n.length * pixelSize) * ((B + b) / 2));
             }
         }
         return surf;
@@ -2036,7 +1906,7 @@ public class Root implements Comparable<Root> {
      * @param rootKey the new root key
      */
     public void setRootKey(String rootKey) {
-        this.rootKey = (rootKey.length() == 0) ? noName : rootKey;
+        this.rootKey = (rootKey.isEmpty()) ? noName : rootKey;
         updateChildren();
     }
 
@@ -2054,7 +1924,7 @@ public class Root implements Comparable<Root> {
      *
      * @return 0 if not a lateral; 1 if on the left, 2 if on the right
      */
-    public int isLeftRight() {
+    public int isLeftRight() { // funny function
 
         if (isChild() == 0) return 0;
         else {
@@ -2103,8 +1973,8 @@ public class Root implements Comparable<Root> {
      */
     public float getChildrenLength() {
         float cl = 0;
-        for (int i = 0; i < childList.size(); i++) {
-            cl = cl + childList.get(i).getRootLength();
+        for (Root root : childList) {
+            cl = cl + root.getRootLength();
         }
         return cl;
     }
@@ -2115,10 +1985,10 @@ public class Root implements Comparable<Root> {
      * @return the children angle
      */
     public float getChildrenAngle() {
-        if (childList.size() > 0) {
+        if (!childList.isEmpty()) {
             float ang = 0;
-            for (int i = 0; i < childList.size(); i++) {
-                ang += childList.get(i).getInsertAngl();
+            for (Root root : childList) {
+                ang += root.getInsertAngl();
             }
             return ang / childList.size();
         } else return 0;
@@ -2146,7 +2016,7 @@ public class Root implements Comparable<Root> {
                 return Double.compare(r1.firstNode.y, r2.firstNode.y);
             }
         };
-        Collections.sort(childList, comparatorLateral);
+        childList.sort(comparatorLateral);
         return childList.toArray(new Root[childList.size()]);
     }
 
@@ -2211,94 +2081,6 @@ public class Root implements Comparable<Root> {
     }
 
     /**
-     * Return the min X coordinate of the root and its children.
-     *
-     * @return the x min total
-     */
-    public float getXMinTotal() {
-        float min = 100000;
-        Node n = this.firstNode;
-        while (n.child != null) {
-            if (n.x < min) min = n.x;
-            n = n.child;
-        }
-        for (int i = 0; i < childList.size(); i++) {
-            n = childList.get(i).firstNode;
-            while (n.child != null) {
-                if (n.x < min) min = n.x;
-                n = n.child;
-            }
-        }
-        return min;
-    }
-
-    /**
-     * Return the max X coordinate of the root and its children.
-     *
-     * @return the x max total
-     */
-    public float getXMaxTotal() {
-        float max = 0;
-        Node n = this.firstNode;
-        while (n.child != null) {
-            if (n.x > max) max = n.x;
-            n = n.child;
-        }
-        for (int i = 0; i < childList.size(); i++) {
-            n = childList.get(i).firstNode;
-            while (n.child != null) {
-                if (n.x > max) max = n.x;
-                n = n.child;
-            }
-        }
-        return max;
-    }
-
-    /**
-     * Return the min Y coordinate of the root and its children.
-     *
-     * @return the y min total
-     */
-    public float getYMinTotal() {
-        float min = 100000;
-        Node n = this.firstNode;
-        while (n.child != null) {
-            if (n.y < min) min = n.y;
-            n = n.child;
-        }
-        for (int i = 0; i < childList.size(); i++) {
-            n = childList.get(i).firstNode;
-            while (n.child != null) {
-                if (n.y < min) min = n.y;
-                n = n.child;
-            }
-        }
-        return min;
-    }
-
-    /**
-     * Return the max Y coordinate of the root and its children.
-     *
-     * @return the y max total
-     */
-    public float getYMaxTotal() {
-        float max = 0;
-        Node n = this.firstNode;
-        while (n.child != null) {
-            if (n.y > max) max = n.y;
-            n = n.child;
-        }
-        for (int i = 0; i < childList.size(); i++) {
-            n = childList.get(i).firstNode;
-            while (n.child != null) {
-                if (n.y > max) max = n.y;
-                n = n.child;
-            }
-        }
-        return max;
-    }
-
-    /**
      * Return the average orientation of the root.
      *
      * @return the root orientation
@@ -2316,30 +2098,16 @@ public class Root implements Comparable<Root> {
     }
 
     /**
-     * Get the Plant Ontology accession of the root.
-     *
-     * @return the po accession
-     */
-    public String getPoAccession() {
-        return FSR.listPoNames[poIndex];
-    }
-
-    /**
-     * Set the plant ontology accession to a new value.
-     *
-     * @param po the new po accession
-     */
-    public void setPoAccession(int po) {
-        this.poIndex = (rootID.isEmpty()) ? 0 : po;
-    }
-
-    /**
      * Get the convexhull area.
      *
      * @return the convex hull area
      */
     public float getConvexHullArea() {
         return 0;
+    }
+
+    public int getOrder() {
+        return order;
     }
 
     /**
@@ -2359,8 +2127,7 @@ public class Root implements Comparable<Root> {
             yList.add((int) n.y);
             n = n.child;
         }
-        for (int i = 0; i < childList.size(); i++) {
-            Root r = childList.get(i);
+        for (Root r : childList) {
             n = r.firstNode;
             while (n.child != null) {
                 xList.add((int) n.x);
@@ -2388,8 +2155,22 @@ public class Root implements Comparable<Root> {
      */
     @Override
     public int compareTo(Root arg0) {
-        if (this.firstNode.x == arg0.firstNode.x) return 0;
-        else if (this.firstNode.x < arg0.firstNode.x) return -1;
-        else return 1;
+        return Float.compare(this.firstNode.x, arg0.firstNode.x);
+    }
+
+    public String getPoAccession() {
+        return String.valueOf(poIndex);
+    }
+
+    public String getId() {
+        return rootID;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public List<Root> getChildren() {
+        return childList;
     }
 }
