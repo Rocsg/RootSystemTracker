@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="fca537db-2d85-4f63-92b8-2fc0c759541d" name="Changes" comment="better gitignore*">
+      <change afterPath="$PROJECT_DIR$/.idea/git_toolbox_prj.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Metadata.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Plant.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RSMLParser2DplusT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RSMLWriter2DplusT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Scene.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/FSR.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RSMLGUI.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RSMLNoGUI.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RSML_reader.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Root.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Root.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RootModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RootModel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/RsmlExpert_Plugin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/gui/RsmlExpert_Plugin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rsml/Test_RSMLViewer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstplugin/PipelineActionsHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstplugin/PipelineActionsHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstplugin/RstBox.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstplugin/RstBox.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/BlockMatchingRegistrationRootModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/BlockMatchingRegistrationRootModel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/SegmentToSegment.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/SegmentToSegment.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/Validation.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/rstutils/Validation.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/topologicaltracking/RegionAdjacencyGraphPipeline.oldjava" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/topologicaltracking/RegionAdjacencyGraphPipeline.oldjava" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/io/github/rocsg/topologicaltracking/RegionAdjacencyGraphPipelineV2.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/io/github/rocsg/topologicaltracking/RegionAdjacencyGraphPipelineV2.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Money-eng&quot;
+  }
+}</component>
+  <component name="GitToolBoxStore">
+    <option name="recentBranches">
+      <RecentBranches>
+        <option name="branchesForRepo">
+          <list>
+            <RecentBranchesForRepo>
+              <option name="branches">
+                <list>
+                  <RecentBranch>
+                    <option name="branchName" value="Dev_Loai_annotation" />
+                    <option name="lastUsedInstant" value="1762524570" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="main" />
+                    <option name="lastUsedInstant" value="1762524569" />
+                  </RecentBranch>
+                </list>
+              </option>
+              <option name="repositoryRootUrl" value="file://$PROJECT_DIR$" />
+            </RecentBranchesForRepo>
+          </list>
+        </option>
+      </RecentBranches>
+    </option>
+  </component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/Money-eng/RootSystemTracker.git&quot;,
+    &quot;accountId&quot;: &quot;0ee8f827-88fd-48bf-b04e-78cfdbd8da9a&quot;
+  }
+}</component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="2" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="359ZKhbLMnShjdrqILYkCvx8IjA" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.RsmlExpert_Plugin.executor": "Coverage",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "Dev__Loai__annotation",
+    "ignore_missing_gitignore": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.grazie",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
+      <recent name="io.github.rocsg.rsml" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.27397.103" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.27397.103" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="fca537db-2d85-4f63-92b8-2fc0c759541d" name="Changes" comment="" />
+      <created>1762524190987</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1762524190987</updated>
+      <workItem from="1762524190989" duration="576000" />
+      <workItem from="1762524786974" duration="169000" />
+      <workItem from="1762525048810" duration="9126000" />
+      <workItem from="1762938455723" duration="6187000" />
+    </task>
+    <task id="LOCAL-00001" summary="better gitignore">
+      <option name="closed" value="true" />
+      <created>1762524506725</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1762524506725</updated>
+    </task>
+    <task id="LOCAL-00002" summary="better gitignore*">
+      <option name="closed" value="true" />
+      <created>1762524556988</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1762524556988</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="better gitignore" />
+    <MESSAGE value="better gitignore*" />
+    <option name="LAST_COMMIT_MESSAGE" value="better gitignore*" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/RootSystemTracker$RsmlExpert_Plugin.ic" NAME="RsmlExpert_Plugin Coverage Results" MODIFIED="1762944370338" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true">
+      <FILTER>io.github.rocsg.gui.*</FILTER>
+    </SUITE>
+  </component>
+</project>

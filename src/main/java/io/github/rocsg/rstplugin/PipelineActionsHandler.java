@@ -12,24 +12,16 @@ import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
 import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.Transform3DType;
-import io.github.rocsg.rsml.Node;
-import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
-import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
 import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipelineV2;
 
-import org.apache.commons.io.FileUtils;
-import org.jgrapht.GraphPath;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
-import org.scijava.vecmath.Point3d;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public class PipelineActionsHandler {
     // Flag indicating the pipeline has finished processing

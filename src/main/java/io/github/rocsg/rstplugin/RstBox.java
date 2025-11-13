@@ -7,7 +7,6 @@ import ij.plugin.RGBStackMerge;
 import io.github.rocsg.fijiyama.common.VitiDialogs;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.rsml.RootModel;
-import io.github.rocsg.rsml.FSR;
 import io.github.rocsg.rsml.Root;
 
 import java.io.File;
@@ -47,10 +46,6 @@ public class RstBox {
         // Catch the number of slices in the image 22_registered_stack.tif
         this.imgReg = IJ.openImage(path + "/22_registered_stack.tif");
         this.Nt = imgReg.getNSlices();
-
-        // Initialize the object FSR, required for reading RSML models
-        FSR sr = new FSR();
-        sr.initialize();
 
         if (new File(path, "61_graph_expertized.rsml").exists()) {
             rootModel = RootModel.RootModelWildReadFromRsml(

@@ -50,36 +50,14 @@ import java.util.List;
 import java.util.*;
 
 /**
+ * @author Fernandez Romain
+ * @author Gandeel Loai
+ *
+ * Adapted from RootModel
  * @author Xavier Draye and Guillaume Lobet - Université catholique de Louvain
  */
 
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-class IdenticalDataFileFilter extends FileFilter {
-
-    String rootFName;
-
-    public IdenticalDataFileFilter(String rootFName) {
-        int l = rootFName.length();
-        int crop = l - (l / 10);
-        this.rootFName = rootFName.substring(0, crop);
-    }
-
-    public boolean accept(File f) {
-        return (f.getName().toLowerCase().endsWith("xml") && f.getName().startsWith(rootFName));
-    }
-
-    public String getDescription() {
-        return "SmartRoot Datafiles associated with " + rootFName;
-    }
-}
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-class DataFileFilterRSML extends FileFilter
-        implements java.io.FileFilter {
+class DataFileFilterRSML extends FileFilter implements java.io.FileFilter {
 
     public DataFileFilterRSML() {
     }
@@ -93,84 +71,10 @@ class DataFileFilterRSML extends FileFilter
     }
 }
 
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /**
  * The Class RootModel.
  */
 public class RootModel extends WindowAdapter {
-
-
-    //START UNSAFE ZONE
-
-    /**
-     * The Constant fileSuffix.
-     */
-    public static final String[] fileSuffix = {"xml", "xml01", "xml02", "xml03", "xml04"};
-    /**
-     * The Constant fileSuffixRSML.
-     */
-    public static final String[] fileSuffixRSML = {"rsml", "rsml01", "rsml02", "rsml03", "rsml04"};
-    /**
-     * Return code from selectNode().
-     */
-    static final int NODE = 1;
-    /**
-     * The Constant ROOT.
-     */
-    static final int ROOT = 2;
-    /**
-     * The Constant CHILD.
-     */
-    static final int CHILD = 3;
-    /**
-     * The Constant PARENT.
-     */
-    static final int PARENT = 4;
-    /**
-     * The Constant CHILDPARENT.
-     */
-    static final int CHILDPARENT = 5;
-    /**
-     * Modifier flags for tracing operations.
-     */
-    static final int AUTO_TRACE = 1;
-    /**
-     * The Constant FREEZE_DIAMETER.
-     */
-    static final int FREEZE_DIAMETER = 2;
-    /**
-     * The Constant SNAP_TO_BORDER.
-     */
-    static final int SNAP_TO_BORDER = 4;
-
-
-    //END UNSAFE ZONE
-    /**
-     * The Constant THRESHOLD_ADAPTIVE1.
-     */
-    static final int THRESHOLD_ADAPTIVE1 = 1;
-    /**
-     * The Constant THRESHOLD_ADAPTIVE2.
-     */
-    static final int THRESHOLD_ADAPTIVE2 = 2;
-    /**
-     * The Constant REGULAR_TRACING.
-     */
-    static final int REGULAR_TRACING = 1;
-    /**
-     * The Constant LATERAL_TRACING.
-     */
-    static final int LATERAL_TRACING = 2;
-    /**
-     * The Constant LINE_TRACING.
-     */
-    static final int LINE_TRACING = 4;
-    /**
-     * The Constant LATERAL_TRACING_ONE.
-     */
-    static final int LATERAL_TRACING_ONE = 8;
     /**
      * The datafile filter RSML.
      */
@@ -184,6 +88,7 @@ public class RootModel extends WindowAdapter {
      * The datafile key.
      */
     static String datafileKey = "default";
+    public Metadata metadata;
     /**
      * The root list.
      */
@@ -205,11 +110,6 @@ public class RootModel extends WindowAdapter {
      */
     public float pixelSize;
 
-    /**  autoBuildFromNode() estimates the putative location for a new node in the direction of the         line joining the previous and current nodes, using a distance which is the minimum of         putative distances 1 & 2 (see AUTOBUILD_STEP_FACTOR_BORDER AUTOBUILD_STEP_FACTOR_DIAMETER)        but which is at least equal to AUTOBUILD_MIN_STEP. */
-    /** Putative distance 1 (from the current node) is equal to the
-     distance to the root border (along the predicted direction) multiplied by the AUTOBUILD_STEP_FACTOR_BORDER */
-    /** Putative distance 2 (from the current node) is equal to the
-     root diameter at the current node multiplied by the AUTOBUILD_STEP_FACTOR_DIAMETER */
     /**
      * Minimum angle step for the automatic recentering of nodes in autoBuildFromNode()
      */
@@ -286,7 +186,10 @@ public class RootModel extends WindowAdapter {
      * @param dataFName the data F name
      */
     public RootModel(String dataFName) {
-        dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
+        //dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
+        if (dpi == 0) { // TODO fix
+            dpi = 1;
+        }
         pixelSize = 2.54f / dpi;
         //readRSML(dataFName);
         readRSMLNew(dataFName);
@@ -299,7 +202,10 @@ public class RootModel extends WindowAdapter {
      * @param timeLapseModel the time lapse model
      */
     public RootModel(String dataFName, boolean timeLapseModel) {
-        dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
+        //dpi = (FSR.prefs != null ? FSR.prefs.getFloat("DPI_default", dpi) : 1);
+        if (dpi == 0) { // TODO fix
+            dpi = 1;
+        }
         pixelSize = 2.54f / dpi;
         readRSML(dataFName, timeLapseModel);
     }
@@ -338,24 +244,15 @@ public class RootModel extends WindowAdapter {
     }
 
     /**
-     * Here is a test function for the function above, standardOrderingOfRoots()
-     * It takes as an argument a rsml, read it by using the function RootModelWildReadFromRsml, then standardize ordering, and then write it back to a new rsml file
-     */
-    public static void testStandardOrderingOfRoots(String rsmlFile) {
-        RootModel rm = RootModel.RootModelWildReadFromRsml(rsmlFile);
-        rm.standardOrderingOfRoots();
-        rm.writeRSML3D(rsmlFile + "_standardized.rsml", "", true, false);
-    }
-
-    /**
      * Root model wild read from rsml.
      *
      * @param rsmlFile the rsml file
      * @return the root model
      */
-    public static RootModel RootModelWildReadFromRsml(String rsmlFile) {//Wild read model for Fijiyama did Root model with time, diameter, vx and vy information
-        FSR sr = (new FSR());
-        sr.initialize();
+    public static RootModel RootModelWildReadFromRsml(String rsmlFile) {
+        //Wild read model for Fijiyama did Root model with time, diameter, vx and vy information
+        //FSR sr = (new FSR());
+        //sr.initialize();
         boolean debug = false;
         //String lineSep= System.getProperty("line.separator");
 
@@ -432,28 +329,6 @@ public class RootModel extends WindowAdapter {
     }
 
     /**
-     * Creates the superposition time lapse from path.
-     *
-     * @param imgPath  the img path
-     * @param rsmlPath the rsml path
-     * @return the image plus
-     */
-    public static ImagePlus createSuperpositionTimeLapseFromPath(String imgPath, String rsmlPath) {
-        ImagePlus imgReg = IJ.openImage(imgPath);
-        int Nt = imgReg.getStackSize();
-        ImagePlus[] tabReg = VitimageUtils.stackToSlices(imgReg);
-        ImagePlus[] tabRes = new ImagePlus[Nt];
-        RootModel rm = RootModel.RootModelWildReadFromRsml(rsmlPath);
-        for (int i = 0; i < Nt; i++) {
-            ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgReg, 1, false, (i + 1), true, new boolean[]{true, true, true, false, true}, new double[]{2, 2});
-            imgRSML.setDisplayRange(0, Nt + 3);
-            tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
-            IJ.run(tabRes[i], "RGB Color", "");
-        }
-        return VitimageUtils.slicesToStack(tabRes);
-    }
-
-    /**
      * Project rsml on image.
      *
      * @param rm               the rm
@@ -466,8 +341,7 @@ public class RootModel extends WindowAdapter {
      * @param projectOnStack   the project on stack
      * @return the image plus
      */
-    public static ImagePlus projectRsmlOnImage(RootModel rm, ImagePlus registeredStack, int zoomFactor,
-                                               int primaryRadius, int secondaryRadius, boolean isOldRsmlVersion, boolean binaryColor, boolean projectOnStack) {
+    public static ImagePlus projectRsmlOnImage(RootModel rm, ImagePlus registeredStack, int zoomFactor, int primaryRadius, int secondaryRadius, boolean isOldRsmlVersion, boolean binaryColor, boolean projectOnStack) {
         if (!isOldRsmlVersion) {
             IJ.showMessage("Not yet coded");
             System.exit(0);
@@ -485,8 +359,7 @@ public class RootModel extends WindowAdapter {
             IJ.run(tabRes[i], "RGB Color", "");
         }
         t.print("Updating root model took : ");
-        ImagePlus res = VitimageUtils.slicesToStack(tabRes);
-        return res;
+        return VitimageUtils.slicesToStack(tabRes);
     }
 
     /**
@@ -528,7 +401,7 @@ public class RootModel extends WindowAdapter {
         int dy = y2 - y1;
         int absdx = dx >= 0 ? dx : -dx;
         int absdy = dy >= 0 ? dy : -dy;
-        int n = absdy > absdx ? absdy : absdx;
+        int n = Math.max(absdy, absdx);
         double xinc = dx != 0 ? (double) dx / n : 0; //single point (dx=dy=n=0): avoid division by zero
         double yinc = dy != 0 ? (double) dy / n : 0;
         double x = x1;
@@ -572,8 +445,7 @@ public class RootModel extends WindowAdapter {
             tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
             IJ.run(tabRes[i], "RGB Color", "");
         }
-        ImagePlus res = VitimageUtils.slicesToStack(tabRes);
-        return res;
+        return VitimageUtils.slicesToStack(tabRes);
     }
 
     public void increaseNbPlants() {
@@ -700,36 +572,6 @@ public class RootModel extends WindowAdapter {
         return ret;
     }
 
-    public double[][] getTipDepthSpeedAndRootLengthOverTime(Root r) {
-        Node n = r.firstNode;
-        Node nPar = n;
-        double[][] ret = new double[3][hoursCorrespondingToTimePoints.length];
-        ret[1][0] = 0;
-        int incrIndex = -1;
-        double incrTime = 0;
-        double incrDist = 0;
-        double totalDist = 0;
-        double curHours = n.birthTimeHours;
-        while (n.child != null) {
-            incrDist = 0;
-            incrTime = 0;
-            while (curHours < hoursCorrespondingToTimePoints[incrIndex + 1]) {
-                nPar = n;
-                n = n.child;
-                curHours = n.birthTimeHours;
-
-                incrDist += distance(nPar, n);
-                totalDist += distance(nPar, n);
-                incrTime += (n.birthTimeHours - nPar.birthTimeHours);
-            }
-            incrIndex++;
-            ret[0][incrIndex] = n.y;
-            ret[1][incrIndex] = incrDist / incrTime;
-            ret[2][incrIndex] = totalDist;
-        }
-        return ret;
-    }
-
     /**
      * Gets the lateral speeds and depth over time.
      *
@@ -793,10 +635,10 @@ public class RootModel extends WindowAdapter {
         re = dom.createElement("rsml");
 
         //create time list
-        String hours = "";
+        StringBuilder hours = new StringBuilder();
         for (int i = 1; i < hoursCorrespondingToTimePoints.length - 1; i++)
-            hours += VitimageUtils.dou(hoursCorrespondingToTimePoints[i]) + ",";
-        hours += VitimageUtils.dou(hoursCorrespondingToTimePoints[hoursCorrespondingToTimePoints.length - 1]);
+            hours.append(VitimageUtils.dou(hoursCorrespondingToTimePoints[i])).append(",");
+        hours.append(VitimageUtils.dou(hoursCorrespondingToTimePoints[hoursCorrespondingToTimePoints.length - 1]));
 
         //Build and add metadata
         me = dom.createElement("metadata");
@@ -822,7 +664,7 @@ public class RootModel extends WindowAdapter {
         met.setTextContent(fileName);
         me.appendChild(met);
         met = dom.createElement("observation-hours");
-        met.setTextContent(hours);
+        met.setTextContent(hours.toString());
         me.appendChild(met);
         met = dom.createElement("image");
         mett = dom.createElement("label");
@@ -839,8 +681,7 @@ public class RootModel extends WindowAdapter {
 
         //Build and add plant 1
         int incrPlant = 0;
-        for (int indexPrim = 0; indexPrim < rootList.size(); indexPrim++) {
-            Root r = rootList.get(indexPrim);
+        for (Root r : rootList) {
             if (r.isChild == 1) continue;
             ++incrPlant;
             plant = dom.createElement("plant");
@@ -852,16 +693,16 @@ public class RootModel extends WindowAdapter {
             geomPrim = dom.createElement("geometry");
             polyPrim = dom.createElement("polyline");
             double[][] coord = getRootCoordinates(r);
-            for (int i = 0; i < coord.length; i++) {
+            for (double[] doubles : coord) {
                 pt = dom.createElement("point");
-                pt.setAttribute(respectStandardRSML ? "x" : "coord_x", "" + (shortValues ? VitimageUtils.dou(coord[i][0]) : coord[i][0]));
-                pt.setAttribute(respectStandardRSML ? "y" : "coord_y", "" + (shortValues ? VitimageUtils.dou(coord[i][1]) : coord[i][1]));
+                pt.setAttribute(respectStandardRSML ? "x" : "coord_x", "" + (shortValues ? VitimageUtils.dou(doubles[0]) : doubles[0]));
+                pt.setAttribute(respectStandardRSML ? "y" : "coord_y", "" + (shortValues ? VitimageUtils.dou(doubles[1]) : doubles[1]));
                 if (!respectStandardRSML) {
-                    pt.setAttribute("vx", "" + (shortValues ? VitimageUtils.dou(coord[i][2]) : coord[i][2]));
-                    pt.setAttribute("vy", "" + (shortValues ? VitimageUtils.dou(coord[i][3]) : coord[i][3]));
-                    pt.setAttribute("diameter", "" + (shortValues ? VitimageUtils.dou(coord[i][4]) : coord[i][4]));
-                    pt.setAttribute("coord_t", "" + (shortValues ? VitimageUtils.dou(coord[i][5]) : coord[i][5]));
-                    pt.setAttribute("coord_th", "" + (shortValues ? VitimageUtils.dou(coord[i][6]) : coord[i][6]));
+                    pt.setAttribute("vx", "" + (shortValues ? VitimageUtils.dou(doubles[2]) : doubles[2]));
+                    pt.setAttribute("vy", "" + (shortValues ? VitimageUtils.dou(doubles[3]) : doubles[3]));
+                    pt.setAttribute("diameter", "" + (shortValues ? VitimageUtils.dou(doubles[4]) : doubles[4]));
+                    pt.setAttribute("coord_t", "" + (shortValues ? VitimageUtils.dou(doubles[5]) : doubles[5]));
+                    pt.setAttribute("coord_th", "" + (shortValues ? VitimageUtils.dou(doubles[6]) : doubles[6]));
                 }
                 polyPrim.appendChild(pt);
             }
@@ -872,18 +713,18 @@ public class RootModel extends WindowAdapter {
                 Element funcPrim = dom.createElement("function");
                 funcPrim.setAttribute("name", "timepoint");
                 funcPrim.setAttribute("domain", "polyline");
-                for (int i = 0; i < coord.length; i++) {
+                for (double[] doubles : coord) {
                     pt = dom.createElement("sample");
-                    pt.setTextContent("" + (shortValues ? VitimageUtils.dou(coord[i][5]) : coord[i][5]));
+                    pt.setTextContent("" + (shortValues ? VitimageUtils.dou(doubles[5]) : doubles[5]));
                     funcPrim.appendChild(pt);
                 }
                 functionPrim.appendChild(funcPrim);
                 Element funcPrim2 = dom.createElement("function");
                 funcPrim2.setAttribute("name", "hours");
                 funcPrim2.setAttribute("domain", "polyline");
-                for (int i = 0; i < coord.length; i++) {
+                for (double[] doubles : coord) {
                     pt = dom.createElement("sample");
-                    pt.setTextContent("" + (shortValues ? VitimageUtils.dou(coord[i][6]) : coord[i][6]));
+                    pt.setTextContent("" + (shortValues ? VitimageUtils.dou(doubles[6]) : doubles[6]));
                     funcPrim2.appendChild(pt);
                 }
                 functionPrim.appendChild(funcPrim2);
@@ -901,16 +742,16 @@ public class RootModel extends WindowAdapter {
                 geomLat = dom.createElement("geometry");
                 polyLat = dom.createElement("polyline");
                 coord = getRootCoordinates(rLat);
-                for (int i = 0; i < coord.length; i++) {
+                for (double[] doubles : coord) {
                     pt = dom.createElement("point");
-                    pt.setAttribute(respectStandardRSML ? "x" : "coord_x", "" + (shortValues ? VitimageUtils.dou(coord[i][0]) : coord[i][0]));
-                    pt.setAttribute(respectStandardRSML ? "y" : "coord_y", "" + (shortValues ? VitimageUtils.dou(coord[i][1]) : coord[i][1]));
+                    pt.setAttribute(respectStandardRSML ? "x" : "coord_x", "" + (shortValues ? VitimageUtils.dou(doubles[0]) : doubles[0]));
+                    pt.setAttribute(respectStandardRSML ? "y" : "coord_y", "" + (shortValues ? VitimageUtils.dou(doubles[1]) : doubles[1]));
                     if (!respectStandardRSML) {
-                        pt.setAttribute("vx", "" + (shortValues ? VitimageUtils.dou(coord[i][2]) : coord[i][2]));
-                        pt.setAttribute("vy", "" + (shortValues ? VitimageUtils.dou(coord[i][3]) : coord[i][3]));
-                        pt.setAttribute("diameter", "" + (shortValues ? VitimageUtils.dou(coord[i][4]) : coord[i][4]));
-                        pt.setAttribute("coord_t", "" + (shortValues ? VitimageUtils.dou(coord[i][5]) : coord[i][5]));
-                        pt.setAttribute("coord_th", "" + (shortValues ? VitimageUtils.dou(coord[i][6]) : coord[i][6]));
+                        pt.setAttribute("vx", "" + (shortValues ? VitimageUtils.dou(doubles[2]) : doubles[2]));
+                        pt.setAttribute("vy", "" + (shortValues ? VitimageUtils.dou(doubles[3]) : doubles[3]));
+                        pt.setAttribute("diameter", "" + (shortValues ? VitimageUtils.dou(doubles[4]) : doubles[4]));
+                        pt.setAttribute("coord_t", "" + (shortValues ? VitimageUtils.dou(doubles[5]) : doubles[5]));
+                        pt.setAttribute("coord_th", "" + (shortValues ? VitimageUtils.dou(doubles[6]) : doubles[6]));
                     }
                     polyLat.appendChild(pt);
                 }
@@ -921,18 +762,18 @@ public class RootModel extends WindowAdapter {
                     Element funcLat = dom.createElement("function");
                     funcLat.setAttribute("name", "timepoint");
                     funcLat.setAttribute("domain", "polyline");
-                    for (int i = 0; i < coord.length; i++) {
+                    for (double[] doubles : coord) {
                         pt = dom.createElement("sample");
-                        pt.setTextContent("" + (shortValues ? VitimageUtils.dou(coord[i][5]) : coord[i][5]));
+                        pt.setTextContent("" + (shortValues ? VitimageUtils.dou(doubles[5]) : doubles[5]));
                         funcLat.appendChild(pt);
                     }
                     functionLat.appendChild(funcLat);
                     Element funcLat2 = dom.createElement("function");
                     funcLat2.setAttribute("name", "hours");
                     funcLat2.setAttribute("domain", "polyline");
-                    for (int i = 0; i < coord.length; i++) {
+                    for (double[] doubles : coord) {
                         pt = dom.createElement("sample");
-                        pt.setTextContent("" + (shortValues ? VitimageUtils.dou(coord[i][6]) : coord[i][6]));
+                        pt.setTextContent("" + (shortValues ? VitimageUtils.dou(doubles[6]) : doubles[6]));
                         funcLat2.appendChild(pt);
                     }
                     functionLat.appendChild(funcLat2);
@@ -979,8 +820,8 @@ public class RootModel extends WindowAdapter {
         //Then we use comparator to sort rootList
         this.rootList.sort(comparatorPrimaries);
         int incr = 0;
-        for (int i = 0; i < this.rootList.size(); i++) {
-            if (this.rootList.get(i).order == 1) this.rootList.get(i).plantNumber = (incr++);
+        for (Root root : this.rootList) {
+            if (root.order == 1) root.plantNumber = (incr++);
         }
 
         //Then, we order the lateral roots
@@ -996,9 +837,9 @@ public class RootModel extends WindowAdapter {
         }
 
         for(int ord=2;ord<=100;ord++){
-            for (int i = 0; i < this.rootList.size(); i++) {
-                if (this.rootList.get(i).order == ord)
-                    this.rootList.get(i).plantNumber = this.rootList.get(i).getParent().plantNumber;
+            for (Root root : this.rootList) {
+                if (root.order == ord)
+                    root.plantNumber = root.getParent().plantNumber;
             }
         }
     }
@@ -1060,7 +901,7 @@ public class RootModel extends WindowAdapter {
         double distMin = maxGuessedDistance;
         for (Root r : rootList) {
             Node n = r.firstNode;
-            while (n != null && n.child != null && n.child.birthTime <= pt.z) {
+            while (n != null && n.child != null && (n.birthTime <= pt.z || n.child.birthTime <= pt.z)) {
                 double dist = distanceBetweenPointAndSegmentOrTenTimesVitimageUtilsLargeValueIfTheProjectionDoesNotFallIntoTheSegment(
                         new double[]{pt.x, pt.y, 0}, new double[]{n.x, n.y, 0}, new double[]{n.child.x, n.child.y, 0});
                 if (dist < distMin) {
@@ -1072,81 +913,6 @@ public class RootModel extends WindowAdapter {
             }
         }
         return new Object[]{nearestParent, nearestRoot};
-    }
-
-    /**
-     * Csv send marks.
-     *
-     * @param pw     the pw
-     * @param header the header
-     * @param name   the name
-     * @param last   the last
-     */
-    public void csvSendMarks(PrintWriter pw, boolean header, String name, boolean last) {
-
-        if (header)
-            pw.println("image, source, root, root_name, mark_type, position_from_base, diameter, angle, x, y, root_order, root_ontology, value");
-        String stmt;
-        for (Root r : rootList) {
-            // Root origin information
-            stmt = name + ", ";
-            stmt = stmt.concat(imgName + ", ");  // XD 20110629
-            stmt = stmt.concat(r.getRootKey() + ", ");
-            stmt = stmt.concat(r.getRootID() + ", ");
-            stmt = stmt.concat("Origin, ");
-            stmt = stmt.concat("0.0, 0.0, 0.0, ");
-            stmt = stmt.concat(r.firstNode.x * pixelSize + ", ");
-            stmt = stmt.concat(r.firstNode.y * pixelSize + ", ");
-            stmt = stmt.concat(r.isChild() + ", ");
-            stmt = stmt.concat(r.getPoAccession() + ", ");
-            stmt = stmt.concat(imgName);
-            pw.println(stmt);
-            pw.flush();
-            // Marks information
-            for (int j = 0; j < r.markList.size(); j++) {
-                Mark m = r.markList.get(j);
-                //Point p = r.getLocation(m.lPos * pixelSize);
-                stmt = imgName + ", ";
-                stmt = stmt.concat((m.isForeign ? m.foreignImgName : imgName) + ", ");  // XD 20110629
-                stmt = stmt.concat(r.getRootKey() + ", ");
-                stmt = stmt.concat(r.getRootID() + ", ");
-                stmt = stmt.concat(Mark.getName(m.type) + ", ");
-                stmt = stmt.concat(r.lPosPixelsToCm(m.lPos) + ", ");
-                stmt = stmt.concat(m.diameter * pixelSize + ", ");
-                stmt = stmt.concat(m.angle + ", ");
-//              if (p != null) {
-//                 stmt = stmt.concat(p.x * pixelSize + ", ");
-//                 stmt = stmt.concat(p.y * pixelSize + ", ");
-//              }
-//              else {
-//                 SR.write("[WARNING] " + Mark.getName(m.type) + " mark '" + m.value + "' on root '"+ r.getRootID() + "' is past the end of root.");
-//                 stmt = stmt.concat(" 0.0, 0.0, ");
-//              }
-                stmt = stmt.concat(r.isChild() + ", ");
-                stmt = stmt.concat(r.getPoAccession() + ", ");
-                if (m.needsTwinPosition())
-                    stmt = stmt.concat(((m.twinLPos - m.lPos) * pixelSize) + "");
-                else stmt = stmt.concat(m.value);
-                pw.println(stmt);
-                pw.flush();
-            }
-            // Root end information
-            stmt = imgName + ", ";
-            stmt = stmt.concat(imgName + ", ");  // XD 20110629
-            stmt = stmt.concat(r.getRootKey() + ", ");
-            stmt = stmt.concat(r.getRootID() + ", ");
-            stmt = stmt.concat("Length, ");
-            stmt = stmt.concat(r.lPosPixelsToCm(r.getRootLength()) + ", ");
-            stmt = stmt.concat("0.0, 0.0, ");
-            stmt = stmt.concat(r.lastNode.x * pixelSize + ", ");
-            stmt = stmt.concat(r.lastNode.y * pixelSize + ", ");
-            stmt = stmt.concat(r.isChild() + ", ");
-            stmt = stmt.concat(r.getPoAccession() + ", ");
-            stmt = stmt.concat(imgName);
-            pw.println(stmt);
-            if (last) pw.flush();
-        }
-        FSR.write("CSV data transfer completed for 'Marks'.");
     }
 
     /**
@@ -1211,10 +977,9 @@ public class RootModel extends WindowAdapter {
      * @param rt   the rt
      * @param name the name
      */
-    public void sendRootData(ResultsTable rt, String name) {
+    public void sendRootData(ResultsTable rt, String name) { // ?
 
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
+        for (Root r : rootList) {
             if (!r.validate()) continue; // corrupted Root instance
             rt.incrementCounter();
             rt.addValue("image", name);
@@ -1225,7 +990,7 @@ public class RootModel extends WindowAdapter {
             rt.addValue("volume", r.getRootVolume());
             rt.addValue("convexhull_area", r.getConvexHullArea());
             rt.addValue("diameter", r.getAVGDiameter());
-            rt.addValue("root_order", r.isChild());
+            rt.addValue("root_order", r.order);
             rt.addValue("root_ontology", r.getPoAccession());
             rt.addValue("parent_name", r.getParentName());
             if (r.getParent() != null) rt.addValue("parent", r.getParent().getRootKey());
@@ -1269,8 +1034,7 @@ public class RootModel extends WindowAdapter {
      */
     public void sendNodeData(ResultsTable rt, String name) {
 
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
+        for (Root r : rootList) {
             if (!r.validate()) continue; // corrupted Root instance
             Node n = r.firstNode;
             do {
@@ -1337,15 +1101,6 @@ public class RootModel extends WindowAdapter {
     }
 
     /**
-     * Ge tthe DPI value for the image.
-     *
-     * @return the dpi
-     */
-    public float getDPI() {
-        return dpi;
-    }
-
-    /**
      * Set the DPI avlue for the image.
      *
      * @param dpi the new dpi
@@ -1353,7 +1108,7 @@ public class RootModel extends WindowAdapter {
     public void setDPI(float dpi) {
         this.dpi = dpi;
         pixelSize = (float) (2.54 / dpi);
-        for (int i = 0; i < rootList.size(); i++) rootList.get(i).setDPI(dpi);
+        for (Root root : rootList) root.setDPI(dpi);
     }
 
     /**
@@ -1367,10 +1122,10 @@ public class RootModel extends WindowAdapter {
      * Log read error.
      */
     private void logReadError() {
-        FSR.write("An I/O error occured while attemping to read the datafile.");
-        FSR.write("A new empty datafile will be created.");
-        FSR.write("Backup versions of the datafile, if any, can be loaded");
-        FSR.write("using the File -> Use backup datafile menu item.");
+        IJ.log("An I/O error occured while attemping to read the datafile.");
+        IJ.log("A new empty datafile will be created.");
+        IJ.log("Backup versions of the datafile, if any, can be loaded");
+        IJ.log("using the File -> Use backup datafile menu item.");
     }
 
     /**
@@ -1438,7 +1193,7 @@ public class RootModel extends WindowAdapter {
                     nodeMeta = nodeMeta.getNextSibling();
                 }
                 dpi = getDPI(unit, res);
-                FSR.write("resolution = " + dpi);
+                IJ.log("resolution = " + dpi);
                 pixelSize = 2.54f / dpi;
             }
 
@@ -1465,7 +1220,7 @@ public class RootModel extends WindowAdapter {
             }
             nodeDOM = nodeDOM.getNextSibling();
         }
-        FSR.write(rootList.size() + " root(s) were created");
+        IJ.log(rootList.size() + " root(s) were created");
         setDPI(dpi);
     }
 
@@ -1561,7 +1316,7 @@ public class RootModel extends WindowAdapter {
             }
             nodeDOM = nodeDOM.getNextSibling();
         }
-        FSR.write(rootList.size() + " root(s) were created");
+        IJ.log(rootList.size() + " root(s) were created");
         setDPI(dpi);
     }
 
@@ -1623,7 +1378,7 @@ public class RootModel extends WindowAdapter {
                     String metaName = nodeMeta.getNodeName();
                     // Get the image resolution
                     if (metaName.equals("unit")) unit = nodeMeta.getFirstChild().getNodeValue();
-                    if (metaName.equals("resolution")) res = Float.valueOf(nodeMeta.getFirstChild().getNodeValue());
+                    if (metaName.equals("resolution")) res = Float.parseFloat(nodeMeta.getFirstChild().getNodeValue());
                     if (metaName.equals("file-key")) datafileKey = nodeMeta.getFirstChild().getNodeValue();
                     if (metaName.equals("software")) origin = nodeMeta.getFirstChild().getNodeValue();
                     nodeMeta = nodeMeta.getNextSibling();
@@ -1656,7 +1411,7 @@ public class RootModel extends WindowAdapter {
             }
             nodeDOM = nodeDOM.getNextSibling();
         }
-        FSR.write(rootList.size() + " root(s) were created");
+        IJ.log(rootList.size() + " root(s) were created");
         setDPI(dpi);
     }
 
@@ -1930,7 +1685,7 @@ public class RootModel extends WindowAdapter {
     public Object[] getClosestNodeInPrimary(Point3d pt) {
         double x = pt.x;
         double y = pt.y;
-        double distMin = 1E18;
+        double distMin = Double.MAX_VALUE;
         Node nodeMin = null;
         Root rootMin = null;
         for (Root r : rootList) {
@@ -1948,11 +1703,33 @@ public class RootModel extends WindowAdapter {
         return new Object[]{nodeMin, rootMin};
     }
 
+    public Object[] getClosestNodeInOtherRoot(Point3d pt, Root currentRoot) {
+        double x = pt.x;
+        double y = pt.y;
+        double distMin = Double.MAX_VALUE;
+        Node nodeMin = null;
+        Root rootMin = null;
+        for (Root r : rootList) {
+            if (r == currentRoot) continue;
+            Node n = r.firstNode;
+            while (n != null) {
+                double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+                if (dist < distMin) {
+                    distMin = dist;
+                    rootMin = r;
+                    nodeMin = n;
+                }
+                n = n.child;
+            }
+        }
+        return new Object[]{nodeMin, rootMin};
+    }
+
     public Object[] getClosesNodeParentOrder(Point3d pt, Root currentRoot) {
         double x = pt.x;
         double y = pt.y;
-        double distMin = 1E18;
-        if (currentRoot.order == 1) return new Object[]{null, null};
+        double distMin = Double.MAX_VALUE;
+        if (currentRoot.order <= 2) return getClosestNodeInPrimary(pt);
         int parentOrder = currentRoot.order - 1;
         Node nodeMin = null;
         Root rootMin = null;
@@ -1968,6 +1745,49 @@ public class RootModel extends WindowAdapter {
                 }
                 n = n.child;
             }
+        }
+        return new Object[]{nodeMin, rootMin};
+    }
+
+    public Object[] getClosestNodeChildOrder(Point3d pt, Root currentRoot) {
+        double x = pt.x;
+        double y = pt.y;
+        double distMin = Double.MAX_VALUE;
+        if (currentRoot.order < 1) return null;
+        int childOrder = currentRoot.order + 1;
+        Node nodeMin = null;
+        Root rootMin = null;
+        for (Root r : rootList) {
+            if (r.order != childOrder) continue;
+            Node n = r.firstNode;
+            while (n != null) {
+                double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+                if (dist < distMin && n.birthTime <= pt.z) {
+                    distMin = dist;
+                    rootMin = r;
+                    nodeMin = n;
+                }
+                n = n.child;
+            }
+        }
+        return new Object[]{nodeMin, rootMin};
+    }
+
+    public Object[] getClosesNodeInCurrentRoot(Point3d pt, Root currentRoot) {
+        double x = pt.x;
+        double y = pt.y;
+        double distMin = 1E18;
+        Node nodeMin = null;
+        Root rootMin = null;
+        Node n = currentRoot.firstNode;
+        while (n != null) {
+            double dist = Math.sqrt((x - n.x) * (x - n.x) + (y - n.y) * (y - n.y));
+            if (dist < distMin && n.birthTime <= pt.z) {
+                distMin = dist;
+                rootMin = currentRoot;
+                nodeMin = n;
+            }
+            n = n.child;
         }
         return new Object[]{nodeMin, rootMin};
     }
@@ -2046,8 +1866,8 @@ public class RootModel extends WindowAdapter {
     public int getNPRoot() {
         int n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) n++;
         }
         return n;
@@ -2062,8 +1882,8 @@ public class RootModel extends WindowAdapter {
     public int getNPRoot(double t) {
         int n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0 && r.firstNode.birthTime <= t) n++;
         }
         return n;
@@ -2077,8 +1897,8 @@ public class RootModel extends WindowAdapter {
     public int getNSRoot() {
         int n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() != 0) n++;
         }
         return n;
@@ -2093,8 +1913,8 @@ public class RootModel extends WindowAdapter {
     public int getNSRoot(double t) {
         int n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() != 0 && r.firstNode.birthTime <= t) n++;
         }
         return n;
@@ -2109,8 +1929,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() != 0) {
                 n += r.getRootLength();
                 m++;
@@ -2128,8 +1948,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 n += r.getRootLength();
                 m++;
@@ -2146,8 +1966,8 @@ public class RootModel extends WindowAdapter {
     public float getTotalRLength() {
         float n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n += r.getRootLength();
         }
         return n * pixelSize;
@@ -2163,8 +1983,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n += r.getRootLength();
             m++;
         }
@@ -2180,8 +2000,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() != 0) {
                 Node node = r.firstNode;
                 n += node.diameter;
@@ -2205,8 +2025,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() != 0) {
                 n += (float) (r.getInsertAngl() * (180 / Math.PI));
                 m++;
@@ -2223,8 +2043,8 @@ public class RootModel extends WindowAdapter {
     public float getTotalPRLength() {
         int l = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 l += (int) r.lPosPixelsToCm(r.getRootLength());
             }
@@ -2241,8 +2061,8 @@ public class RootModel extends WindowAdapter {
     public float getTotalPRLength(double t) {
         int l = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 l += (int) r.computeRootLength(t);
             }
@@ -2274,12 +2094,11 @@ public class RootModel extends WindowAdapter {
     public float getPRLength(double t) {
         int l = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            System.out.println("New : " + r);
-            System.out.println("Got :");
-            System.out.println(r.parentKey);
-            System.out.println(r.rootID);
+        for (Root root : rootList) {
+            if (root.order == 1) {
+                r = root;
+                l += (int) r.computeRootLength(t);
+            }
         }
         return l;
     }
@@ -2345,7 +2164,7 @@ public class RootModel extends WindowAdapter {
      */
     public double[] getPrimDepthOverTime(int tMax, int plant) {
         double[] ret = new double[tMax];
-        for (int i = 0; i < ret.length; i++) ret[i] = -100000000;
+        Arrays.fill(ret, -100000000);
         for (Root r : rootList) {
             if (r.plantNumber != plant || r.order != 1) continue;
             Node n = r.firstNode;
@@ -2448,8 +2267,8 @@ public class RootModel extends WindowAdapter {
     public float getTotalSRLength() {
         int l = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() > 0) {
                 l += (int) r.lPosPixelsToCm(r.getRootLength());
             }
@@ -2466,8 +2285,8 @@ public class RootModel extends WindowAdapter {
     public float getTotalSRLength(double t) {
         int l = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() > 0) {
                 l += (int) r.computeRootLength(t);
             }
@@ -2484,8 +2303,8 @@ public class RootModel extends WindowAdapter {
         float n = 0;
         int m = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 Node node = r.firstNode;
                 n += node.diameter;
@@ -2509,109 +2328,14 @@ public class RootModel extends WindowAdapter {
         float iB = 0;
         Root r;
         int n = 0;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.getInterBranch() != 0) {
                 iB += r.getInterBranch();
                 n++;
             }
         }
         return (iB / n) * pixelSize;
-    }
-
-    /**
-     * Get the number of nodes of the primary roots.
-     *
-     * @return the number of nodes of the primary roots
-     */
-    public int getNPNode() {
-        int m = 0;
-        Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (r.isChild() == 0) {
-                Node node = r.firstNode;
-                m++;
-                while (node.child != null) {
-                    node = node.child;
-                    m++;
-                }
-            }
-        }
-        return m;
-    }
-
-    /**
-     * Get the number of node of the secondary roots.
-     *
-     * @return the number of node of the secondary roots
-     */
-
-    public int getNSNode() {
-        int m = 0;
-        Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (r.isChild() != 0) {
-                Node node = r.firstNode;
-                m++;
-                while (node.child != null) {
-                    node = node.child;
-                    m++;
-                }
-            }
-        }
-        return m;
-    }
-
-    /**
-     * Get a list of strings containing all the name of roots having children.
-     *
-     * @return a list of strings containing all the name of roots having children
-     */
-    public String[] getParentRootNameList() {
-        int ind = 0;
-        int c = 0;
-        Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (!r.childList.isEmpty()) {
-                ind++;
-            }
-        }
-        String[] n = new String[ind];
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (!r.childList.isEmpty()) {
-                n[i - c] = r.getRootID();
-            } else c++;
-        }
-        return n;
-    }
-
-    /**
-     * Get a list of strings containing all the name of primary.
-     *
-     * @return a list of strings containing all the name of primary
-     */
-    public String[] getPrimaryRootNameList() {
-        int ind = 0;
-        int c = 0;
-        Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (r.isChild() == 0) {
-                ind++;
-            }
-        }
-        String[] n = new String[ind];
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            if (r.isChild() == 0) {
-                n[i - c] = r.getRootID();
-            } else c++;
-        }
-        return n;
     }
 
     /**
@@ -2623,15 +2347,15 @@ public class RootModel extends WindowAdapter {
         int ind = 0;
         int incr = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 ind++;
             }
         }
         Root[] n = new Root[ind];
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) {
                 n[incr++] = r;
             }
@@ -2649,8 +2373,8 @@ public class RootModel extends WindowAdapter {
         float cd = 0;
         int n = 0;
         Root r;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.getChildDensity() != 0) {
                 cd += r.getChildDensity();
                 n++;
@@ -2680,8 +2404,8 @@ public class RootModel extends WindowAdapter {
         float min = 1e5f, max = 0;
         Root r;
         Node n;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.x < min) min = n.x;
@@ -2695,8 +2419,8 @@ public class RootModel extends WindowAdapter {
         // Get y
         min = 1e5f;
         max = 0;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.y < min) min = n.y;
@@ -2719,8 +2443,8 @@ public class RootModel extends WindowAdapter {
         float min = 1e5f;
         Root r;
         Node n;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.y < min) min = n.y;
@@ -2739,8 +2463,8 @@ public class RootModel extends WindowAdapter {
         float min = 1e5f;
         Root r;
         Node n;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.x < min) min = n.x;
@@ -2760,8 +2484,8 @@ public class RootModel extends WindowAdapter {
         float min = 1e5f, max = 0;
         Root r;
         Node n;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.x < min) min = n.x;
@@ -2783,8 +2507,8 @@ public class RootModel extends WindowAdapter {
         float min = 1e5f, max = 0;
         Root r;
         Node n;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             while (n.child != null) {
                 if (n.y < min) min = n.y;
@@ -2804,8 +2528,8 @@ public class RootModel extends WindowAdapter {
     public void refineDescription(int maxRangeBetweenNodes) {
         Root r;
         Node n, n1, n0;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
             n0 = r.firstNode;
             while (n.child != null) {
@@ -2838,8 +2562,8 @@ public class RootModel extends WindowAdapter {
     public void attachLatToPrime() {
         Root r, rPar;
         Node nPrim, nLat, newNode = null;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             if (r.isChild() == 0) continue;
             rPar = r.parent;
             nLat = r.firstNode;
@@ -2864,23 +2588,17 @@ public class RootModel extends WindowAdapter {
      */
     public void applyTransformToGeometry(ItkTransform tr) {
         Root r;
-        Node n, n1;
+        Node n;
         double[] coords;
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
-            if (r.isChild == 1) {
-                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
-                n.x += (n.x - (float) coords[0]);
-                n.y += (n.y - (float) coords[1]);
-            }
-            if (n.parent == null) {
-                coords = tr.transformPoint(new double[]{n.x, n.y, 0});
-                n.x += (n.x - (float) coords[0]);
-                n.y += (n.y - (float) coords[1]);
-            }
+
+            coords = tr.transformPoint(new double[]{n.x, n.y, 0});
+            n.x += (n.x - (float) coords[0]);
+            n.y += (n.y - (float) coords[1]);
+
             while (n.child != null) {
-                n1 = n;
                 n = n.child;
                 coords = tr.transformPoint(new double[]{n.x, n.y, 0});
                 n.x += (n.x - (float) coords[0]);
@@ -2936,7 +2654,6 @@ public class RootModel extends WindowAdapter {
         int[] initDims = new int[]{imgInitSize.getWidth(), imgInitSize.getHeight()};
         return createGrayScaleImageWithTime(initDims, SIZE_FACTOR, binaryColor, observationTime, dotLineForHidden, symbolOptions, lineWidths, true);
     }
-
 
     /**
      * Creates the gray scale image with time.
@@ -3112,7 +2829,6 @@ public class RootModel extends WindowAdapter {
         return imgRSML;
     }
 
-
     /**
      * Creates the gray scale image time lapse.
      *
@@ -3148,12 +2864,11 @@ public class RootModel extends WindowAdapter {
             Node n = r.firstNode;
             Node n1;
             int lwid = (int) lineWidths[r.order - 1];
-            int color = (r.order == 1 ? 1 : 2);
+            int color = (r.order == 1 ? 1 : 2); // TODO generalize to 3rd order
             int dotEvery = lwid * 2;
             if (r.order == 1) nPrim++;
             if (r.order == 2) nSecond++;
             nTot++;
-            int incr = 0;
             while (n.child != null) {
                 n1 = n;
                 n = n.child;
@@ -3187,7 +2902,7 @@ public class RootModel extends WindowAdapter {
                     drawDotline(ips[indt], ImagePlus.GRAY8, (int) n1.x, (int) n1.y, (int) interX, (int) interY, dotEvery, lwid, color);
                     //then draw the parent node
                     double delta = Math.abs(n1.birthTime - Math.round(n1.birthTimeHours));
-                    if (true) {
+                    if (true) { // ?
                         //draw date start symbol
                     } else {
                         //draw intermediary point
@@ -3231,49 +2946,6 @@ public class RootModel extends WindowAdapter {
 
         imgRSML.setDisplayRange(0, 3);
         return imgRSML;
-    }
-
-    public ImagePlus createGrayScaleImages(ImagePlus imgRef, double sigmaSmooth, boolean convexHull, boolean skeleton, int width) {
-        int w = imgRef.getWidth();
-        int h = imgRef.getHeight();
-        int t = imgRef.getStackSize();
-        ImageStack stack = new ImageStack(); // + t
-        for (int i = 1; i <= t; i++) {
-            ImagePlus imgRSML = new ImagePlus("", this.createImage(false, width, false, w, h, convexHull, i));
-            //imgRSML.show();
-            imgRSML = VitimageUtils.gaussianFiltering(imgRSML, sigmaSmooth, sigmaSmooth, sigmaSmooth);
-            if (skeleton) {
-                ImageProcessor ip = imgRSML.getProcessor();
-                for (Root r : rootList) {
-                    Node n = r.firstNode;
-                    Node n1;
-                    while (n.child != null) {
-                        n1 = n;
-                        n = n.child;
-                        if (n.birthTime > i) continue;
-                        ip.setColor(Color.white);
-                        ip.setLineWidth(width);
-                        ip.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
-                    }
-                    ip.setColor(Color.white);
-                    ip.drawRect((int) (n.x - 1), (int) (n.y - 1), 3, 3);
-                    double distLast = 0;
-                    while (n.child != null) {
-                        n1 = n;
-                        n = n.child;
-                        if (n.birthTime > i) continue;
-                        distLast += distance(n, n1);
-                        if (distLast > 5) {
-                            ip.setColor(Color.black);
-                            ip.drawRect((int) (n.x - 1), (int) (n.y - 1), 3, 3);
-                            distLast = 0;
-                        }
-                    }
-                }
-            }
-            stack.addSlice("", imgRSML.getProcessor());
-        }
-        return new ImagePlus("", stack);
     }
 
     /**
@@ -3326,7 +2998,6 @@ public class RootModel extends WindowAdapter {
         return imgRSML;
     }
 
-
     /**
      * Create an image processor based on the roots contained into the root system.
      *
@@ -3352,8 +3023,8 @@ public class RootModel extends WindowAdapter {
         ImageProcessor tracingP = tracing.getProcessor();
 
         //if(name == null) fit.checkImageProcessor();
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
 
             if (color) {
@@ -3396,67 +3067,6 @@ public class RootModel extends WindowAdapter {
 
         return tracingP;
     }
-
-    public ImageProcessor createImage(boolean color, int line, boolean real, int w, int h, boolean convexhull, float time) {
-
-        Root r;
-        Node n, n1;
-        ImagePlus tracing;
-
-
-        if (color) tracing = IJ.createImage("tracing", "RGBblack", w, h, 1);
-        else tracing = IJ.createImage("tracing", "8-bitblack", w, h, 1);
-
-
-        ImageProcessor tracingP = tracing.getProcessor();
-
-        //if(name == null) fit.checkImageProcessor();
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
-            n = r.firstNode;
-
-            if (color) {
-                switch (r.isChild()) {
-                    case 0:
-                        tracing.setColor(new Color(Math.round(255), 0, 0));
-                        break;
-                    case 1:
-                        tracing.setColor(new Color(0, Math.round(255), 0));
-                        break;
-                    case 2:
-                        tracing.setColor(new Color(0, 0, Math.round(255)));
-                        break;
-                }
-            } else tracing.setColor(Color.white);
-
-            while (n.child != null) {
-                n1 = n;
-                n = n.child;
-                if (n.birthTime > time) continue;
-                if (real) tracingP.setLineWidth((int) ((r.isChild() == 0) ? n.diameter : n.diameter - 1));
-                else tracingP.setLineWidth((r.isChild() == 0) ? line : line - 1);
-                tracingP.drawLine((int) (n1.x), (int) (n1.y), (int) (n.x), (int) (n.y));
-            }
-            tracing.setProcessor(tracingP);
-            if (convexhull) {
-                if (r.isChild() == 0) {
-                    tracing.setColor(Color.yellow);
-                    PolygonRoi ch = r.getConvexHull();
-                    int[] xRoi = ch.getXCoordinates();
-                    int[] yRoi = ch.getYCoordinates();
-                    Rectangle rect = ch.getBounds();
-                    for (int j = 1; j < xRoi.length; j++) {
-                        tracingP.drawLine(xRoi[j - 1] + rect.x, yRoi[j - 1] + rect.y, xRoi[j] + rect.x, yRoi[j] + rect.y);
-                    }
-                    tracingP.drawLine(xRoi[xRoi.length - 1] + rect.x, yRoi[xRoi.length - 1] + rect.y, xRoi[0] + rect.x, yRoi[0] + rect.y);
-                }
-            }
-            tracingP = tracing.getProcessor();
-        }
-
-        return tracingP;
-    }
-
 
     /**
      * Create an image processor based on the roots contained into the root system.
@@ -3484,8 +3094,8 @@ public class RootModel extends WindowAdapter {
         ImageProcessor tracingP = tracing.getProcessor();
 
         //if(name == null) fit.checkImageProcessor();
-        for (int i = 0; i < rootList.size(); i++) {
-            r = rootList.get(i);
+        for (Root root : rootList) {
+            r = root;
             n = r.firstNode;
 
             if (color) {
@@ -3528,7 +3138,6 @@ public class RootModel extends WindowAdapter {
 
         return tracingP;
     }
-
 
     /**
      * Create an image processor based on the roots contained into the root system.
@@ -3600,64 +3209,6 @@ public class RootModel extends WindowAdapter {
         return tracingP;
     }
 
-
-    /**
-     * Get the index of the po accession.
-     *
-     * @param po the po
-     * @return the index from po
-     */
-    public int getIndexFromPo(String po) {
-        for (int i = 0; i < FSR.listPo.length; i++) {
-            if (po.equals(FSR.listPo[i])) return i;
-        }
-        return 0;
-    }
-
-    /**
-     * Get the convexhull area of all the roots in the image.
-     *
-     * @return the convex hull area
-     */
-    public float getConvexHullArea() {
-        return 0;
-    }
-
-    /**
-     * Get the convexhull of all the roots in the image. Uses the native image functions
-     *
-     * @return the convex hull
-     */
-    public PolygonRoi getConvexHull() {
-
-        List<Integer> xList = new ArrayList<Integer>();
-        List<Integer> yList = new ArrayList<Integer>();
-
-        // Add all the nodes coordinates
-        for (int i = 0; i < rootList.size(); i++) {
-            Root r = rootList.get(i);
-            Node n = r.firstNode;
-            while (n.child != null) {
-                xList.add((int) n.x);
-                yList.add((int) n.y);
-                n = n.child;
-            }
-            xList.add((int) n.x);
-            yList.add((int) n.y);
-        }
-
-        int[] xRoiNew = new int[xList.size()];
-        int[] yRoiNew = new int[yList.size()];
-        for (int l = 0; l < yList.size(); l++) {
-            xRoiNew[l] = xList.get(l);
-            yRoiNew[l] = yList.get(l);
-        }
-
-        Roi roi = new PolygonRoi(xRoiNew, yRoiNew, yRoiNew.length, Roi.POLYGON);
-        return new PolygonRoi(roi.getConvexHull(), Roi.POLYGON);
-    }
-
-
     /**
      * Distance.
      *
@@ -3669,5 +3220,9 @@ public class RootModel extends WindowAdapter {
      */
     public double distance(double x0, double y0, double x1, double y1) {
         return Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+    }
+    /// / Reader utilities
+    public void initializeMetadata() {
+        metadata = new Metadata();
     }
 }

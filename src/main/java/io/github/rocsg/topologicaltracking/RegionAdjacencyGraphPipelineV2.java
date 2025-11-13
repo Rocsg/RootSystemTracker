@@ -7,12 +7,11 @@ import ij.plugin.Duplicator;
 import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
-import io.github.rocsg.rsml.FSR;
 import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstplugin.PipelineParamHandler;
 import io.github.rocsg.rstplugin.PipelineActionsHandler;
-import io.github.rocsg.rstutils.MorphoUtils;
+import io.github.ro.stringNodes()csg.rstutils.MorphoUtils;
 import io.github.rocsg.rstutils.SplineAndPolyLineUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -124,7 +123,7 @@ est ce que la vitesse typique et le rayon et la longueur ne peuvent pas etre li√
         PipelineParamHandler pph=new PipelineParamHandler(inventoryDir, processingDir);
         PipelineActionsHandler.doStepOnImg(4, 1, pph);
         PipelineActionsHandler.doStepOnImg(5, 1, pph);
-        //PipelineActionsHandler.doStepOnImg(6, 1, pph);
+        PipelineActionsHandler.doStepOnImg(7, 1, pph);
         System.out.println("Done");
     }
 
@@ -3112,8 +3111,6 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
         
         //Prepare output data storage
-        FSR sr = (new FSR());
-        sr.initialize();
         RootModel rm = new RootModel();
         rm.pixelSize = (float) (pph.originalPixelSize * pph.subsamplingFactor);
         rm.setHoursFromPph(pph.getHoursExtremities(indexImg));
@@ -3718,7 +3715,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 if (debugLat) {
                     System.out.println("\n=== DEBUG: Nodes in lateral root BEFORE resampleFlyingPoints ===");
                     System.out.println("hoursCorrespondingToTimePoints array size: " + rm.hoursCorrespondingToTimePoints.length);
-                    System.out.println("Root nodes description:\n" + rLat.stringNodes());
+                    System.out.println("Root nodes description:\n" + rLat);
                     System.out.println("=== END DEBUG ===\n");
                 }
                 
@@ -5137,27 +5134,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
 
 
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

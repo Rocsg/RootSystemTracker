@@ -1,7 +1,7 @@
 /*
  *
  */
-package io.github.rocsg.rsml;
+package io.github.rocsg.gui;
 
 import com.sun.management.OperatingSystemMXBean;
 import ij.IJ;
@@ -14,18 +14,17 @@ import ij.plugin.Memory;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
-import ij.process.ImageProcessor;
 import io.github.rocsg.fijiyama.common.Timer;
 import io.github.rocsg.fijiyama.common.*;
+import io.github.rocsg.rsml.Node;
+import io.github.rocsg.rsml.Root;
+import io.github.rocsg.rsml.RootModel;
 import org.apache.commons.io.FileUtils;
-import org.jgrapht.GraphPath;
 import org.scijava.vecmath.Point3d;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.Line2D;
-import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
@@ -41,6 +40,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static io.github.rocsg.rsml.RSMLParser2DplusT.rootModelReadFromRsml;
 
 /**
  * The Class RsmlExpert_Plugin.
@@ -146,6 +147,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     private final double USER_PRECISION_ON_CLICK = 20;
     private final boolean isDevModeActivated = false;
+    private final String currentVersion = "v2.0.2-SNAPSHOT";
     /**
      * The Nt.
      */
@@ -215,21 +217,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private boolean toResize = true;
     private String version = "v2.0.2-SNAPSHOT - Release candidate";
 
-
     /**
      * Instantiates a new rsml expert plugin.
      */
     public RsmlExpert_Plugin() {
         super("");
-    }
-
-    /**
-     * Instantiates a new ${e.g(1).rsfl()}.
-     *
-     * @param arg the arg
-     */
-    public RsmlExpert_Plugin(String arg) {
-        super(arg);
     }
 
     /**
@@ -251,156 +243,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         RsmlExpert_Plugin plugin = new RsmlExpert_Plugin();
         //plugin.isDevModeActivated = true;
         plugin.run(null);//testDir);
-    }
-
-    /**
-     * Function to create tif files from the directories containing the images
-     * <p>
-     *
-     * @param inputDirectory  The directory containing the images
-     * @param outputDirectory The directory where the tif files will be saved
-     */
-    private static void createTif(String inputDirectory, String outputDirectory) {
-        // for all the directories in the directory
-        for (File file : Objects.requireNonNull(new File(inputDirectory).listFiles())) {
-            if (file.isDirectory()) {
-                System.out.println("Directory : " + file.getAbsolutePath());
-                try {
-                    ImagePlus imgPlus = createImageFromImageDirectory(file.getAbsolutePath());
-                    // save the image keeping the folder structure
-                    String outputDirWithFolder = outputDirectory + file.getName();
-                    File outputDirFile = new File(outputDirWithFolder);
-                    if (!outputDirFile.exists()) {
-                        outputDirFile.mkdirs();
-                    }
-                    String outputDirWithFolderAndFile = outputDirWithFolder + "\\" + file.getName() + ".tif";
-                    IJ.saveAsTiff(imgPlus, outputDirWithFolderAndFile);
-
-                    // free the memory
-                    imgPlus.flush();
-                } catch (IOException | InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-    }
-
-    private static Map<Double, List<Boolean>> getTimeMapLast(TreeMap<Double, List<Point3d>> pointsByTime) {
-        Map<Double, List<Boolean>> extremity = new TreeMap<>();
-        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
-        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            List<Boolean> list = new ArrayList<>();
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                if (i == entry.getValue().size() - 1) {// if (i == 0 || i == entry.getValue().size() - 1) {
-                    list.add(true);
-                } else {
-                    list.add(false);
-                }
-            }
-            extremity.put(entry.getKey(), list);
-        }
-        return extremity;
-    }
-
-    private static Map<Double, List<Boolean>> getTimeMapFirst(TreeMap<Double, List<Point3d>> pointsByTime) {
-        Map<Double, List<Boolean>> extremity = new TreeMap<>();
-        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
-        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            List<Boolean> list = new ArrayList<>();
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                if (i == 0) {// if (i == 0 || i == entry.getValue().size() - 1) {
-                    list.add(true);
-                } else {
-                    list.add(false);
-                }
-            }
-            extremity.put(entry.getKey(), list);
-        }
-        return extremity;
-    }
-
-    private static Map<Double, List<Boolean>> getDoubleListMap(TreeMap<Double, List<Point3d>> pointsByTime) {
-        Map<Double, List<Boolean>> extremity = new TreeMap<>();
-        // Composed of a list of boolean, the first and the last point of each list are always extremities (true) and the others are not (false)
-        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-            List<Boolean> list = new ArrayList<>();
-            for (int i = 0; i < entry.getValue().size(); i++) {
-                if ((i == (entry.getValue().size() - 1))) {
-                    list.add(true);
-                } else {
-                    list.add(false);
-                }
-            }
-            extremity.put(entry.getKey(), list);
-        }
-        return extremity;
-    }
-
-    // TODO Generalization
-    public static List<String> getImagesFromFolder(String directory) throws IOException {
-        Pattern pattern = Pattern.compile("\\d{2}_\\d{2}_\\d{4}");
-        ConcurrentHashMap<String, Date> imageDates = new ConcurrentHashMap<>();
-
-        Files.list(Paths.get(directory))
-                .parallel()
-                .filter(path -> path.toString().matches(".*\\.(tif|tiff|jpg|jpeg|png)$"))
-                .forEach(path -> {
-                    String image = path.toString();
-                    Matcher matcher = pattern.matcher(image);
-                    if (matcher.find()) {
-                        int year = Integer.parseInt(matcher.group(0).split("_")[2]) - 1900;
-                        int month = Integer.parseInt(matcher.group(0).split("_")[1]) - 1;
-                        int day = Integer.parseInt(matcher.group(0).split("_")[0]);
-                        imageDates.put(image, new Date(year, month, day));
-                    }
-                });
-
-        return imageDates.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
-    }
-
-    public static ImagePlus getImageStackFromImages(List<String> images) throws InterruptedException {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        // check if the images have all the same size, if not resize them to the "smallest" size
-        ImagePlus firstImage = IJ.openImage(images.get(0));
-        int width = firstImage.getWidth();
-        int height = firstImage.getHeight();
-        firstImage.close();
-
-        for (String image : images) {
-            ImagePlus img = IJ.openImage(image);
-            if (img.getWidth() < width || img.getHeight() < height) {
-                width = Math.min(width, img.getWidth());
-                height = Math.min(height, img.getHeight());
-            }
-        }
-
-        final ImageStack finalStack = new ImageStack(width, height);
-        for (String image : images) {
-            int finalWidth = width;
-            int finalHeight = height;
-            executor.submit(() -> {
-                ImagePlus img = IJ.openImage(image);
-                if (img.getWidth() != finalWidth || img.getHeight() != finalHeight) {
-                    img = VitimageUtils.resize(img, finalWidth, finalHeight, img.getNSlices());
-                }
-                finalStack.addSlice(img.getProcessor());
-                img.close();
-            });
-        }
-
-
-        executor.shutdown();
-        executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-
-        return new ImagePlus("Stack", finalStack);
-    }
-
-    public static ImagePlus createImageFromImageDirectory(String directory) throws IOException, InterruptedException {
-        return getImageStackFromImages(getImagesFromFolder(directory));
     }
 
     public String getBoxName() {
@@ -432,18 +274,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         t = new Timer();
 
         //Choose an existing expertize, or initiate a new one
-        System.out.println("Toto 31");
         if (arg != null && !arg.isEmpty() && new File(arg).exists()) {
             dataDir = arg;
-            System.out.println("Toto 32");
         } else {
-            System.out.println("Toto 33");
             dataDir = VitiDialogs.chooseDirectoryUI("Choose a boite directory", "Ok");
-            System.out.println("Toto 34");
         }
-        System.out.println("Toto 35");
         if (!new File(dataDir, "InfoRSMLExpert.csv").exists()) startNewExpertize();
-        System.out.println("Toto 36");
         readInfoFile();
         t.mark();
 
@@ -476,7 +312,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public void startNewExpertize() {
 //        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath().replace("\\", "/");
 //        this.rsmlPath = new File(dataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/");
-        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath().replace("\\", "/");
+        this.stackPath = new File(dataDir, "22_registered_stack.tif").getAbsolutePath().replace("\\", "/"); // Consider spaces " "
         this.rsmlPath = new File(dataDir, "61_graph.rsml").getAbsolutePath().replace("\\", "/");
         try {
             FileUtils.copyFile(new File(dataDir, "61_graph.rsml"), new File(dataDir, "61_graph_copy_before_expertize.rsml"));
@@ -539,7 +375,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     }
 
     public void setupFrameAndLogArea() {
-        /**
+        /*
          * The screen width.
          */
         int screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
@@ -682,11 +518,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         registeredStack = IJ.openImage(new File(stackPath).getAbsolutePath());
 
         // Initialize the FSR (Flying Software Renderer)
-        FSR sr = new FSR();
-        sr.initialize();
+        //FSR sr = new FSR();
+        //sr.initialize();
+        IJ.run(registeredStack, "Enhance Contrast", "saturated=0.35");
 
         // Load the RSML model from the specified path
-        currentModel = RootModel.RootModelWildReadFromRsml(rsmlPath);
+        currentModel = rootModelReadFromRsml(rsmlPath); // TODO Check reproducibility
 
         // Clean the RSML model and resample the flying roots
         System.out.println(currentModel.cleanWildRsml());
@@ -716,7 +553,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         if (toResize) {
             // Determine the number of available processors
-            int numProcessors = Runtime.getRuntime().availableProcessors();
+            int numProcessors = Runtime.getRuntime().availableProcessors() / 2;
 
             // Create an ExecutorService with a fixed thread pool
             ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
@@ -916,7 +753,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         nModifs--;
 
         // Reload the model from the RSML file
-        currentModel = RootModel.RootModelWildReadFromRsml(rsmlPath);
+        currentModel = rootModelReadFromRsml(rsmlPath); // TODO Check reproducibility
 
         // Reapply all modifications up to the current state
         int j = 1;
@@ -961,7 +798,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * Action move point.
      */
     public void actionMovePoint() {
-        System.out.println("M1");
         boolean did = false;
         addLog("Running action \"Move a point\" ...", -1);
         addLog(" Click on the point to move, then the target destination.", 1);
@@ -1181,8 +1017,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * If the resampling operation is not successful, the method aborts the action.
      */
     public void actionResample() {//TODO : il n 'y a pas d'annuler
-        // Print debug information
-        System.out.println("I1");
 
         // Initialize the did variable to false
         boolean did = false;
@@ -1194,15 +1028,15 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         double[] tabHours = currentModel.hoursCorrespondingToTimePoints;
 
         // Construct the steps/hours string
-        String s = "Steps/hours : ";
-        for (int i = 0; i < tabHours.length; i++) s += " | " + i + " -> " + VitimageUtils.dou(tabHours[i]);
+        StringBuilder s = new StringBuilder("Steps/hours : ");
+        for (int i = 0; i < tabHours.length; i++) s.append(" | ").append(i).append(" -> ").append(VitimageUtils.dou(tabHours[i]));
 
         // Calculate the mean timestep
         String s2 = "Mean timestep = " + VitimageUtils.dou(tabHours[tabHours.length - 1] / (tabHours.length - 1));
 
         // Log the start of the resampling operation, the steps/hours, and the mean timestep
         addLog("Running action \"Resample RSML\" ...", -1);
-        addLog(s, -1);
+        addLog(s.toString(), -1);
         addLog(s2, -1);
 
         // Prompt the user to select the target timestep (in hours)
@@ -1213,14 +1047,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         addLog(" Select the output file name.", 1);
         addLog(" Suggested : 61_graph_expertized_resample_" + timestep + "hours.rsml", 1);
 
-        // Print debug information
-        System.out.println("I3");
-
         // Prompt the user to select the path to save the resampled RSML
         String path = VitiDialogs.saveImageUIPath("Path to your resampled rsml", "61_graph_expertized_resample_" + timestep + "hours.rsml");
-
-        // Print debug information
-        System.out.println("I4");
 
         // Initialize the infos array to null
         String[] infos = null;
@@ -1230,9 +1058,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // If the resampling operation is not successful, set did to false
         if (infos == null) did = false;
-
-        // Print debug information
-        System.out.println("I8");
 
         // If the resampling operation is successful, finish the action and update the image
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
@@ -1322,6 +1147,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         //Case where we remove a tip
         if (n1 != r1.firstNode) {
             r1.lastNode = n1.parent;
+            assert r1.lastNode != null;
             r1.lastNode.child = null;
             r1.updateTiming();
             return infos;
@@ -1353,33 +1179,37 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      */
     public String[] refineSegmentInModel(Point3d[] tabPts, RootModel rm) {
         String[] infos = formatInfos("ADDMIDDLE", tabPts);
-        System.out.println("H1");
         if (tabPts.length < 2) {
             IJ.showMessage("This action needs you to click on 1) the line to change and 2) the point to add. Abort");
             return null;
         }
 
-        System.out.println("H2");
         Object[] obj = rm.getNearestRootSegment(tabPts[0], USER_PRECISION_ON_CLICK);
         if (obj[0] == null) {
             IJ.showMessage("Please click better, we have not found the corresponding segment");
             return null;
         }
-        System.out.println("H3");
         Node nParent = (Node) obj[0];
         Root rParent = (Root) obj[1];
-        Node nChild = nParent.child;
-        System.out.println("Adding nodes in segment :\n --> Node 1 " + nParent + "\n --> Node 2 " + nChild + "\n --> Of root " + rParent);
+        Node rChild = nParent.child;
+        float rParentBirthTime = nParent.birthTime;
+        float rChildBirthTime = rChild.birthTime;
+        float rParentBirthTimeHours = nParent.birthTimeHours;
+        float rChildBirthTimeHours = rChild.birthTimeHours;
+        System.out.println("Adding nodes in segment :\n --> Node 1 " + nParent + "\n --> Node 2 " + rChild + "\n --> Of root " + rParent);
 
         for (int i = 1; i < tabPts.length; i++) {
             Node nPlus = new Node((float) tabPts[i].x, (float) tabPts[i].y, nParent, true);
-            nPlus.birthTime = 0.5f;
+            // nPlus.birthTime = 0.5f; previous bug
+            // Birthtime = (time of parent) + (time of child - time of parent) * ((time of new point - time of parent) / (time of child - time of parent))
+            nPlus.birthTime = (float) (rParentBirthTime + (rChildBirthTime - rParentBirthTime) * ((tabPts[i].z - rParentBirthTime) / (rChildBirthTime - rParentBirthTime)));
+            nPlus.birthTimeHours = (float) (rParentBirthTimeHours + (rChildBirthTimeHours - rParentBirthTimeHours) * ((tabPts[i].z - rParentBirthTime) / (rChildBirthTime - rParentBirthTime)));
             nParent.child = nPlus;
             nPlus.parent = nParent;
             nParent = nPlus;
         }
-        nParent.child = nChild;
-        nChild.parent = nParent;
+        nParent.child = rChild;
+        rChild.parent = nParent;
         rParent.updateTiming();
         return infos;
     }
@@ -1478,10 +1308,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (tabPt.length < 2) return null;
 
         for (int l = 0; l < tabPt.length - 1; l++) {
-            if (tabPt[l].z > tabPt[l + 1].z) {
-                IJ.showMessage("You gave points that are not in chronological order. Abort.");
-                return null;
-            }
             if (tabPt[l] == null || tabPt[l + 1] == null) {
                 IJ.showMessage("You gave a null point. Abort.");
                 return null;
@@ -1490,53 +1316,52 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 IJ.showMessage("You gave points that does not follow in time, there is a gap. Abort.");
                 return null;
             }
-        }
 
-        // Create a map to store points by time
-        TreeMap<Double, List<Point3d>> pointsByTime = new TreeMap<>();
-
-        for (Point3d pt : tabPt) {
-            pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
-        }
-
-        // For the first time, reduce the time value of all the elements of the list except the last one
-        if (pointsByTime.firstKey() != 0) {
-            List<Point3d> list = pointsByTime.get(pointsByTime.firstKey());
-            for (int i = 0; i < list.size() - 1; i++) {
-                list.get(i).z -= 1;
+            if (tabPt[l].z > tabPt[l + 1].z) {
+                IJ.showMessage("You gave points that are not in chronological order. Abort.");
+                return null;
             }
         }
 
-        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
-        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
+        // All points at first selected time except the last one are shifted down by 1 in time (only the tip remains at the initial time)
+        Point3d[] tabPtArranged = new Point3d[tabPt.length];
+        if (tabPt[1].z == tabPt[0].z && tabPt[0].z == 1) tabPtArranged[0] = new Point3d(tabPt[0].x, tabPt[0].y, 0);
+        else tabPtArranged[0] = new Point3d(tabPt[0].x, tabPt[0].y, tabPt[0].z);
+        int i = 1;
+        while (tabPt[i].z == 1 && tabPt[i+1].z == 1 && i < tabPt.length - 2) {
+            tabPtArranged[i] = new Point3d(tabPt[i].x, tabPt[i].y, tabPt[0].z - 1);
+            i++;
+        }
 
+        for (int k = i; k < tabPt.length; k++) {
+            tabPtArranged[k] = new Point3d(tabPt[k].x, tabPt[k].y, tabPt[k].z);
+        }
 
-        Point3d pt0 = pointsByTime.get(pointsByTime.firstKey()).get(0);
+        Point3d pt0 = tabPtArranged[0];
         Node n = new Node((float) pt0.x, (float) pt0.y, null, false);
         // if it is an extremity, we set the birth time to the exact time
         n.birthTime = (float) pt0.z;
         n.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt0.z];
         Node nPar = n;
 
-        List<Node> recordedNodes = new ArrayList<Node>();
-        recordedNodes.add(n);
+        // Iterate over the points to create new nodes and link them
+        for (Point3d pt : tabPtArranged) {
+            if (pt == pt0) continue; // skip the first point, already created
+            //else if (pt == tabPtArranged[tabPtArranged.length - 1]) continue; // skip the last point, will be created in the next step
+            Node nNew = new Node((float) pt.x, (float) pt.y, nPar, true);
+            nNew.birthTime = (float) pt.z;
+            nNew.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
+            nPar.child = nNew;
+            nPar = nNew;
+        }
 
-        // Iterate over the different times for which there is at least one point and iterate over the points defined at this at the same time
-        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
-
-        // Add the new primary root to the RootModel
-        Root rNew = new Root(null, rm, "", 1);
+        String rootId = "AnnotatedPrimary_" + (rm.rootList.size() + 1);
+        Root rNew = new Root(null, rm, rootId, 1);
         rNew.firstNode = n;
         rNew.lastNode = nPar;
         rNew.updateTiming();
         rm.rootList.add(rNew);
-        rm.increaseNbPlants();
-
-        // Free memory
-        pointsByTime.clear();
-        extremityLast.clear();
-        extremityFirst.clear();
-        recordedNodes.clear();
+        rm.increaseNbPlants(); // TODO determine if needed (monocotyledon or dicotyledon ?)
 
         return formatInfos("CREATEPRIMARY", tabPt);
     }
@@ -1558,7 +1383,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         String[] infos = formatInfos("CREATEBRANCH", tabPt);
         if (tabPt.length < 2) return null;
 
-        Object[] obj = rm.getClosestNodeInPrimary(tabPt[0]);
+        Object[] obj = rm.getClosestNodeInPrimary(tabPt[0]); // TODO : this assumes branches can only emerge from primary roots
         if (obj == null) {
             IJ.showMessage("The branch has not yet appeared. Abort.");
             return null;
@@ -1567,11 +1392,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         Node n = (Node) obj[0];
         Root r = (Root) obj[1];
         System.out.println("Creating branch from :\n --> Node " + n + "\n --> Of root " + r);
-
-//        if (Math.sqrt(Math.pow(n.x - tabPt[0].x, 2) + Math.pow(n.y - tabPt[0].y, 2)) > USER_PRECISION_ON_CLICK) {
-//            IJ.showMessage("Please select the first point of the branch you want to extend (Precision requiered). Abort.");
-//            return null;
-//        }
 
         // Check if the points are in the correct time order and if any time slices are missed
         for (int l = 0; l < tabPt.length - 1; l++) {
@@ -1591,50 +1411,30 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             }
         }
 
-        // Create a map to store points by time
-        TreeMap<Double, List<Point3d>> pointsByTime = new TreeMap<>();
-
-        for (Point3d pt : tabPt) {
-            pointsByTime.computeIfAbsent(pt.z, k -> new ArrayList<>()).add(pt);
-        }
-
-        Map<Double, List<Boolean>> extremityFirst = getTimeMapFirst(pointsByTime);
-        Map<Double, List<Boolean>> extremityLast = getTimeMapLast(pointsByTime);
-
         n = new Node((float) tabPt[0].x, (float) tabPt[0].y, null, false);
         n.birthTime = (float) tabPt[0].z;
         n.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) tabPt[0].z];
         Node firstNode = n;
 
-        // replace the first point of the list of the first time by n
-        //pointsByTime.get(pointsByTime.firstKey()).set(0, new Point3d(n.x, n.y, n.birthTime));
-
         Node nPar = n;
 
-        List<Node> recordedNodes = new ArrayList<Node>();
-        recordedNodes.add(n);
-        recordedNodes.add(firstNode);
-        recordedNodes.add(firstNode);
+        // Iterate over the points to create new nodes and link them
+        for (Point3d pt : tabPt) {
+            if (pt == tabPt[0]) continue;
+            Node nNew = new Node((float) pt.x, (float) pt.y, nPar, true);
+            nNew.birthTime = (float) pt.z;
+            nNew.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
+            nPar.child = nNew;
+            nPar = nNew;
+        }
 
-        // Iterate over the different times for which there is at least one point and iterate over the points defined at this at same time
-        nPar = getNodeStruture(rm, pointsByTime, extremityFirst, extremityLast, recordedNodes, nPar);
-
-        Root rNew = new Root(null, rm, "", 2);
+        Root rNew = new Root(null, rm, "", r.getOrder() + 1);
         rNew.firstNode = firstNode;
         rNew.lastNode = nPar;
         rNew.updateTiming();
-        System.out.println(rNew);
-        System.out.println(r);
         r.attachChild(rNew);
         rNew.attachParent(r);
         rm.rootList.add(rNew);
-
-
-        // free memory
-        pointsByTime.clear();
-        extremityLast.clear();
-        extremityFirst.clear();
-        recordedNodes.clear();
 
         return infos;
     }
@@ -1820,52 +1620,11 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         remake.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) oldFirst.z];
         nn.child = remake;
         remake.child = childSon;
-        r.parentNode = (Node) rm.getClosesNodeParentOrder(new Point3d(r.firstNode.x, r.firstNode.y, r.firstNode.birthTime), r)[0];
+        r.ComputeParentNode();
 
         // Update the root timing and clear the points' map
         r.updateTiming();
         return infos;
-    }
-
-
-    private Node getNodeStruture(RootModel rm, TreeMap<Double, List<Point3d>> pointsByTime, Map<Double, List<Boolean>> extremityFirst, Map<Double, List<Boolean>> extremityLast, List<Node> recordedNodes, Node nPar) {
-        for (Map.Entry<Double, List<Point3d>> entry : pointsByTime.entrySet()) {
-
-            for (Point3d pt : entry.getValue()) {
-
-                if ((nPar != null) && (nPar.x == (float) pt.x) && (nPar.y == (float) pt.y) && (nPar.birthTime == (float) pt.z)) {
-                    continue;
-                }
-
-                Node nn = new Node((float) pt.x, (float) pt.y, nPar, true);
-
-                nn.parent = nPar;
-                // Avoid repeating the same node
-                if (recordedNodes.contains(nn))
-                    continue;
-
-                // If the current point is an extremity, set its birth time and birth time in the past hours
-                if (extremityLast.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z + (float) 0.0;
-                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                } else if (extremityFirst.get(entry.getKey()).get(entry.getValue().indexOf(pt))) {
-                    nn.birthTime = (float) pt.z;
-                    nn.birthTimeHours = (float) rm.hoursCorrespondingToTimePoints[(int) pt.z];
-                } else {
-                    // If the current point is not an extremity, calculate its birth time and birth time in hours
-                    nn.birthTime = (float) (pt.z + 0.5);
-                    nn.birthTimeHours =
-                            (float) (0.5 * rm.hoursCorrespondingToTimePoints[(int) pt.z] + 0.5 * nPar.birthTime);
-                }
-                nPar.child = nn;
-
-                // Set the current node as the parent for the next iteration
-                nPar = nn;
-
-                recordedNodes.add(nn);
-            }
-        }
-        return nPar;
     }
 
     /**
@@ -1903,37 +1662,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         r.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
         r.updateTiming();
         return infos;
-    }
-
-    private String[] getLastAction() {
-        int l = tabModifs.length - 1;
-        while (tabModifs[l][0].isEmpty()) {
-            l--;
-        }
-        return tabModifs[l];
-    }
-
-    private String getActionType(String[] lastAction) {
-        Pattern actionPattern = Pattern.compile("\\[(\\w+)");
-        Matcher actionMatcher = actionPattern.matcher(Arrays.toString(lastAction));
-        if (actionMatcher.find()) {
-            return actionMatcher.group(1);
-        }
-        return null;
-    }
-
-    private Point3d[] extractPoints(String[] lastAction) {
-        Pattern pointsPattern = Pattern.compile("(Pt_\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+),\\s(\\d+\\.\\d+)");
-        Matcher pointsMatcher = pointsPattern.matcher(Arrays.toString(lastAction));
-
-        List<Point3d> pointsList = new ArrayList<>();
-        while (pointsMatcher.find()) {
-            double x = Double.parseDouble(pointsMatcher.group(2));
-            double y = Double.parseDouble(pointsMatcher.group(3));
-            double z = Double.parseDouble(pointsMatcher.group(4));
-            pointsList.add(new Point3d(x, y, z));
-        }
-        return pointsList.toArray(new Point3d[0]);
     }
 
     /**
@@ -1977,7 +1705,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     public String[] resampleModel(RootModel rm, double timestep, String path) {
         String[] infos = formatInfos("RESAMPLE_" + new File(path).getName(), new Point3d[]{new Point3d(timestep, 0,
                 0)});
-        RootModel rm2 = RootModel.RootModelWildReadFromRsml(rsmlPath);
+        RootModel rm2 = rootModelReadFromRsml(rsmlPath); // TODO Check reproducibility
 
         IntStream.range(1, tabModifs.length)
                 .parallel()
@@ -1992,15 +1720,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
     public RootModel resampleRootModelToTargetTimestep(RootModel rm, double timestep) {
         //Preparing variables
-        boolean debug = false;
-        if (debug) IJ.log("Starting resampling");
         double[] tabHours = Arrays.copyOf(rm.hoursCorrespondingToTimePoints, rm.hoursCorrespondingToTimePoints.length);
         int NimgInit = this.registeredStack.getStackSize();
         double hourMax = tabHours[tabHours.length - 1];
         int N = (int) Math.floor(hourMax / timestep) + 1;
         double[] hours = new double[N];
         int[] correspondingImage = new int[N];
-        if (debug) IJ.log("variables ok. N=" + N);
 
         //Identifying for each timepoint the corresponding image in the original stack, and the actual time since experiment start
         for (int i = 0; i < N; i++) {
@@ -2013,21 +1738,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             IJ.log("Timestep " + i + " = " + hours[i] + " identified keyimage=" + index);
         }
 
-
         //Change the timebasis and use flyingRootsMethod to create new nodes along with the timepoints
-        if (debug) IJ.log("Starting step 0");
-
-        if (debug) IJ.log("Starting step 1");
         rm.changeTimeBasis(timestep, N);
-
-        if (debug) IJ.log("Starting step 2");
         rm.resampleFlyingRoots();
 
         //Remove all the timepoints not falling onto actual timepoints
-        if (debug) IJ.log("Starting step 3");
         rm.removeInterpolatedNodes();
-        if (debug) IJ.log("All steps ok.");
-
 
         Timer t = new Timer();
         ImagePlus[] tabImg = new ImagePlus[N];
@@ -2137,7 +1853,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Update the data in the current image based on the current model
         try {
-            VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
+            VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
         }
         catch (Exception e) {
             VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
@@ -2153,19 +1869,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Write the information about the action to a file
         writeInfoFile();
-    }
-
-    /**
-     * Save the model into a final RSML
-     */
-    public void saveRsmlModel() {
-        IJ.setTool("hand");
-        addLog("Saving RSML", 0);
-        this.currentModel.writeRSML3D(new File(dataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"), "", true, false);
-        VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
-        addLog("Ok.", 2);
-        enable(all);
-        disable(OK);
     }
 
     /**
@@ -2248,7 +1951,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             IntStream.range(0, Nt).forEach(i -> {
                 // Create a grayscale image of the RSML model at this time point
                 ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgInitSize, zoomFactor, false, (i + 1), true,
-                        new boolean[]{true, true, true, false, true}, new double[]{2, 2});
+                        new boolean[]{true, true, true, false, true}, new double[]{2, 2}); // TODO RGB
 
                 // Set the display range of the image
                 imgRSML.setDisplayRange(0, Nt + 3);
@@ -2356,7 +2059,6 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         if (currentImage != null) currentImage.close();
         if (RoiManager.getInstance() != null) RoiManager.getInstance().close();
     }
-
 
     /**
      * Enable.
@@ -2471,7 +2173,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return str;
         }
 
-        str[0] = "Welcome to RSML Expert " + version;
+        str[0] = "Welcome to RSML Expert \n\t Previous version" + version + "\n\t Current version" + currentVersion;
         str[1] = "System check. Available memory in JVM=" + jvmMemory + " MB over " + memoryFullSize + " MB. #Available processor cores=" + nbCpu + ".";
         if (verbose) return str;
         else return new String[]{"", ""};
@@ -2485,283 +2187,4 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         addLog(str[0], 0);
         addLog(str[1], 0);
     }
-
-    /**
-     * Gets the rsml name.
-     *
-     * @return the rsml name
-     */
-	/*public String getRsmlName() {
-		return (  new File(modelDir,"4_2_Model_"+ (stepOfModel<1000 ? ("0") : "" ) + (stepOfModel<100 ? ("0") : "" ) + (stepOfModel<10 ? ("0") : "" ) + stepOfModel+".rsml" ).getAbsolutePath());
-	}
-*/
-    public String[] fitLastActionRootsInModel(RootModel rm) {
-        String[] lastAction = getLastAction();
-        System.out.println("Last action: " + Arrays.toString(lastAction));
-
-        String actionType = getActionType(lastAction);
-        System.out.println("Action type: " + actionType);
-
-        Point3d[] points = extractPoints(lastAction);
-
-        System.out.println("Image size: " + currentImage.getWidth() + "x" + currentImage.getHeight());
-        System.exit(0);
-
-        extractedImageRepartition eir = new extractedImageRepartition(rm, currentImage, points, zoomFactor, Nt);
-
-        // Get the shortest and darkest path in the image
-        eir.applyDarkestShortestPath();
-
-        // Exit all program
-        //System.exit(0);
-
-        return null; // Placeholder return
-    }
 }
-
-class RsmlInfo {
-    String version;
-    String unit;
-    String resolution;
-    String lastModified;
-    String software;
-    String user;
-    String fileKey;
-    String captured;
-    String label;
-    List<PropertyDefinition> propertyDefinitions = new ArrayList<>();
-    List<RootFromRSML> roots = new ArrayList<>();
-
-    static class PropertyDefinition {
-        String label;
-        String type;
-        String unit;
-    }
-
-    static class RootFromRSML {
-        String id;
-        String label;
-        String accession;
-        double rulerAtOrigin;
-        double length;
-        double orientation;
-        double lbuz;
-        double lauz;
-        List<Point2D.Double> pointCoordinates = new ArrayList<>();
-        Map<String, List<String>> functionSamples = new HashMap<>();
-
-        RootFromRSML parent;
-        List<RootFromRSML> children = new ArrayList<>();
-    }
-}
-
-class extractedImageRepartition {
-    private final int zoomFactor;
-    private final RootModel rm;
-    private final Point3d[] point3d;
-    private final int Nt;
-    private ImagePlus image;
-
-    public extractedImageRepartition(RootModel rm, ImagePlus image, Point3d[] point3d, int zoomFactor, int Nt) {
-        this.rm = rm;
-        this.point3d = point3d;
-        this.zoomFactor = zoomFactor;
-        this.Nt = Nt;
-        extractStackOfImageFromPoints(image);
-    }
-
-
-    /**
-     * Function to extract a part of the original image :
-     * A rectangle that contains all the points of the model
-     * The extracted image is made out of floats (pixels of the original image are copied)
-     */
-    public void extractStackOfImageFromPoints(ImagePlus currentImage) {
-        // Find the bounding box that contains all the 3D points
-        double minX = Double.MAX_VALUE;
-        double minY = Double.MAX_VALUE;
-        double maxX = Double.MIN_VALUE;
-        double maxY = Double.MIN_VALUE;
-
-        for (Point3d point : this.point3d) {
-            if (point.x < minX) minX = point.x;
-            if (point.x > maxX) maxX = point.x;
-            if (point.y < minY) minY = point.y;
-            if (point.y > maxY) maxY = point.y;
-        }
-
-        // Adjust the bounding box according to the zoom factor
-        int startX = (int) Math.floor(minX * zoomFactor);
-        int startY = (int) Math.floor(minY * zoomFactor);
-        int width = (int) Math.ceil((maxX - minX) * zoomFactor);
-        int height = (int) Math.ceil((maxY - minY) * zoomFactor);
-
-        System.out.println("Bounding box : " + startX + " " + startY + " " + width + " " + height);
-
-        // Extraction of stack of part images
-        ImagePlus[] tabImg = new ImagePlus[Nt];
-
-        // For each time
-        // Assuming continuity of the roots
-        for (int i = 0; i < Nt; i++) {
-            // Extract the part of the image
-            ImageProcessor ip = currentImage.getStack().getProcessor(i + 1).duplicate().convertToFloat();
-            ip.setRoi(startX, startY, width, height);
-            ip = ip.crop();
-            tabImg[i] = new ImagePlus("Extracted image", ip);
-        }
-        this.image = VitimageUtils.slicesToStack(tabImg);
-        // Current image takes the value of the stack of images
-
-        // express the points in the new coordinate system
-        for (Point3d point : this.point3d) {
-            point.x = point.x - minX;
-            point.y = point.y - minY;
-        }
-
-        // free memory
-        for (ImagePlus img : tabImg) {
-            img.close();
-        }
-
-    }
-
-    public void applyDarkestShortestPath() {
-
-        // for each 2 points with corresponding times (3rd coordinate)
-        for (int i = 0; i < 5; i++) {// point3d.length - 1; i++) {
-            // Get the shortest and darkest path in the image
-            GraphPath<Pix, Bord> shortestPath = VitimageUtils.getShortestAndDarkestPathInImage(image, 8, new Pix((int) point3d[i].x, (int) point3d[i].y, 0), new Pix((int) point3d[i + 1].x, (int) point3d[i + 1].y, 0));
-
-            // print the result
-            System.out.println("Initial points : " + point3d[i] + " -> " + point3d[i + 1]);
-            System.out.println("Shortest path length: " + shortestPath.getLength());
-            for (Bord b : shortestPath.getEdgeList()) {
-                System.out.println(b);
-            }
-            for (Pix p : shortestPath.getVertexList()) {
-                System.out.println(p);
-            }
-
-            // plot the points with crosses on the image and show the image at right time of the stack
-//            ImagePlus ip = image.duplicate();
-//            ip.show();
-//            for (Pix p : shortestPath.getVertexList()) {
-//                ip.getStack().getProcessor((int) point3d[i].z + 1).drawDot(p.x, p.y);
-//            }
-
-            // exit program
-
-        }
-
-    }
-
-
-    public void plotPixelRepartitionFollowingLine() {
-        Pix pixStart = new Pix((int) point3d[0].x, (int) point3d[0].y, 0);
-        Pix pixEnd = new Pix((int) point3d[1].x, (int) point3d[1].y, 0);
-        int time = 0;
-        // Get the line between the 2 points
-        Line2D line = new Line2D.Double(pixStart.x, pixStart.y, pixEnd.x, pixEnd.y);
-
-        // get distance between the 2 points
-        double distance = Math.sqrt(Math.pow(pixEnd.x - pixStart.x, 2) + Math.pow(pixEnd.y - pixStart.y, 2));
-
-        // Get the pixels that are on the line - Bresenham
-        List<Pix> pixelsOnLine = new ArrayList<>();
-        int x1 = (int) line.getX1();
-        int y1 = (int) line.getY1();
-        int x2 = (int) line.getX2();
-        int y2 = (int) line.getY2();
-        int dx = Math.abs(x2 - x1);
-        int dy = Math.abs(y2 - y1);
-        int sx = x1 < x2 ? 1 : -1;
-        int sy = y1 < y2 ? 1 : -1;
-        int err = dx - dy;
-        int e2;
-        int x = x1;
-        int y = y1;
-        while (true) {
-            pixelsOnLine.add(new Pix(x, y, 0));
-            if (x == x2 && y == y2) break;
-            e2 = 2 * err;
-            if (e2 > -dy) {
-                err = err - dy;
-                x = x + sx;
-            }
-            if (e2 < dx) {
-                err = err + dx;
-                y = y + sy;
-            }
-        }
-
-        // Pixel repartition following that line :
-        // Step 1: Compute color distribution along the original line
-        Map<Color, Integer> colorDistributionOriginal = new HashMap<>();
-        for (Pix pixel : pixelsOnLine) {
-            Color color = new Color(image.getProcessor().getPixel(pixel.x, pixel.y));
-            colorDistributionOriginal.put(color, colorDistributionOriginal.getOrDefault(color, 0) + 1);
-        }
-
-        // Plot the repartition of the pixel along the orthogonal line of the previous one
-        // Get the orthogonal line
-        List<Pix> orthogonalPixelsOnLine = new ArrayList<>();
-        double angle = Math.atan2(y2 - y1, x2 - x1);
-        double orthogonalAngle = angle + Math.PI / 2; // Adding 90 degrees to get the orthogonal angle
-        double cosOrthogonalAngle = Math.cos(orthogonalAngle);
-        double sinOrthogonalAngle = Math.sin(orthogonalAngle);
-
-        // Determine the midpoint of the line segment
-        double midX = (pixStart.x + pixEnd.x) / 2.0;
-        double midY = (pixStart.y + pixEnd.y) / 2.0;
-
-        // Calculate the offset for the orthogonal line
-        double orthogonalOffsetX = cosOrthogonalAngle * distance / 2.0;
-        double orthogonalOffsetY = sinOrthogonalAngle * distance / 2.0;
-
-        // Determine the start and end points for the orthogonal line
-        int orthoStartX = (int) Math.round(midX - orthogonalOffsetX);
-        int orthoStartY = (int) Math.round(midY - orthogonalOffsetY);
-        int orthoEndX = (int) Math.round(midX + orthogonalOffsetX);
-        int orthoEndY = (int) Math.round(midY + orthogonalOffsetY);
-
-        // Apply Bresenham's algorithm to get the pixels on the orthogonal line
-        dx = Math.abs(orthoEndX - orthoStartX);
-        dy = Math.abs(orthoEndY - orthoStartY);
-        sx = orthoStartX < orthoEndX ? 1 : -1;
-        sy = orthoStartY < orthoEndY ? 1 : -1;
-        err = dx - dy;
-        x = orthoStartX;
-        y = orthoStartY;
-        while (true) {
-            orthogonalPixelsOnLine.add(new Pix(x, y, distance));
-            if (x == orthoEndX && y == orthoEndY) break;
-            e2 = 2 * err;
-            if (e2 > -dy) {
-                err = err - dy;
-                x = x + sx;
-            }
-            if (e2 < dx) {
-                err = err + dx;
-                y = y + sy;
-            }
-        }
-
-        // plot the two lines onto the image
-        ImagePlus ip = image.duplicate();
-        ip.show();
-        for (Pix p : pixelsOnLine) {
-            ip.getProcessor().drawDot(p.x, p.y);
-        }
-        for (Pix p : orthogonalPixelsOnLine) {
-            ip.getProcessor().drawDot(p.x, p.y);
-        }
-
-    }
-
-    public ImagePlus getImage() {
-        return image;
-    }
-}
-
-

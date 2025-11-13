@@ -274,8 +274,6 @@
             <artifactId>mcib3d-core</artifactId>
             <version>master-47119b6729-1</version>
         </dependency>-->
-
-        <!-- https://mvnrepository.com/artifact/org.scijava/scijava-java3d -->
     </dependencies>
 
     <!--<dependencyManagement>

@@ -5,7 +5,6 @@ import ij.ImageJ;
 import ij.ImagePlus;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.registration.TransformUtils;
-import io.github.rocsg.rsml.FSR;
 import io.github.rocsg.rsml.Node;
 import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
@@ -15,10 +14,6 @@ import java.util.ArrayList;
 public class SegmentToSegment {
 
     public static void main(String[] args) {
-        ImageJ ij = new ImageJ();
-        String mainDataDir = "/home/rfernandez/Bureau/A_Test/RSML";
-        FSR sr = (new FSR());
-        sr.initialize();
         String path="/home/rfernandez/Bureau/A_Test/RootSystemTracker/UC_BPMP/RST-230629-PN-standard/Processing_of_230629-PN-pip/230629PN023/";
         String ml = "1";
         String boite = "00001";
