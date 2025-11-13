@@ -19,13 +19,15 @@ public class SegmentToSegment {
         String mainDataDir = "/home/rfernandez/Bureau/A_Test/RSML";
         FSR sr = (new FSR());
         sr.initialize();
+        String path="/home/rfernandez/Bureau/A_Test/RootSystemTracker/UC_BPMP/RST-230629-PN-standard/Processing_of_230629-PN-pip/230629PN023/";
         String ml = "1";
         String boite = "00001";
         double proximityThreshold = 3;
-        RootModel rm = RootModel.RootModelWildReadFromRsml(mainDataDir + "/4_RSML/ML" + ml + "_Boite_" + boite + ".rsml");
-        ImagePlus seqReg = IJ.openImage("/home/rfernandez/Bureau/A_Test/RSML/1_Registered/ML" + ml + "_Boite_" + boite + ".tif");
+        RootModel rm = RootModel.RootModelWildReadFromRsml(path+"61_graph_copy_before_expertize.rsml");
+        ImagePlus seqReg = IJ.openImage(path+"22_registered_stack.tif");
         ImagePlus img = drawComplexByTime(rm, seqReg, proximityThreshold);
         img.show();
+        img.duplicate().show();
     }
 
 

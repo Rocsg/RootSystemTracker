@@ -213,7 +213,8 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     private String stackPath;
     private String rsmlPath;
     private boolean toResize = true;
-    private String version = "v2.0.0";
+    private String version = "v2.0.2-SNAPSHOT - Release candidate";
+
 
     /**
      * Instantiates a new rsml expert plugin.
@@ -823,7 +824,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 if (e.getSource() == buttonSwitch && buttonSwitch.isEnabled()) {
                     disable(SWITCH);
                     pointStart();
-                    actionSwitchPoint();
+                    actionSwitchFalseCross();
                     return;
                 }
                 if (e.getSource() == buttonCreatePrimary && buttonCreatePrimary.isEnabled()) {
@@ -929,7 +930,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         currentModel.resampleFlyingRoots();
 
         // Update the current image with the modified model
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
+        try {
+            VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
+        }
+        catch (Exception e) {
+            VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
+        }
 
         // Log the successful completion of the undo action
         addLog("Ok.", 2);
@@ -1017,14 +1023,14 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
     /**
      * Action switch point.
      */
-    public void actionSwitchPoint() {
+    public void actionSwitchFalseCross() {
         boolean did = false;
         addLog("Running action \"Switch cross\" ...", -1);
         addLog(" Resolve a X cross. Click on the first point of Root A before cross, and first point of Root B before cross.", 1);
         String[] infos = null;
         Point3d[] tabPt = getAndAdaptCurrentPoints(waitPoints(2));
         if (tabPt != null) {
-            infos = switchPointInModel(tabPt, currentModel);
+            infos = switchFalseCrossInModel(tabPt, currentModel);
             if (infos != null) did = true;
         }
         if (did) finishActionThenGoOnStepSaveActionAndUpdateImage(infos);
@@ -1384,7 +1390,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
      * @param tabPt the tab pt
      * @return true, if successful
      */
-    public String[] switchPointInModel(Point3d[] tabPt, RootModel rm) {
+    public String[] switchFalseCrossInModel(Point3d[] tabPt, RootModel rm) {
         String[] infos = formatInfos("SWITCHPOINT", tabPt);
         Object[] obj1 = rm.getClosestNode(tabPt[0]);
         Object[] obj2 = rm.getClosestNode(tabPt[1]);
@@ -1393,27 +1399,66 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        Node n1 = (Node) obj1[0];
+        Node s1 = (Node) obj1[0];
         Root r1 = (Root) obj1[1];
-        Node n2 = (Node) obj2[0];
+        Node s2 = (Node) obj2[0];
         Root r2 = (Root) obj2[1];
-
-        boolean isFeasible = !(n1.parent.birthTime >= n2.birthTime);
-        if (n2.parent.birthTime >= n1.birthTime) isFeasible = false;
-        if (n1.child.birthTime <= n2.birthTime) isFeasible = false;
-        if (n2.child.birthTime <= n1.birthTime) isFeasible = false;
-        System.out.println("Trying to switch :\n --> Node " + n1 + "\n and node n2 " + n2);
-
+        Node t1=s1.child;
+        Node t2=s2.child;
+        boolean isFeasible=true;
+        if(t1==null && t2==null) isFeasible=false;
+        if(Math.floor(s1.birthTime)>Math.floor(t2.birthTime)){ System.out.println("Because : \n . s1 birthTime = "+s1.birthTime+"\n . t2.birthTime = "+t2.birthTime); isFeasible=false;}
+        if(Math.floor(s2.birthTime)>Math.floor(t1.birthTime)){ System.out.println("Because : \n . s2 birthTime = "+s2.birthTime+"\n . t1.birthTime = "+t1.birthTime); isFeasible=false;}
         if (!isFeasible) {
-            IJ.showMessage("This switch is not possible");
+            IJ.showMessage("New feature dev: This switch is not possible");
+            System.out.println("Because : \n . s1 birthTime = "+s1.birthTime+"\n . s2 birthTime = "+s2.birthTime+
+            "\n . t1.birthTime = "+t1.birthTime+"\n . t2.birthTime = "+t2.birthTime);
             return null;
         }
-        Node par1 = n1.parent;
-        Node chi1 = n1.child;
-        n1.parent = n2.parent;
-        n1.child = n2.child;
-        n2.parent = par1;
-        n2.child = chi1;
+        System.out.println("Trying to switch :\n "+
+        "Former situation was \n . root 1 --> Node " + s1 + " to "+ t1+
+        "\n . root 2 --> Node " + s2 + " to "+ t2);
+
+
+        //Processing root 1 source
+        Node nTmp=s1;
+        s1.birthTime=(float) Math.floor(s1.birthTime);
+        while(nTmp.parent!=null && Math.floor(nTmp.parent.birthTime)==Math.floor(s1.birthTime)){
+            nTmp=nTmp.parent;
+            nTmp.birthTime=(float) Math.floor(s1.birthTime);
+        }
+
+        //Processing root 2 source
+        nTmp=s2;
+        s2.birthTime=(float) Math.floor(s2.birthTime);
+        while(nTmp.parent!=null && Math.floor(nTmp.parent.birthTime)==Math.floor(s2.birthTime)){
+            nTmp=nTmp.parent;
+            nTmp.birthTime=(float) Math.floor(s2.birthTime);
+        }
+
+
+        //Processing root 1 former target
+        nTmp=t1;
+        t1.birthTime=(float) Math.floor(t1.birthTime);
+        while(nTmp.child!=null && Math.floor(nTmp.child.birthTime)==Math.floor(t1.birthTime)){
+            nTmp=nTmp.child;
+            nTmp.birthTime=(float) Math.floor(t1.birthTime);
+        }
+
+        //Processing root 2 target
+        nTmp=t2;
+        t2.birthTime=(float) Math.floor(t2.birthTime);
+        while(nTmp.child!=null && Math.floor(nTmp.child.birthTime)==Math.floor(t2.birthTime)){
+            nTmp=nTmp.child;
+            nTmp.birthTime=(float) Math.floor(t2.birthTime);
+        }
+
+        s1.child=t2;
+        s2.child=t1;
+        t2.parent=s1;
+        t1.parent=s2;
+
+
         r1.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
         r1.updateTiming();
         r2.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
@@ -1670,7 +1715,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
 
         // Update the last node of the root and update the timing
         r.lastNode = nFirst;
-        r.updateTiming();
+        r.updateTimingModifiedForDebuggingRSMLExpert();
 
         return infos;
     }
@@ -2033,7 +2078,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 refineSegmentInModel(tabPt, rm);
                 break;// TODO
             case "SWITCHPOINT":
-                switchPointInModel(tabPt, rm);
+                switchFalseCrossInModel(tabPt, rm);
                 break;// TODO
             case "CREATEPRIMARY":
                 createPrimaryInModel(tabPt, rm);
@@ -2091,8 +2136,12 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         System.arraycopy(infos, 0, tabModifs[nModifs], 0, infos.length);
 
         // Update the data in the current image based on the current model
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
-
+        try {
+            VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
+        }
+        catch (Exception e) {
+            VitimageUtils.actualizeData(projectRsmlOnImage(currentModel), currentImage);
+        }
         // Log that the image update was successful
         addLog("Ok.", 2);
 
@@ -2113,7 +2162,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         IJ.setTool("hand");
         addLog("Saving RSML", 0);
         this.currentModel.writeRSML3D(new File(dataDir, "61_graph_expertized.rsml").getAbsolutePath().replace("\\", "/"), "", true, false);
-        VitimageUtils.actualizeDataMultiThread(projectRsmlOnImage(currentModel), currentImage);
+        VitimageUtils.actualizeData/*MultiThread*/(projectRsmlOnImage(currentModel), currentImage);
         addLog("Ok.", 2);
         enable(all);
         disable(OK);
@@ -2178,20 +2227,38 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
         // Create an array to store processed images
         ImagePlus[] processedImages = new ImagePlus[Nt];
 
-        // Loop over each time point in the model
-        IntStream.range(0, Nt).parallel().forEach(i -> {
-            // Create a grayscale image of the RSML model at this time point
-            ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgInitSize, zoomFactor, false, (i + 1), true,
-                    new boolean[]{true, true, true, false, true}, new double[]{2, 2});
+        try {
+            // Loop over each time point in the model
+            IntStream.range(0, Nt).parallel().forEach(i -> {
+                // Create a grayscale image of the RSML model at this time point
+                ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgInitSize, zoomFactor, false, (i + 1), true,
+                        new boolean[]{true, true, true, false, true}, new double[]{2, 2});
 
-            // Set the display range of the image
-            imgRSML.setDisplayRange(0, Nt + 3);
+                // Set the display range of the image
+                imgRSML.setDisplayRange(0, Nt + 3);
 
-            // Merge the grayscale image with the registered stack image
-            processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
-            // Convert the image to RGB color
-            IJ.run(processedImages[i], "RGB Color", "");
-        });
+                // Merge the grayscale image with the registered stack image
+                processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
+                // Convert the image to RGB color
+                IJ.run(processedImages[i], "RGB Color", "");
+            });
+        }
+        catch (Exception e) {
+            // Loop over each time point in the model
+            IntStream.range(0, Nt).forEach(i -> {
+                // Create a grayscale image of the RSML model at this time point
+                ImagePlus imgRSML = rm.createGrayScaleImageWithTime(imgInitSize, zoomFactor, false, (i + 1), true,
+                        new boolean[]{true, true, true, false, true}, new double[]{2, 2});
+
+                // Set the display range of the image
+                imgRSML.setDisplayRange(0, Nt + 3);
+
+                // Merge the grayscale image with the registered stack image
+                processedImages[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabReg[i], imgRSML}, true);
+                // Convert the image to RGB color
+                IJ.run(processedImages[i], "RGB Color", "");
+            });
+        }
 
         // Print the execution time of this method
         t.print("Updating root model took : ");

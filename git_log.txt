@@ -1,0 +1,82 @@
+*   c3facee  (origin/main) Merge pull request #15 from LGPolytech/CCissue 2024-06-27 <Romain Fernandez>
+|\  
+| * b0aff59  ccissue 2024-06-27 <LGPolytech>
+|/| 
+| * 9207720  (HEAD -> Dev_Loai, origin/Dev_Loai) pre V2 2024-06-27 <Rocsg>
+| * ec62eb7  Awkward tough fermeture for users 2024-04-11 <Rocsg>
+| * df91033  Correct 2024-04-11 <Rocsg>
+| *   447898b  Merge pull request #13 from LGPolytech/Dev_Loai 2024-04-11 <Romain Fernandez>
+| |\  
+| | * e21d73b  v4.4.1 - extend time0 corrections 2024-04-10 <LGPolytech>
+| * | 06680df  repackaging impacted to resources file 2024-04-11 <Rocsg>
+| * |   a9d956f  Merge branch 'Dev_Loai' of https://github.com/Rocsg/RootSystemTracker into Dev_Loai 2024-04-10 <Rocsg>
+| |\ \  
+| | * | af50c9b  Merge pull request #12 from LGPolytech/Dev_Loai 2024-04-10 <Romain Fernandez>
+| | |\| 
+| | | * a61b248  v4.4.1 - Linkin nodes (primary & secondary) 2024-04-10 <LGPolytech>
+| * | | f1b8509  Integrated grayscale 2024-04-10 <Rocsg>
+| |/ /  
+| * | 4ab02c0  Actually real good closing 2024-04-10 <Rocsg>
+| * | db19e41  Merged 2024-04-10 <Rocsg>
+| * |   4516c60  Merged 2024-04-10 <Rocsg>
+| |\ \  
+| | * | 8bfa491  Merge pull request #11 from LGPolytech/Dev_Loai 2024-04-10 <Romain Fernandez>
+| | |\| 
+| | | * 2a958eb  v4.4.1 - Before Release 2024-04-10 <LGPolytech>
+| * | | ea3fef9  Plz help 2024-04-10 <Rocsg>
+| |/ /  
+| * | f172c95  After some debate we reached a consensus 2024-04-09 <Rocsg>
+| * |   8e3cc7d  Merge ok 2024-04-09 <Rocsg>
+| |\ \  
+| | * | 3cca72e  Merge pull request #7 from LGPolytech/Dev_Loai 2024-04-09 <Romain Fernandez>
+| | |\| 
+| | | * 6d66d16  v4.4.1 - Corrections of Extend branch 2024-04-08 <LGPolytech>
+| | | * 26ce823  v4.4.1 - Corrections and optimization 2024-04-08 <LGPolytech>
+| * | | 1d048eb  minors 2024-04-09 <Rocsg>
+| |/ /  
+| * | a3466ef  Merge pull request #6 from LGPolytech/Dev_Loai 2024-04-05 <Romain Fernandez>
+| |\| 
+| | * 10f7937  log corrections 2024-04-05 <LGPolytech>
+| | * f1df919  v 4.4.1 - corrected 2024-04-03 <LGPolytech>
+| | * 3f51744  v 4.4.1 - Map method for creating branches 2024-04-02 <LGPolytech>
+| | * 3dbd107  v 4.4.1 2024-03-29 <LGPolytech>
+| | * dbec755  v 4.4.0 2024-03-22 <LGPolytech>
+| | *   6a80980  Merge remote-tracking branch 'origin/Dev_Loai' into Dev_Loai 2024-03-20 <LGPolytech>
+| | |\  
+| | |/  
+| |/|   
+| | * c8d8b6a  Release 1.6.1.0 2024-03-07 <Rocsg>
+* | | 0d7b561  (main) Before merge 2024-04-05 <Rocsg>
+|/ /  
+* / ccfd347  Release 1.6.1 2024-03-07 <Rocsg>
+|/  
+* 986e4b5  Release 1.6.1 2024-03-07 <Rocsg>
+* eded9cd  Split-root-04-debugCici 2023-04-18 <Rocsg>
+* e626643  Split-root-03-typeExp-Feature 2023-04-18 <Rocsg>
+* f698f95  1.5.1 1704 patch02 2023-04-17 <Rocsg>
+* 7f0001c  SPlit-root-01 2023-04-17 <Rocsg>
+* be088e2  Man-in-the-loop computing step choice 2023-04-14 <Rocsg>
+* 70eccb6  V1.5.0 2023-02-21 <Rocsg>
+* e4d2e45  (adaptative_timer) Pre-release 2023-02-10 <Rocsg>
+* 44af892  (tag: v1.5.0) Cleaning for 1.5 release 2023-01-27 <Rocsg>
+* e9e1777  Cleaning for 1.5 release 2023-01-27 <Rocsg>
+* 5f010e7  (tag: v1.4.0) Easy restart of a step for the user when changing parameters 2022-07-19 <Rocsg>
+* 309323b  Add link to the demo movie 2022-07-18 <Rocsg>
+* 0378cd9  Copy README from plugin page 2022-07-18 <Rocsg>
+* 5a7363c  Paper release 2022-07-18 <Rocsg>
+* 763a0ea  Release as a Fiji plugin 2022-07-07 <Rocsg>
+* 4f9a221  Clearer packaging 2022-07-06 <Rocsg>
+* 0c5841f  Removing target dir 2022-07-06 <Rocsg>
+* f83c34c  Ignoring target in gitignore 2022-07-06 <Rocsg>
+*   034f385  Merge pull request #1 from Rocsg/Global_resolution 2022-07-06 <Rocsg>
+|\  
+| | * baa2c1d  (origin/Global_resolution, Global_resolution) Add target to gitignore 2022-07-06 <Rocsg>
+| |/  
+| * 67ba486  Hosting part on Fijiyama libs 2022-07-06 <Rocsg>
+| * 2115bbe  Update with movie functionality 2022-03-02 <Rocsg>
+| * 85ee3f5  ML setup for date estimation 2022-01-22 <Rocsg>
+| * 48252a9  First stable 2021-11-19 <Rocsg>
+| * 46a2b1b  Safety commit 2021-10-12 <Rocsg>
+|/  
+* 944afe7  Link with github en el GUI tambien 2021-10-01 <Rocsg>
+* ae6fc92  first setup 2021-10-01 <Rocsg>

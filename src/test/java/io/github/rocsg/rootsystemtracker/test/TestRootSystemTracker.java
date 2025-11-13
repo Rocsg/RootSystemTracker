@@ -11,7 +11,7 @@ import io.github.rocsg.rstplugin.PipelineActionsHandler;
 import io.github.rocsg.rstplugin.PipelineParamHandler;
 import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
-import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
+import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipelineV2;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.junit.FixMethodOrder;
 import org.junit.jupiter.api.Assertions;
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.runners.MethodSorters;
 
 import java.io.File;
-import java.util.Objects;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING) // force name ordering
 public class TestRootSystemTracker {
@@ -151,8 +150,7 @@ public class TestRootSystemTracker {
 
         // Create the graph and save it
         PipelineActionsHandler.buildAndProcessGraph(indexImg, outputDataDir, pph);
-        SimpleDirectedWeightedGraph<CC, ConnectionEdge> gg = RegionAdjacencyGraphPipeline
-                .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
+        SimpleDirectedWeightedGraph<CC, ConnectionEdge> gg = RegionAdjacencyGraphPipelineV2.readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
         System.out.println("There3");
         IJ.openImage(new File(outputDataDir, "51_graph_rendering.tif").getAbsolutePath());
         // Verify graph parameters
@@ -190,7 +188,7 @@ public class TestRootSystemTracker {
         for (int i = 0; i < tab.length; i++) {
             System.out.println(i + " : " + tab[i]);
         }
-        PipelineActionsHandler.computeRSMLUntilExpertize(indexImg, outputDataDir, pph);
+        PipelineActionsHandler.buildAndProcessGraphV2(indexImg, outputDataDir, pph);
         PipelineActionsHandler.computeRSMLAfterExpertize(indexImg, outputDataDir, pph);
         RootModel rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath());
 

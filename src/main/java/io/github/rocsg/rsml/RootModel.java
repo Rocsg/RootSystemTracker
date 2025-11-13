@@ -48,7 +48,6 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author Xavier Draye and Guillaume Lobet - Université catholique de Louvain
@@ -996,11 +995,12 @@ public class RootModel extends WindowAdapter {
             r.childList.sort(comparatorLateral);
         }
 
-        for (int i = 0; i < this.rootList.size(); i++) {
-            if (this.rootList.get(i).order == 2)
-                this.rootList.get(i).plantNumber = this.rootList.get(i).getParent().plantNumber;
+        for(int ord=2;ord<=100;ord++){
+            for (int i = 0; i < this.rootList.size(); i++) {
+                if (this.rootList.get(i).order == ord)
+                    this.rootList.get(i).plantNumber = this.rootList.get(i).getParent().plantNumber;
+            }
         }
-
     }
 
     /**
@@ -3009,7 +3009,7 @@ public class RootModel extends WindowAdapter {
                 if (nPar == null) continue;
                 int dotEvery = 2;
                 double width = 2;
-                if (!((countInHours ? n.birthTimeHours : n.birthTime) > observationTime)) {
+                if(false)if (!((countInHours ? n.birthTimeHours : n.birthTime) > observationTime)) {
                     drawDotline(ip, ImagePlus.GRAY8, (int) ((nPar.x + 0.5) * SIZE_FACTOR), (int) ((nPar.y + 0.5) * SIZE_FACTOR), (int) ((n.x + 0.5) * SIZE_FACTOR), (int) ((n.y + 0.5) * SIZE_FACTOR), dotEvery, width, binaryColor ? 1 : (countInHours ? n.birthTimeHours : n.birthTime));
                 }
             }
@@ -3125,7 +3125,15 @@ public class RootModel extends WindowAdapter {
     public ImagePlus createGrayScaleImageTimeLapse(ImagePlus imgInitSize, double[] observationTimes, double[] lineWidths, double deltaModel) {//TODO : pass into hours
         int[] initDims = new int[]{imgInitSize.getWidth(), imgInitSize.getHeight()};
         int Z = observationTimes.length;
-        ImagePlus imgRSML = IJ.createImage("", initDims[0], initDims[1], Z, 8);
+        
+        // Créer manuellement le stack pour s'assurer d'avoir le bon nombre de slices
+        ImageStack stack = new ImageStack(initDims[0], initDims[1]);
+        for (int z = 0; z < Z; z++) {
+            stack.addSlice(new ByteProcessor(initDims[0], initDims[1]));
+        }
+        ImagePlus imgRSML = new ImagePlus("", stack);
+        
+        System.out.println("DEBUG: Z = " + Z + ", Stack size = " + imgRSML.getStackSize() + ", nSlices = " + imgRSML.getNSlices());
         int w = initDims[0];
         int h = initDims[1];
         double maxDate = 0;

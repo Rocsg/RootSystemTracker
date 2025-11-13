@@ -1,10 +1,12 @@
 package io.github.rocsg.rstplugin;
 
 import ij.IJ;
+import ij.ImageJ;
 import ij.ImagePlus;
 import ij.gui.GenericDialog;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
+import imagescience.image.Image;
 import io.github.rocsg.fijiyama.common.*;
 import io.github.rocsg.fijiyama.fijiyamaplugin.RegistrationAction;
 import io.github.rocsg.fijiyama.registration.BlockMatchingRegistration;
@@ -16,7 +18,8 @@ import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
-import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
+import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipelineV2;
+
 import org.apache.commons.io.FileUtils;
 import org.jgrapht.GraphPath;
 import org.jgrapht.graph.SimpleDirectedWeightedGraph;
@@ -47,6 +50,8 @@ public class PipelineActionsHandler {
     public static final int yMaxStamp = 50; // TODO. It is relative value Y, after the crop
     // Timer object for tracking time-related operations in the pipeline
     public static Timer t;
+    static double THRESH_RUPT_RATIO = 0.40;
+    static double THRESH_SLOPE_RATIO = 0.10;
 
     /**
      * This method allows the user to select the first and last steps and images to
@@ -364,6 +369,8 @@ public class PipelineActionsHandler {
         String outputDataDir = new File(pph.outputDir, pph.imgNames[indexImg]).getAbsolutePath();
         boolean executed = true;
 
+
+
         System.out.println("Starting with step " + step + " on img index " + indexImg + " : " + pph.imgNames[indexImg]);
         t = new Timer();
         // Perform the specified step
@@ -380,19 +387,19 @@ public class PipelineActionsHandler {
                 break;
             case 3: // Compute mask, find leaves falling in the ground and remove them
                 t.print("Starting step 3, masking -  on img " + pph.imgNames[indexImg]);
-                executed = PipelineActionsHandler.computeMasksAndRemoveLeaves(indexImg, outputDataDir, pph);
+                executed = true;/*PipelineActionsHandler.computeMasksAndRemoveLeaves(indexImg, outputDataDir, pph);*/
                 break;
-            case 4: // Compute graph
+            case 4: // mean shift computation
                 t.print("Starting step 4, space/time segmentation -  on img " + pph.imgNames[indexImg]);
                 executed = PipelineActionsHandler.spaceTimeMeanShiftSegmentation(indexImg, outputDataDir, pph);
                 break;
             case 5: // Compute graph
                 t.print("Starting step 5 -  on img " + pph.imgNames[indexImg]);
-                executed = PipelineActionsHandler.buildAndProcessGraph(indexImg, outputDataDir, pph);
+                executed = PipelineActionsHandler.buildAndProcessGraphV2(indexImg, outputDataDir, pph);
                 break;
             case 6: // RSML building
                 t.print("Starting step 6 -  on img " + pph.imgNames[indexImg]);
-                executed = PipelineActionsHandler.computeRSMLUntilExpertize(indexImg, outputDataDir, pph);
+                executed = PipelineActionsHandler.cleanRSMLForExpertize(indexImg, outputDataDir, pph);
                 break;
             case 7: // RSML building
                 t.print("Starting step 7 -  on img " + pph.imgNames[indexImg]);
@@ -646,110 +653,50 @@ public class PipelineActionsHandler {
      *                      various parameters.
      * @return A boolean indicating whether the operation was successful.
      */
-    public static boolean computeMasksAndRemoveLeaves(int indexImg, String outputDataDir, PipelineParamHandler pph) {
-        // Open the registered image
-        
-        
-        
-        ImagePlus imgReg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
-
-        // Compute the mask for the area of interest at the first time point
-        ImagePlus imgMask1 = getMaskOfAreaInterestAtTime(imgReg, 1, false);
-        // Save the mask as a TIFF file
-        IJ.saveAsTiff(imgMask1, new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
-
-        // Compute the mask for the area of interest at the last time point
-        ImagePlus imgMaskN = getMaskOfAreaInterestAtTime(imgReg, imgReg.getStackSize(), false);
-        // Save the mask as a TIFF file
-        IJ.saveAsTiff(imgMaskN, new File(outputDataDir, "32_mask_at_tN.tif").getAbsolutePath());
-
-        // Erode the first mask using a circular structuring element with a radius of
-        // 250 pixels
-        // TODO: The value 250 should be replaced with a value that has a geometrical
-        // meaning in the context of the images
-        ImagePlus imgMask2 = MorphoUtils.erosionCircle2D(imgMask1, 250);
-        imgMask2.setDisplayRange(0, 1);
-        // Save the eroded mask as a TIFF file
-        IJ.saveAsTiff(imgMask2, new File(outputDataDir, "33_mask_feuilles").getAbsolutePath());
-
-        // Remove leaves from the registered image using the first and second masks
-        ImagePlus[] imgsOut = removeLeavesFromSequence(imgReg, imgMask1, imgMask2);
-
-        // Set the display range of the first output image
-        // TODO: The display range should be set adaptively based on the image data
-        imgsOut[0].setDisplayRange(0, 255);
-        // If the split option is enabled in pph, remove the split central line from the
-        // first output image
-        if (pph.isSplit()) {
-            imgsOut[0] = removeSplitCentralLine(imgsOut[0]);
-        }
-        // If the gaps option is enabled in pph, perform additional processing
-        // TODO: Implement the processing for gaps
-        if (pph.isGaps()) {
-        }
-        // Save the first output image as a TIFF file
-        IJ.saveAsTiff(imgsOut[0], new File(outputDataDir, "34_leaves_removed").getAbsolutePath());
-
-        // Set the display range of the second output image
-        // TODO: The display range should be set adaptively based on the image data
-        imgsOut[1].setDisplayRange(0, 1);
-        // Save the second output image as a TIFF file
-        IJ.saveAsTiff(imgsOut[1], new File(outputDataDir, "35_mask_of_removed_leaves").getAbsolutePath());
-
-        return true;
-    }
-
-    public static ImagePlus removeSplitCentralLine(ImagePlus img) {
-        ImagePlus[] imgs = VitimageUtils.stackToSlices(img);
-        int N = imgs.length;
-        IJ.log("" + N);
-        ImagePlus img2 = MorphoUtils.dilationCircle2D(imgs[N - 1], 2);
-        ImagePlus img3 = MorphoUtils.dilationLine2D(img2, 15, true);
-        ImagePlus img4 = VitimageUtils.thresholdImage(img3, 152, 256);
-        ImagePlus imgTrench = VitimageUtils.getBinaryMaskUnary(img4, 127);
-        ImagePlus imgRest = VitimageUtils.invertBinaryMask(imgTrench);
-        ImagePlus trench = VitimageUtils.makeOperationBetweenTwoImages(img3, imgTrench, 2, false);
-
-        for (int i = 0; i < N; i++) {
-            ImagePlus rest = VitimageUtils.makeOperationBetweenTwoImages(imgs[i], imgRest, 2, false);
-            imgs[i] = VitimageUtils.makeOperationBetweenTwoImages(rest, trench, 1, false);
-        }
-        return VitimageUtils.slicesToStack(imgs);
-    }
 
     public static boolean spaceTimeMeanShiftSegmentation(int indexImg, String outputDataDir, PipelineParamHandler pph) {
-        ImagePlus imgIn = IJ.openImage(new File(outputDataDir, "34_leaves_removed.tif").getAbsolutePath());
-        ImagePlus imgMask1 = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
-        ImagePlus imgMaskN = IJ.openImage(new File(outputDataDir, "32_mask_at_tN.tif").getAbsolutePath());
-        ImagePlus imgMaskOfLeaves = IJ
-                .openImage(new File(outputDataDir, "35_mask_of_removed_leaves.tif").getAbsolutePath());
-
-        // Insert a first slice with no roots in it. That way, the roots already present
-        // will be detected as roots appearing at time 1 (for convention, as background
-        // has label 0)
-        ImagePlus mire = computeMire(imgIn);
-        imgIn = VitimageUtils.addSliceToImage(mire, imgIn);
-        int threshRupt = 25;
-        int threshSlope = 10;
-        ImagePlus imgOut = projectTimeLapseSequenceInColorspaceCombined(imgIn, imgMask1, imgMaskN, imgMaskOfLeaves,
-                threshRupt, threshSlope);
-        imgOut = VitimageUtils.makeOperationBetweenTwoImages(imgOut, imgMaskN, 2, true);
+        ImagePlus imgIn= IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
+        double expectedDiff=Math.abs(pph.rootTissueIntensityLevel-pph.backgroundIntensityLevel);
+        int threshRupt = (int) (expectedDiff * THRESH_RUPT_RATIO);
+        int threshSlope = (int) (expectedDiff * THRESH_SLOPE_RATIO);
+        ImagePlus imgOut = projectTimeLapseSequenceInColorspaceCombined(imgIn,
+                threshRupt, threshSlope,outputDataDir,pph);
+        //        imgOut = VitimageUtils.makeOperationBetweenTwoImages(imgOut, 2, true);
         ImagePlus img2 = VitimageUtils.thresholdImage(imgOut, 0.5, 100000);
         img2 = VitimageUtils.connexeNoFuckWithVolume(img2, 1, 10000, 2000, 1E10, 4, 0, true);
         img2 = VitimageUtils.thresholdImage(img2, 0.5, 1E8);
         img2 = VitimageUtils.getBinaryMaskUnary(img2, 0.5);
+        ImagePlus imgMaskRoi=IJ.openImage(new File(outputDataDir, "31_MaskHandmadeForRootAreaSelection.tif").getAbsolutePath());
+        imgMaskRoi=VitimageUtils.getBinaryMaskUnary(imgMaskRoi, 0.5);
+        img2=VitimageUtils.makeOperationBetweenTwoImages(img2, imgMaskRoi, 2, true);
+        img2=VitimageUtils.convertFloatToByteWithoutDynamicChanges(img2);
+
         IJ.run(img2, "8-bit", "");
         imgOut = VitimageUtils.makeOperationBetweenTwoImages(imgOut, img2, 2, true);
+
         IJ.run(imgOut, "Fire", "");
         imgOut.setDisplayRange(0, pph.imgSerieSize[indexImg] + 1);
+        System.out.println("Saving date map to " + new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+        System.out.println("With colormap range 0 to " + (pph.imgSerieSize[indexImg] + 1) + ")");
         IJ.saveAsTiff(imgOut, new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+        return true;
+    }
+
+
+
+
+
+    public static boolean buildAndProcessGraphV2(int indexImg, String outputDataDir, PipelineParamHandler pph) {
+        System.out.println("index = " + indexImg + " output_dir = " + outputDataDir + " pph = " + pph);
+        ImagePlus imgDates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+        RegionAdjacencyGraphPipelineV2.buildAndProcessGraphStraight(imgDates, outputDataDir, pph, indexImg);
         return true;
     }
 
     public static boolean buildAndProcessGraph(int indexImg, String outputDataDir, PipelineParamHandler pph) {
         System.out.println("index = " + indexImg + " output_dir = " + outputDataDir + " pph = " + pph);
         ImagePlus imgDates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
-        RegionAdjacencyGraphPipeline.buildAndProcessGraphStraight(imgDates, outputDataDir, pph, indexImg);
+        RegionAdjacencyGraphPipelineV2.buildAndProcessGraphStraight(imgDates, outputDataDir, pph, indexImg);
         return true;
     }
 
@@ -764,46 +711,14 @@ public class PipelineActionsHandler {
      * @param pph           An instance of the PipelineParamHandler class containing various parameters.
      * @return A boolean indicating whether the operation was successful.
      */
-    public static boolean computeRSMLUntilExpertize(int indexImg, String outputDataDir, PipelineParamHandler pph) {
-        // Open the mask image
-        ImagePlus mask = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
-        // Dilate the mask image
-        mask = MorphoUtils.dilationCircle2D(mask, 9);
-        // Open the dates image
-        ImagePlus dates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
-        // Read the graph from a file
-        SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipeline
-                .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
-        // Compute the distance transform of the dates image
-        ImagePlus distOut = MorphoUtils.getDistOut(dates, false);
-        // Open the registered image
-        ImagePlus reg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
-
-        // Refine the graph
-        RootModel rm = RegionAdjacencyGraphPipeline.refinePlongementOfCCGraph(graph, distOut, pph, indexImg);
-        // Clean the RSML
+    public static boolean cleanRSMLForExpertize(int indexImg, String outputDataDir, PipelineParamHandler pph) {
+        SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipelineV2.readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
+        RootModel rm = RegionAdjacencyGraphPipelineV2.buildStep9RefinePlongement(graph/* , distOut*/, pph, indexImg);
         rm.cleanWildRsml();
-        // Resample flying roots
         rm.resampleFlyingRoots();
-        // Clean negative thresholds
         rm.cleanNegativeTh();
-
-        // Write the RSML
         rm.writeRSML3D(new File(outputDataDir, "60_graph_no_backtrack.rsml").getAbsolutePath(), "", true, false);
-        // If the split option is not enabled, backtrack the primaries
-        if (!pph.isSplit()) {
-            backTrackPrimaries(new File(outputDataDir, "60_graph_no_backtrack.rsml").getAbsolutePath(),
-                    new File(outputDataDir, "61_graph.rsml").getAbsolutePath(), mask, reg,
-                    pph.toleranceDistanceForBeuckerSimplification);
-        } else {
-            // If the split option is enabled, copy the file
-            try {
-                FileUtils.copyFile(new File(outputDataDir, "60_graph_no_backtrack.rsml"),
-                        new File(outputDataDir, "61_graph.rsml"));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        rm.writeRSML3D(new File(outputDataDir, "61_graph.rsml").getAbsolutePath(), "", true, false);
         return true;
     }
 
@@ -818,14 +733,11 @@ public class PipelineActionsHandler {
      * @return A boolean indicating whether the operation was successful.
      */
     public static boolean computeRSMLAfterExpertize(int indexImg, String outputDataDir, PipelineParamHandler pph) {
-        // Open the mask image
-        ImagePlus mask = IJ.openImage(new File(outputDataDir, "31_mask_at_t1.tif").getAbsolutePath());
-        // Dilate the mask image
-        mask = MorphoUtils.dilationCircle2D(mask, 9);
         // Open the dates image
         ImagePlus dates = IJ.openImage(new File(outputDataDir, "40_date_map.tif").getAbsolutePath());
+
         // Read the graph from a file
-        SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipeline
+        SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph = RegionAdjacencyGraphPipelineV2
                 .readGraphFromFile(new File(outputDataDir, "50_graph.ser").getAbsolutePath());
         // Open the registered image
         ImagePlus reg = IJ.openImage(new File(outputDataDir, "22_registered_stack.tif").getAbsolutePath());
@@ -834,15 +746,13 @@ public class PipelineActionsHandler {
         RootModel rm = null;
         // Check if the RSML file exists
         if (new File(outputDataDir, "61_graph_expertized.rsml").exists()) {
-            rm = RootModel
-                    .RootModelWildReadFromRsml(new File(outputDataDir, "61_graph_expertized.rsml").getAbsolutePath());
-        } else {
-            rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath());
-        }
+            rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph_expertized.rsml").getAbsolutePath());
+        } else {rm = RootModel.RootModelWildReadFromRsml(new File(outputDataDir, "61_graph.rsml").getAbsolutePath());        }
         // Draw distance or time
-        ImagePlus skeletonTime = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 3);
-        ImagePlus skeletonDay = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, true, 2);
-        ImagePlus allTimes = RegionAdjacencyGraphPipeline.drawDistanceOrTime(dates, graph, false, false, 1);
+
+        ImagePlus allTimes = RegionAdjacencyGraphPipelineV2.drawDistanceOrTime(dates, graph, false, false, 1);
+        ImagePlus skeletonTime = RegionAdjacencyGraphPipelineV2.drawDistanceOrTime(dates, graph, false, true, 3);
+        ImagePlus skeletonDay = RegionAdjacencyGraphPipelineV2.drawDistanceOrTime(dates, graph, false, true, 2);
 
         // Check if memory saving is disabled
         if (pph.memorySaving == 0) {
@@ -872,189 +782,25 @@ public class PipelineActionsHandler {
         ImagePlus[] tabRes = VitimageUtils.stackToSlices(imgReg);
         for (int i = 0; i < tabRes.length; i++) {
             ImagePlus imgRSML = rm.createGrayScaleImageWithTime(tabRes[i], 1, false, (i + 1), true,
-                    new boolean[]{true, true, true, false, true}, new double[]{2, 2});
+                    new boolean[]{true, true, true, false, true}, new double[]{2, 2,2,2,2,2});
             tabRes[i] = RGBStackMerge.mergeChannels(new ImagePlus[]{tabRes[i], imgRSML}, false);
             IJ.run(tabRes[i], "RGB Color", "");
         }
         return VitimageUtils.slicesToStack(tabRes);
     }
 
-    /**
-     * This method backtracks the primary roots in a Root System Markup Language (RSML) file.
-     * It reads the RSML file, identifies the primary roots, and for each root, it identifies the first coordinates.
-     * It then identifies the mean height of the region to attain in this area and extracts a rectangle around the first coordinate at time 0.
-     * It extracts a minimum Djikstra path to this region and finds in this path the last point that is not in the interest area.
-     * It then subsamples the new path and inserts the corresponding coordinates, updating the time value along the root.
-     * Finally, it writes the updated RSML file.
-     *
-     * @param pathToInputRsml The path to the input RSML file.
-     * @param pathToOutputRsml The path to the output RSML file.
-     * @param mask The mask image used to identify the region of interest.
-     * @param imgRegT0 The registered image at time 0.
-     * @param toleranceDistToCentralLine The tolerance distance to the central line used in the Djikstra path extraction.
-     */
-    public static void backTrackPrimaries(String pathToInputRsml, String pathToOutputRsml, ImagePlus mask,
-                                          ImagePlus imgRegT0, double toleranceDistToCentralLine) {
-        RootModel rmInit = RootModel.RootModelWildReadFromRsml(pathToInputRsml);
-        Root[] prRoots = rmInit.getPrimaryRoots();
-        int X = mask.getWidth();
-        // int Y=mask.getHeight();
-        int xTolerance = X / 20;
 
-        for (Root r : prRoots) {
-            // System.out.println("\nDebugging Root ");
-            // System.out.println(r);
-            // Identify the first coordinates
-            Node oldFirst = r.firstNode;
-            int xMid = (int) oldFirst.x; // x coordinate of the first node
-            int yMid = (int) oldFirst.y; // y coordinate of the first node
-            System.out.println("Identified coordinates start=" + xMid + "," + yMid);
-
-            // Identify the mean height of region to attain in this area
-            int upperPix = 0;
-            for (int i = yMid; i >= 0; i--) {
-                if (mask.getPixel(xMid, i)[0] > 0)
-                    upperPix = i;
-            }
-            upperPix -= 10;// TODO
-
-            // Extract a rectangle around the first coordinate at time 0
-            ImagePlus imgExtractMask = VitimageUtils.cropImage(mask, Math.max(0, xMid - xTolerance),
-                    Math.max(0, upperPix), 0, xTolerance * 2 + 1, yMid - upperPix + 1, 1);
-            imgExtractMask.setDisplayRange(0, 1);
-            ImagePlus imgExtract = VitimageUtils.cropImage(imgRegT0, Math.max(0, xMid - xTolerance),
-                    Math.max(0, upperPix), 0, xTolerance * 2 + 1, yMid - upperPix + 1, 1);
-
-            // Extract a min djikstra path to this region
-            GraphPath<Pix, Bord> graph = VitimageUtils.getShortestAndDarkestPathInImage(imgExtract, 8,
-                    new Pix(xTolerance, 0, 0), new Pix(xTolerance, yMid - upperPix, 0));
-            List<Pix> liInit = graph.getVertexList();
-
-            // Find in this path the last point that is not in the interest area
-            int indFirst = 0;
-            for (int i = 0; i < graph.getLength(); i++) {
-                Pix p = liInit.get(i);
-                // System.out.println("Testing "+p+ " = "+imgExtractMask.getPixel(p.x, p.y)[0]);
-                if (imgExtractMask.getPixel(p.x, p.y)[0] < 1)
-                    indFirst = i;
-            }
-            indFirst += 7;// Fit to the mean
-            if (indFirst >= graph.getLength() - 1)
-                continue;// No path to add
-            List<Pix> liSecond = new ArrayList<Pix>();
-            for (int i = indFirst; i < graph.getLength(); i++) {
-                liSecond.add(liInit.get(i));
-            }
-
-            // subsample the new path
-            List<Integer> liNull = new ArrayList<Integer>();
-            List<Pix> list = DouglasPeuckerSimplify.simplify(liSecond, liNull, toleranceDistToCentralLine);
-            list.remove(list.size() - 1);
-            int x0 = xMid - xTolerance;
-            int y0 = upperPix;
-
-            // Insert the corresponding coordinates update time value along the root
-            Pix p = list.get(0);
-            Node n = new Node(p.x + x0, p.y + y0, 0, null, false);
-            r.firstNode = n;
-            for (int i = 1; i < list.size() - 1; i++) {
-                p = list.get(i);
-                n = new Node(p.x + x0, p.y + y0, 0.01f, n, true);
-            }
-            n.child = oldFirst;
-            oldFirst.parent = n;
-            r.updateNnodes();
-            r.computeDistances();
-            r.resampleFlyingPoints(rmInit.hoursCorrespondingToTimePoints);
-        }
-        rmInit.writeRSML3D(pathToOutputRsml, "", true, false);
-    }
-
-
-    //////////////////// HELPERS OF COMPUTEMASKS ////////////////////////
-    public static ImagePlus computeMire(ImagePlus imgIn) {
-        ImagePlus img = new Duplicator().run(imgIn, 1, 1, 1, 1, 1, 1);
-        IJ.run(img, "Median...", "radius=9 stack");
-        // img=concatPartsOfImages(img,imgIn,"Y",0.5); In case of, when will be the time
-        return img;
-    }
-
-    // Remove the falling stem of arabidopsis from a time lapse sequence imgMask
-    // contains all the root system, and imgMask2 only the part that cannot have a
-    // arabidopsis stem (the lower part)
-    // In this new version, we replace big elements of object with what was at last
-    // image
-    public static ImagePlus[] removeLeavesFromSequence(ImagePlus imgInit, ImagePlus imgMaskRoot,
-                                                       ImagePlus imgMask2Init) {
-        int factor = 1;
-        ImagePlus[] tabInit = VitimageUtils.stackToSlices(imgInit);
-        ImagePlus[] tabTot = VitimageUtils.stackToSlices(imgInit);
-        ImagePlus[] tabMaskOut = VitimageUtils.stackToSlices(imgInit);
-        ImagePlus[] tabMaskIn = VitimageUtils.stackToSlices(imgInit);
-        tabMaskOut[0] = VitimageUtils.nullImage(tabMaskOut[0]);
-        tabMaskIn[0] = VitimageUtils.invertBinaryMask(tabMaskOut[0]);
-        ImagePlus replacement = VitimageUtils.nullImage(tabInit[0]);
-
-        ImagePlus imgMaskAerialNot = VitimageUtils.invertBinaryMask(imgMask2Init);
-        for (int z = 1; z < tabInit.length; z++) {
-            // Get the mask of the big elements of object under the menisque
-            ImagePlus img = VitimageUtils.makeOperationBetweenTwoImages(tabInit[z], imgMaskRoot, 2, true);
-            img = MorphoUtils.dilationCircle2D(img, 2 * factor);
-            img = VitimageUtils.gaussianFiltering(img, 3 * factor, 3 * factor, 0);
-            ImagePlus biggas = VitimageUtils.thresholdImage(img, -100, 120);
-
-            tabMaskOut[z] = VitimageUtils.binaryOperationBetweenTwoImages(imgMaskAerialNot.duplicate(), biggas, 2);
-            tabMaskOut[z] = VitimageUtils.binaryOperationBetweenTwoImages(imgMaskRoot, tabMaskOut[z], 2);
-            tabMaskOut[z] = MorphoUtils.dilationCircle2D(tabMaskOut[z], 2 * factor);
-            tabMaskOut[z].setDisplayRange(0, 1);
-            tabMaskOut[z].setTitle(" " + z);
-
-            // Combine this mask with the one of the previous image
-            tabMaskOut[z] = VitimageUtils.binaryOperationBetweenTwoImages(tabMaskOut[z - 1], tabMaskOut[z], 1);
-            tabMaskOut[z] = VitimageUtils.connexe2dNoFuckWithVolume(tabMaskOut[z], 0.5, 1000, 1000, 1000000, 4, 0,
-                    true);
-            tabMaskOut[z] = VitimageUtils.thresholdImage(tabMaskOut[z], 0.5, 1000);
-            tabMaskOut[z] = VitimageUtils.getBinaryMaskUnary(tabMaskOut[z], 0.5);
-
-            tabMaskIn[z] = VitimageUtils.invertBinaryMask(tabMaskOut[z]);
-            ImagePlus maskNewArea = VitimageUtils.getBinaryMaskUnary(
-                    VitimageUtils.binaryOperationBetweenTwoImages(tabMaskOut[z], tabMaskOut[z - 1], 4), 0.5);
-            replacement = VitimageUtils.addition(replacement,
-                    VitimageUtils.multiply(maskNewArea, tabInit[z - 1], false), false);
-
-            ImagePlus imgPart1 = VitimageUtils.makeOperationBetweenTwoImages(tabMaskIn[z], tabInit[z], 2, false);
-            ImagePlus imgPart2 = VitimageUtils.makeOperationBetweenTwoImages(tabMaskOut[z], replacement, 2, false);
-            tabTot[z] = VitimageUtils.makeOperationBetweenTwoImages(imgPart1, imgPart2, 1, false);
-        }
-        ImagePlus img1 = VitimageUtils.slicesToStack(tabTot);
-        img1.setDisplayRange(0, 255);
-        ImagePlus img2 = VitimageUtils.slicesToStack(tabMaskOut);
-        img2.setDisplayRange(0, 1);
-        return new ImagePlus[]{img1, img2};
-    }
 
     public static void main(String[] args) {
-
+        ImageJ ij=new ImageJ();
+        String inventoryDir="/home/rfernandez/Bureau/A_Test/RootSystemTracker/JeanTrap/test2/Jean_trap-test/Inventory_of_jean_trap_out";
+        String processingDir="/home/rfernandez/Bureau/A_Test/RootSystemTracker/JeanTrap/test2/Jean_trap-test/Processing";
+        PipelineParamHandler pph=new PipelineParamHandler(inventoryDir, processingDir);
+        //doStepOnImg(5, 1, pph);
+        doStepOnImg(4, 1, pph);
+        System.out.println("Done");
     }
 
-    public static ImagePlus getMaskOfAreaInterestAtTime(ImagePlus imgReg, int time, boolean debug) {
-        ImagePlus imgMask1 = new Duplicator().run(imgReg, 1, 1, time, time, 1, 1);
-        if (debug)
-            imgMask1.duplicate().show();
-        imgMask1 = getMenisque(imgMask1, debug);
-        if (debug)
-            imgMask1.duplicate().show();
-        imgMask1 = VitimageUtils.invertBinaryMask(imgMask1);
-        imgMask1 = VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(imgMask1, 4, 1);
-        IJ.run(imgMask1, "8-bit", "");
-        if (debug)
-            imgMask1.duplicate().show();
-        imgMask1 = VitimageUtils.getBinaryMaskUnary(imgMask1, 0.5);
-        imgMask1.setDisplayRange(0, 1);
-        if (debug)
-            imgMask1.duplicate().show();
-        return imgMask1;
-    }
 
     /**
      * Draw rectangle in image.
@@ -1089,205 +835,172 @@ public class PipelineActionsHandler {
         return img;
     }
 
-    // TODO : give a geometrical meaning to the various params
-    public static ImagePlus getMenisque(ImagePlus img, boolean debug) {
-        // Compute the difference between a horizontal opening and a vertical opening
-        int factor = 1;
-        if (debug) {
-            ImagePlus im = img.duplicate();
-            im.setTitle("Init");
-            im.show();
-            IJ.showMessage("Original image for get menisque");
-        }
-        ImagePlus img2 = MorphoUtils.dilationLine2D(img, 8 * factor, false);
-        if (debug) {
-            ImagePlus im2 = img2.duplicate();
-            im2.setTitle("Im2");
-            im2.show();
-            IJ.showMessage("After vertical dilation");
-        }
-        img2 = MorphoUtils.erosionLine2D(img2, 8 * factor, false);
-        if (debug) {
-            ImagePlus im25 = img2.duplicate();
-            im25.setTitle("Im25");
-            im25.show();
-            IJ.showMessage("After vertical erosion");
-        }
-        ImagePlus img3 = MorphoUtils.dilationLine2D(img, 8 * factor, true);
-        if (debug) {
-            ImagePlus im3 = img3.duplicate();
-            im3.setTitle("Im3");
-            im3.show();
-            IJ.showMessage("After horizontal dilation");
-        }
-        img3 = MorphoUtils.erosionLine2D(img3, 8 * factor, true);
-        if (debug) {
-            ImagePlus im35 = img3.duplicate();
-            im35.setTitle("Im35");
-            im35.show();
-            IJ.showMessage("After horizontal erosion");
-        }
-        ImagePlus img4 = VitimageUtils.makeOperationBetweenTwoImages(img2, img3, 4, true);
-        img4 = drawRectangleInImage(img4, 0, 0, img4.getWidth(), yMaxStamp, 0);
-        if (debug) {
-            ImagePlus im4 = img4.duplicate();
-            im4.setTitle("Im4");
-            im4.show();
-            IJ.showMessage("After diff of 2 and 3 and removal of the stamp qr possible place");
-        }
 
-        // Open this difference, binarize and dilate, then select the biggest CC, and
-        // dilate it
-        ImagePlus img5 = MorphoUtils.dilationLine2D(img4, 100 * factor, true);
-        img5 = MorphoUtils.erosionLine2D(img5, 15 * factor, true);
-        if (debug) {
-            ImagePlus im5 = img5.duplicate();
-            im5.setTitle("Im5");
-            im5.show();
-            IJ.showMessage("After closing horizontally");
-        }
-        ImagePlus img6 = VitimageUtils.thresholdImage(img5, 20, 500);
-        if (debug) {
-            ImagePlus im6 = img6.duplicate();
-            im6.setTitle("Im6");
-            im6.show();
-            IJ.showMessage("After thresholding from 20 to 500");
-        }
-        img6 = MorphoUtils.dilationLine2D(img6, 50, true);
-        img6 = MorphoUtils.dilationLine2D(img6, 2 * factor, true);
-        img6 = MorphoUtils.dilationLine2D(img6, factor, false);
-        img6 = VitimageUtils.connexeBinaryEasierParamsConnexitySelectvol(img6, 4, 1);
-        img6 = MorphoUtils.dilationLine2D(img6, 3 * factor, false);
-        IJ.run(img6, "8-bit", "");
-        if (debug) {
-            ImagePlus im8 = img6.duplicate();
-            im8.setTitle("Im8");
-            im8.show();
-            IJ.showMessage("After many dilations and selection of best component");
-        }
-        return img6;
-    }
 
     //////////////////// HELPERS OF SPACETIMEMEANSHIFTSEGMENTATION
     //////////////////// ////////////////////////
-    public static ImagePlus projectTimeLapseSequenceInColorspaceCombined(ImagePlus imgSeq, ImagePlus interestMask1,
-                                                                         ImagePlus interestMaskN,
-                                                                         ImagePlus maskOfLeaves, int thresholdRupture,
-                                                                         int thresholdSlope) {
+    public static ImagePlus projectTimeLapseSequenceInColorspaceCombined(ImagePlus imgSeq,int thresholdRupture,
+                                                                         int thresholdSlope,String outputDataDir,PipelineParamHandler pph) {
         // imgSeq.show();
-        IJ.run(imgSeq, "Gaussian Blur...", "sigma=0.8");
-        // IJ.run(imgSeq, "Mean...", "radius=1 stack");
-        ImagePlus result1 = projectTimeLapseSequenceInColorspaceMaxRuptureDown(imgSeq, interestMask1, interestMaskN,
-                maskOfLeaves, thresholdRupture);
-        ImagePlus result2 = projectTimeLapseSequenceInColorspaceMaxSlope(imgSeq, interestMask1, interestMaskN,
-                thresholdSlope);
-        // result1.show();
-        // result1.setTitle("result1Rupt");
-        // result2.show();
-        // VitimageUtils.waitFor(5000000);
-        ImagePlus out = VitimageUtils.thresholdImage(result1, -0.5, 0.5);
-        out = VitimageUtils.invertBinaryMask(out);
-        ImagePlus mask = VitimageUtils.getBinaryMaskUnary(out, 0.5);
-        result2 = VitimageUtils.makeOperationBetweenTwoImages(result2, mask, 2, false);
-        return result2;
-    }
+        if(new File(outputDataDir, "MaskHandmadeForRootAreaSelection.tif").exists()){
+            ImagePlus imgMask = IJ.openImage(new File(outputDataDir, "MaskHandmadeForRootAreaSelection.tif").getAbsolutePath());
+            IJ.saveAsTiff(imgMask, new File(outputDataDir, "32_mask_at_tN.tif").getAbsolutePath());
 
-    public static ImagePlus projectTimeLapseSequenceInColorspaceMaxSlope(ImagePlus imgSeq, ImagePlus interestMask1,
-                                                                         ImagePlus interestMaskN, int threshold) {
-        int N = imgSeq.getStackSize();
-        ImagePlus[] imgTab = VitimageUtils.stackToSlices(imgSeq);
-        ImagePlus[] imgs = new ImagePlus[N];
-
-        for (int i = 0; i < N - 1; i++) {
-            imgs[i + 1] = VitimageUtils.makeOperationBetweenTwoImages(imgTab[i], imgTab[i + 1], 4, true);
-            imgs[i + 1] = VitimageUtils.makeOperationBetweenTwoImages(imgs[i + 1],
-                    i == 0 ? interestMask1 : interestMaskN, 2, true);
+                   
         }
-        imgs[0] = VitimageUtils.nullImage(imgs[1]);
-        ImagePlus res = VitimageUtils.indMaxOfImageArrayDouble(imgs, threshold);
-        return res;
+                    IJ.run(imgSeq, "Gaussian Blur...", "sigma=0.8");
+
+
+        ImagePlus[] imgTab = projectTimeLapseSequenceInColorspaceMaxRuptureSlopeProduct(imgSeq,thresholdRupture, thresholdSlope,outputDataDir,pph);
+        ImagePlus dateIdx = imgTab[0];      // meilleur i (1..N-1)
+        ImagePlus score   = imgTab[1];
+        
+
+        return dateIdx;//result2;
     }
 
-    public static ImagePlus projectTimeLapseSequenceInColorspaceMaxRuptureDown(ImagePlus imgSeq,
-                                                                               ImagePlus interestMask1,
-                                                                               ImagePlus interestMaskN,
-                                                                               ImagePlus maskOutLeaves,
-                                                                               int threshold) {
+
+
+
+
+    // add Loai 
+        // --- NEW: produit (ruptureDown × slope) et meilleur indice ---
+    public static ImagePlus[] projectTimeLapseSequenceInColorspaceMaxRuptureSlopeProduct(
+            ImagePlus imgSeq,
+            int minThresholdRupture,
+            int minThresholdSlope, String outputDataDir,PipelineParamHandler pph) {
+
+        // 1) Prépare les tranches et applique les masques d’intérêt
         ImagePlus[] tab = VitimageUtils.stackToSlices(imgSeq);
-        IJ.run(maskOutLeaves, "32-bit", "");
-        ImagePlus[] tabLeavesOut = VitimageUtils.stackToSlices(maskOutLeaves);
-        for (int i = 0; i < tab.length; i++) {
-            tab[i] = VitimageUtils.makeOperationBetweenTwoImages(tab[i], i < 2 ? interestMask1 : interestMaskN, 2,
-                    true);
-        }
-        ImagePlus res = indRuptureDownOfImageArrayDouble(tab, tabLeavesOut, threshold);
-        return res;
+        
+        
+        // 3) Calcule, pour chaque pixel, le produit (ruptureDownScore[i] × slope[i]) et choisit i* qui le maximise
+        ImagePlus[] out = valRuptureDownTimesSlopeProductOfImageArray(
+                tab, minThresholdRupture, minThresholdSlope,pph.backgroundIntensityLevel, pph.rootTissueIntensityLevel);
+
+        // Retourne { indices_du_max, valeur_du_produit_au_max }
+        return out;
     }
 
-    public static ImagePlus indRuptureDownOfImageArrayDouble(ImagePlus[] imgs, ImagePlus[] maskLeavesOut,
-                                                             int minThreshold) {
-        int xM = imgs[0].getWidth();
-        int yM = imgs[0].getHeight();
-        int zM = imgs[0].getStackSize();
-        ImagePlus retInd = VitimageUtils.nullImage(imgs[0].duplicate());
+
+    // --- NEW: helper pour calculer le max du produit par pixel ---
+    public static ImagePlus[] valRuptureDownTimesSlopeProductOfImageArray(
+            ImagePlus[] imgs,
+            int minThresholdRupture,
+            int minThresholdSlope,
+            double valMeanExpectedBefore,
+            double valMeanExpectedAfter) {
+
+        final int xM = imgs[0].getWidth();
+        final int yM = imgs[0].getHeight();
+        final int zM = imgs[0].getStackSize();
+        final int N = imgs.length;
+
+        ImagePlus retInd  = VitimageUtils.nullImage(imgs[0].duplicate()); // index du max-produit
+        ImagePlus retProd = VitimageUtils.nullImage(imgs[0].duplicate()); // valeur du max-produit
+        retProd = VitimageUtils.convertToFloat(retProd);
+
         float[] valsInd;
-        float[][] valsImg = new float[imgs.length][];
+        float[] valsProd;
+
+        boolean rootPassingImpliesHyperSignal=(valMeanExpectedAfter>valMeanExpectedBefore);
+        System.out.println("rootPassingImpliesHyperSignal = "+rootPassingImpliesHyperSignal);
+        System.out.println("valMeanExpectedBefore = "+valMeanExpectedBefore);
+        System.out.println("valMeanExpectedAfter = "+valMeanExpectedAfter);
+        System.out.println("minThresholdRupture = "+minThresholdRupture);
+        System.out.println("minThresholdSlope = "+minThresholdSlope);
+        // Buffers temporels
+        float[][] valsImg  = new float[imgs.length][];
         float[][] valsMask = new float[imgs.length][];
-        double[] valsToDetect;
-        double[] valsToMask;
+
         for (int z = 0; z < zM; z++) {
-            valsInd = (float[]) retInd.getStack().getProcessor(z + 1).getPixels();
+            valsInd  = (float[]) retInd.getStack().getProcessor(z + 1).getPixels();
+            valsProd = (float[]) retProd.getStack().getProcessor(z + 1).getPixels();
             for (int i = 0; i < imgs.length; i++) {
-                valsImg[i] = (float[]) imgs[i].getStack().getProcessor(z + 1).getPixels();
-                valsMask[i] = (float[]) maskLeavesOut[((i < 2) ? 0 : i - 1)].getStack().getProcessor(z + 1).getPixels();
+                valsImg[i]  = (float[]) imgs[i].getStack().getProcessor(z + 1).getPixels();
             }
+
             for (int x = 0; x < xM; x++) {
                 for (int y = 0; y < yM; y++) {
-                    int last = 0;
-                    valsToDetect = new double[imgs.length];
-                    valsToMask = new double[imgs.length];
-                    for (int i = 0; i < imgs.length; i++) {
-                        valsToDetect[i] = valsImg[i][xM * y + x];
-                        valsToMask[i] = valsMask[i][xM * y + x];
-                        if (valsToMask[i] < 1)
-                            last = i;
+
+                    boolean debug=false && (x==1026) && (y==227);
+                    // Série temporelle du pixel
+                    double[] s = new double[N];
+                    for (int i = 0; i < N; i++) s[i] = valsImg[i][xM * y + x];
+                    if(debug){
+                        System.out.println("Pixel ("+x+","+y+") : time series = "+Arrays.toString(s));
                     }
-                    boolean blabla = x == 377 && y == 133;
-                    double[] newTab = new double[last + 1];
-                    System.arraycopy(valsToDetect, 0, newTab, 0, last + 1);
-                    int rupt = ruptureDetectionDown(newTab, minThreshold, blabla);
-                    valsInd[xM * y + x] = rupt;
+                    // Scores "rupture down" pour chaque coupure i (i>=1)
+                    double[] rupt = ruptureDownScores(s,valMeanExpectedBefore); // longueur = last+1, rupt[0]=0
+                    double[] diff= localSlopeScore(s,valMeanExpectedBefore);
+                    int    argMax = 0;
+                    double maxP   = 0.0;
+                    if(debug){
+                        System.out.println("Pixel ("+x+","+y+") : rupt = "+Arrays.toString(rupt));
+                        System.out.println("Pixel ("+x+","+y+") : diff = "+Arrays.toString(diff));
+                    }
+                    for (int i = 0; i <N; i++) {
+                        double r=0;
+                        double m=0;
+                        //
+                        if(rootPassingImpliesHyperSignal){
+                            //No need of inverting the values. Eliminating negative slopes and ruptures
+                            r = Math.max(0, rupt[i]-minThresholdRupture);
+                            m = Math.max(0, diff[i]-minThresholdSlope);
+                        }
+                        else{
+                            //Inverting the values to detect negative slopes and ruptures
+                            r = Math.max(0, -rupt[i]-minThresholdRupture);
+                            m = Math.max(0, -diff[i]-minThresholdSlope);
+                        }
+
+                        //TODO
+                        double prod = r * m;
+                        if (prod > maxP) { maxP = prod; argMax = (i+1); }
+                    }
+
+                    valsInd [xM * y + x] = argMax;
+                    valsProd[xM * y + x] = (float) maxP;
                 }
             }
         }
-        return retInd;
+        return new ImagePlus[]{retInd, retProd};
     }
 
-    // Return the index which is the first point of the second distribution
-    public static int ruptureDetectionDown(double[] vals, double threshold, boolean blabla) {
-        int indMax = 0;
-        double diffMax = -10000000;
+    // for i =0..N-1, gives the mean of the difference of the points 0...i-1 and points i..N-1
+    // Specific case : i=0 => mean of all - meanExpectedValueBefore
+    public static double[] ruptureDownScores(double[] vals,
+                                             double meanExpectedValueBefore) {
         int N = vals.length;
+        double[] scores = new double[N];
+        double []meanBefore=new double[N];
+        double []meanAfter=new double[N];
+
         for (int i = 1; i < N; i++) {
-            double m1 = meanBetweenIncludedIndices(vals, 0, i - 1);
-            double m2 = meanBetweenIncludedIndices(vals, i, N - 1);
-            double diff = m1 - m2;
-            if (diff > diffMax) {
-                indMax = i;
-                diffMax = diff;
+            double avgBef=0;
+            double avgAft=0;
+            for(int j=0;j<i;j++) {
+                avgBef+=vals[j];
             }
-            if (blabla) {
-                // System.out.println("Apres i="+i+" : indMax="+indMax+" diffMax="+diffMax+" et
-                // on avait m1="+m1+" et m2="+m2);
+            for(int j=i;j<N;j++) {
+                avgAft+=vals[j];
             }
+            avgBef/=(i);
+            avgAft/=(N-i);
+            scores[i]=avgAft-avgBef;            
         }
-        return (diffMax > threshold ? indMax : 0);
+        scores[0]=VitimageUtils.statistics1D(vals)[0]-meanExpectedValueBefore;
+        return scores;
     }
 
-    public static double meanBetweenIncludedIndices(double[] tab, int ind1, int ind2) {
-        double tot = 0;
-        for (int i = ind1; i <= ind2; i++)
-            tot += tab[i];
-        return (tot / (ind2 - ind1 + 1));
+
+    public static double[] localSlopeScore(double[] vals,double meanExpectedValueBefore) {
+        int N = vals.length;
+        double[] diffs = new double[N];
+        diffs[0] = vals[0]-meanExpectedValueBefore;
+        for (int i = 1; i < N; i++) {
+            diffs[i] = vals[i] - vals[i - 1];
+        }
+        return diffs;
     }
 }

@@ -3,6 +3,7 @@ package io.github.rocsg.topologicaltracking;
 import org.jgrapht.graph.DefaultWeightedEdge;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 
 public class ConnectionEdge extends DefaultWeightedEdge implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -10,7 +11,7 @@ public class ConnectionEdge extends DefaultWeightedEdge implements Serializable 
     public double connectionX;
     public double connectionY;
     public double distanceConnectionTrunk = 0;
-    public boolean activated = true;
+    public boolean activated = false;
     public CC source;
     public boolean isOut = false;
     public CC target;
@@ -18,7 +19,17 @@ public class ConnectionEdge extends DefaultWeightedEdge implements Serializable 
     public int axisY;
     public int nFacets;
     public boolean trunk = false;
-
+    public double[]hintVector;
+    public double hintDistance;
+    double cost=0;
+    ArrayList<CC> pathOfCC;
+    public int stepOfActivation;
+    public int stunningLevel = 0; // if the connection is stunning (suspicious)
+    
+    // Détails des problèmes détectés (pour debugging et résolution)
+    public ArrayList<String> stunningReasons = new ArrayList<>(); // Types de problèmes détectés
+    public ArrayList<Double> stunningMADValues = new ArrayList<>(); // Valeurs de MAD associées (si applicable)
+    public ArrayList<double[]> hiddenConnectingFacets= new ArrayList<>(); // Facets cachées traversant les CC
 
     public ConnectionEdge(double connectionX, double connectionY, int nFacets, CC source, CC target, double axisX,
                           double axisY) {
