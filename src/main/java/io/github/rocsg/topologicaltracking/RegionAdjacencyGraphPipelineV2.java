@@ -3089,23 +3089,34 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
     public static RootModel buildStep9RefinePlongement(SimpleDirectedWeightedGraph<CC, ConnectionEdge> graph,
                                                       /*ImagePlus notUseddistOut,*/ PipelineParamHandler pph, int indexImg) {
         System.out.println("Running the plongement");
+        
 
-        CC ccTest=getCCWithResolution(graph, 5555,3085);
-        System.out.println("ccTest orde="+ccTest.order);
-        for(ConnectionEdge e:graph.outgoingEdgesOf(ccTest)){
-            if(e.activated){
-                System.out.println("Outgoing edge from CC 5555-3085 : to "+e.target+" , hidden = "+e.hidden+" , activated = "+e.activated+" , target order = "+e.target.order);
-            }
+        boolean simplerSimplify = false;
+        boolean debugPrim = false;
+        boolean debugLat = false;
+        double toleranceDistToCentralLine = pph.toleranceDistanceForBeuckerSimplification;
+
+        double[] hoursExtremities = pph.getHoursExtremities(indexImg);
+        hoursExtremities[0] = hoursExtremities[1];
+        ArrayList<Root> listRprim = new ArrayList<Root>();
+        ArrayList<Integer> listNprim = new ArrayList<Integer>();
+        ArrayList<Integer> listDprim = new ArrayList<Integer>();
+        ArrayList<ArrayList<Root>> listRlat = new ArrayList<ArrayList<Root>>();
+        ArrayList<ArrayList<Integer>> listNlat = new ArrayList<ArrayList<Integer>>();
+        ArrayList<ArrayList<Integer>> listDlat = new ArrayList<ArrayList<Integer>>();
+        for(int i=0;i<Utils.MAX_ORDER_ROOTS;i++){
+            listRlat.add(new ArrayList<Root>());
+            listNlat.add(new ArrayList<Integer>());
+            listDlat.add(new ArrayList<Integer>());
         }
+
+        
         //Prepare output data storage
         FSR sr = (new FSR());
         sr.initialize();
         RootModel rm = new RootModel();
         rm.pixelSize = (float) (pph.originalPixelSize * pph.subsamplingFactor);
-        double[] hoursExtremities = pph.getHoursExtremities(indexImg);
-        hoursExtremities[0] = hoursExtremities[1];
         rm.setHoursFromPph(pph.getHoursExtremities(indexImg));
-        double toleranceDistToCentralLine = pph.toleranceDistanceForBeuckerSimplification;
 
 
         //Exclude cc that were outed
@@ -3116,7 +3127,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
         //Identify some features of vertices
         for (CC cc : graph.vertexSet()) {
-            if (cc.order==1){
+            if (cc.order==1){ 
 
                 if (cc.bestIncomingActivatedCC()==null) cc.isPrimStart = true;
                 if (cc.bestOutgoingActivatedCC() == null) cc.isPrimEnd = true;
@@ -3129,29 +3140,13 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 if (cc.bestOutgoingActivatedCC() == null) cc.isLatEnd = true;
             }
         }
-        ArrayList<Root> listRprim = new ArrayList<Root>();
-        ArrayList<Integer> listNprim = new ArrayList<Integer>();
-        ArrayList<Integer> listDprim = new ArrayList<Integer>();
-        ArrayList<ArrayList<Root>> listRlat = new ArrayList<ArrayList<Root>>();
-        ArrayList<ArrayList<Integer>> listNlat = new ArrayList<ArrayList<Integer>>();
-        ArrayList<ArrayList<Integer>> listDlat = new ArrayList<ArrayList<Integer>>();
-        for(int i=0;i<Utils.MAX_ORDER_ROOTS;i++){
-            listRlat.add(new ArrayList<Root>());
-            listNlat.add(new ArrayList<Integer>());
-            listDlat.add(new ArrayList<Integer>());
-        }
-        boolean simplerSimplify = false;
-        boolean debugPrim = false;
-        boolean debugLat = false;
+
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// Primary
-        //Processing primary roots
-        //dessiner la somme des pathlines des racines et l'associer aux CC.
+        //Extracting components of naturally connected CC for each primary root (excluding the hidden connections)
         for (CC cc : graph.vertexSet()) {
             if ((!cc.isPrimStart)) continue;
-            debugPrim=false;//DEBUG PRIM
-            if (debugPrim) System.out.println("\nPROCESSING PLANT primary, starting with CC " + cc);
-            //Identification of connected part of the root
+            if (debugPrim) System.out.println("\nProcessing a primary, starting with CC " + cc);
             CC ccNext = cc;
             ArrayList<ArrayList<CC>> llcc = new ArrayList<ArrayList<CC>>();
             ArrayList<ArrayList<Integer>> toKeep = new ArrayList<ArrayList<Integer>>();
@@ -3164,8 +3159,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
             listDprim.add(llcc.get(0).get(0).day);
             int ind = 0;
             while (ccNext.getChild() != null) {
-                if (ccNext.isHiddenChild()) {
-                    if (debugPrim) System.out.println("Next CC is hidden");
+                if (ccNext.hasHiddenChild()) {
                     llcc.add(new ArrayList<CC>());
                     ind++;
                 }
@@ -3174,21 +3168,58 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 listNprim.add(ccNext.n);
                 listDprim.add(ccNext.day);
                 llcc.get(ind).add(ccNext);
-                if (debugPrim) System.out.println("Adding " + ccNext + " to array number " + ind);
+            }
+
+            //removal of connected part of CCs that are exactly one CC but not the start or end)
+            if (llcc.size() >= 3) {
+                ArrayList<ArrayList<CC>> llccNew = new ArrayList<ArrayList<CC>>();
+                llccNew.add(llcc.get(0));
+                for (int i = 1; i < (llcc.size() - 1); i++) {
+                    if (llcc.get(i).size() > 1) {
+                        llccNew.add(llcc.get(i));
+                    }
+                }
+                llccNew.add(llcc.get(llcc.size() - 1));
+                llcc = llccNew;
+            }
+
+            //Identification of components of hidden (meaning, chains of CC connected by hidden edges strictly) within the chain of .getChild(), starting from cc, and finishing with the last child
+            ccNext=cc;
+            ArrayList<ArrayList<CC>> llccHidden = new ArrayList<ArrayList<CC>>();
+            ArrayList<CC>lccHiddenFuse=new ArrayList<CC>();
+            while (ccNext.getChild() != null) {
+                if (ccNext.hasHiddenChild()) {
+                    //Start of hidden chain
+                    ArrayList<CC> lccHidden = new ArrayList<CC>();
+                    lccHidden.add(ccNext);
+                    ccNext = ccNext.getChild();
+                    while (ccNext != null && ccNext.hasHiddenParent()) {
+                        lccHidden.add(ccNext);
+                        if (ccNext.getChild() != null)ccNext = ccNext.getChild();
+                        else break;
+                    }
+                    llccHidden.add(lccHidden);
+                    CC ccFuseHidden = CC.fuseListOfCCIntoSingleCC(lccHidden);
+                    lccHiddenFuse.add(ccFuseHidden);
+                } else {
+                    ccNext = ccNext.getChild();
+                }
             }
 
 
-            //Dijkstra path processing of the respective parts separated
-            //Compute starting distance (when be for lateral)
+
+
+
+            //Dijkstra path processing of the visible respective parts separated. Compute starting distance (when be for lateral)
             double startingDistance = 0;
+            double cumulatedDistance = startingDistance;
             ArrayList<Double> distInter = new ArrayList<Double>();
             ArrayList<Double> timeInter = new ArrayList<Double>();
-            double cumulatedDistance = startingDistance;
-            int[] nextSource = null;
-            int[] currentSource = null;
-            int[] currentTarget = null;
-            int[] previousTarget = null;
-            debugPrim=false;
+            int[] nextSourceAbs = null;
+            int[] currentSourceAbs = null;
+            int[] currentTargetAbs = null;
+            int[] previousTargetAbs = null;
+
             for (int indl = 0; indl < llcc.size(); indl++) {
                 toKeep.add(new ArrayList<Integer>());
                 List<CC> lcc = llcc.get(indl);
@@ -3197,44 +3228,50 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 CC ccLast = lcc.get(nCC - 1);
 
                 //Identify starting point
-                if (indl > 0) {//It is at least the second connected component
-                    currentSource = nextSource;
-                    cumulatedDistance += VitimageUtils.distance(previousTarget[0], previousTarget[1],
-                            currentSource[0] + ccFirst.xMin, currentSource[1] + ccFirst.yMin);
-                } else {
-                    currentSource = ccFirst.getExpectedSource();
+                if (indl > 0) {//It is at least the second connected component, thus source have been established previously
+                    currentSourceAbs = nextSourceAbs;
+                    cumulatedDistance += VitimageUtils.distance(previousTargetAbs[0], previousTargetAbs[1],
+                            currentSourceAbs[0], currentSourceAbs[1]);
+                } else {//Get the lower y pixel if prim start, or the facet connexion else
+                    currentSourceAbs = ccFirst.getExpectedSource();
+                    currentSourceAbs = new int[]{currentSourceAbs[0]+ccFirst.xMin, currentSourceAbs[1]+ccFirst.yMin};
                 }
                 //Identify target point
                 if (ccLast.getChild() == null) {
                     //End of primary : Identify target in ccLast
                     int[] coords = ccLast.getExpectedSource();
-                    currentTarget = ccLast.determineTargetGeodesicallyFarestFromTheSource(coords);
+                    currentTargetAbs = ccLast.determineTargetGeodesicallyFarestFromTheSource(coords);
+                    currentTargetAbs = new int[]{currentTargetAbs[0] + ccLast.xMin, currentTargetAbs[1] + ccLast.yMin};
                 } else {
-                    //Identify source in next, then target in this
+                    //Identify source in next, then target in this - use facettes from the edge
                     CC ccFirstNext = ccLast.getChild();
-                    int[] coords = ccLast.getExpectedSource();
-                    int[][] sourceTarget = cc.findHiddenStartStopToInOtherCC(ccFirstNext, coords);
-                    nextSource = sourceTarget[1];
-                    currentTarget = sourceTarget[0];
-                    previousTarget = new int[]{sourceTarget[0][0], sourceTarget[0][1]};
-                    previousTarget[0] += ccLast.xMin;
-                    previousTarget[1] += ccLast.yMin;
+                    ConnectionEdge edgeToNext = graph.getEdge(ccLast, ccFirstNext);
+                    
+                    // Use facette coordinates directly - they are in absolute coordinates
+                    // We'll convert to ccFuse-relative coordinates after creating ccFuse
+                    //TODO : danger with 0.5 facets
+
+
+                    Pix p=ccLast.getNearestPix(edgeToNext.hiddenConnectingFacets.get(0)[0], edgeToNext.hiddenConnectingFacets.get(0)[1]);
+                    currentTargetAbs=new int[]{p.x+ccLast.xMin,p.y+ccLast.yMin};
+                    previousTargetAbs = new int[]{currentTargetAbs[0], currentTargetAbs[1]};
+                    
+                    p=ccFirstNext.getNearestPix(edgeToNext.hiddenConnectingFacets.get(edgeToNext.hiddenConnectingFacets.size()-1)[0], edgeToNext.hiddenConnectingFacets.get(edgeToNext.hiddenConnectingFacets.size()-1)[1]);
+                    nextSourceAbs = new int[]{p.x+ccFirstNext.xMin,p.y+ccFirstNext.yMin};
+
+
                 }
 
-                //Compute dijkstra path
+                //Compute dijkstra path within ccFuse
                 CC ccFuse = CC.fuseListOfCCIntoSingleCC(llcc.get(indl));
                 lccFuse.add(ccFuse);
-                currentSource[0] += (ccFirst.xMin - ccFuse.xMin);
-                currentSource[1] += (ccFirst.yMin - ccFuse.yMin);
-                currentTarget[0] += (ccLast.xMin - ccFuse.xMin);
-                currentTarget[1] += (ccLast.yMin - ccFuse.yMin);
-                ccFuse.determineVoxelShortestPath(currentSource, currentTarget, 8, null);
+                int[]sourc=new int[]{currentSourceAbs[0]-ccFuse.xMin,currentSourceAbs[1]-ccFuse.yMin};
+                int[]targ=new int[]{currentTargetAbs[0]-ccFuse.xMin,currentTargetAbs[1]-ccFuse.yMin};
+                ccFuse.determineVoxelShortestPath(sourc, targ, 8, null);
                 cumulatedDistance = ccFuse.setDistancesToMainDijkstraPath(cumulatedDistance);
 
 
-                //Evaluate the timing along dijkstra path
-                //Set first pixel to birthDate of root
-                //Walking along dijkstraPath, and attribute to each a componentIndex
+                //Evaluate the timing along dijkstra path. Set first pixel to birthDate of root, walking along dijkstraPath, and attribute to each a componentIndex
                 int[] indices = new int[ccFuse.mainDjikstraPath.size()];
                 for (int n = 0; n < ccFuse.mainDjikstraPath.size(); n++) {
                     Pix p = ccFuse.mainDjikstraPath.get(n);
@@ -3252,8 +3289,6 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 if (indl == 0) {
                     timeInter.add((double) (lcc.get(0).day - 1));
                     distInter.add(ccFuse.mainDjikstraPath.get(0).wayFromPrim);
-                    if (debugPrim)
-                        System.out.println("Adding a point at indl=" + indl + " indcc=" + 0 + " time=" + timeInter.get(timeInter.size() - 1) + " dist=" + distInter.get(timeInter.size() - 1));
                 }
 
                 //For each component except the last, identify the last point of it and If necessary, add the last
@@ -3279,8 +3314,8 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     distInter.add(ccFuse.mainDjikstraPath.get(ccFuse.mainDjikstraPath.size() - 1).wayFromPrim);
                     timeInter.add((double) (lcc.get(lcc.size() - 1).day));
                 }
-
             }
+            
             //Convert results of correspondance into double tabs
             int N = distInter.size();
             double[] xPoints = new double[N];
@@ -3300,9 +3335,6 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 //Propagate distance into the ccFuse's
                 ccF.updateAllDistancesToTrunk();
 
-                System.out.println("Debug about timeOut");
-                System.out.println(yPointsHours[0]+"  "+yPointsHours[yPointsHours.length-1]);
-
                 //Convert distance into time
                 for (Pix p : ccF.pixGraph.vertexSet()) {
                     p.time = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPoints);
@@ -3310,6 +3342,17 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
                     p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
                     yPointsHours);
+                }
+                
+                // Also calculate time for pixels in mainDjikstraPath that may not be in pixGraph
+                for (Pix p : ccF.mainDjikstraPath) {
+                    if (p.time == -1.0 || p.time == 0.0) {  // Only update if not already set
+                        p.time = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPoints);
+                        p.timeOut = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints, yPoints);
+                        p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
+                        p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
+                        yPointsHours);
+                    }
                 }
 
                 //Back copy to the initial CCs
@@ -3356,30 +3399,24 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
 
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Processing lateral roots
-        //dessiner la somme de pathlines des racines et l'associer aux CC.
+        ////// Processing lateral roots /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
         for(int order=2;order<=Utils.MAX_ORDER_ROOTS;order++){
             int incrLat = 1;
             for (CC cc : graph.vertexSet()) {
                 if (!cc.isLatStart) continue;
                 if(cc.order!=order)continue;
+                debugLat=false; 
                 
-                                                   
-
-                debugLat = (cc==getCCWithResolution(graph, 5850, 1633));//DEBUG LAT
-                if (debugLat)
+               if (debugLat)
                     System.out.println("\n\n\nProcessing lateral root #" + (incrLat++) + " : " + cc + " with order "+cc.order+"  whose source is" +cc.bestIncomingActivatedCC()+ "   "+cc.bestIncomingActivatedEdge().source.day+"-"+ cc.bestIncomingActivatedEdge().source.n+" with order "+cc.bestIncomingActivatedEdge().source.order);
                     
                 //Identification of correspondant n-1th order
                 Root myParent = null;
                 if(order==2){
                     for (int i = 0; i < listRprim.size(); i++) {
-                        if (debugLat)
-                            System.out.println("Looking for " + cc.bestIncomingActivatedEdge().source + "    testing a " +
-                                    "Dprim-Nprim " + listDprim.get(i) + "-" + listNprim.get(i));
                         if (listNprim.get(i) == cc.bestIncomingActivatedEdge().source.n && listDprim.get(i) == cc.bestIncomingActivatedEdge().source.day) {
                             myParent = listRprim.get(i);
-                            if (debugLat) System.out.println(" \n\nTHIS ONE ! ");
                             break;
                         }
                     }
@@ -3387,18 +3424,19 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
                 }else{
                     for (int i = 0; i < listRlat.get(order-1).size(); i++) {
-                        if (debugLat)
-                            System.out.println("Looking for " + cc.bestIncomingActivatedEdge().source + "    testing a " +
-                                    "Dlat-Nlat " + listDlat.get(order-1).get(i) + "-" + listNlat.get(order-1).get(i));
+                        if (debugLat)System.out.println("Testing potential parent root : "+listRlat.get(order-1).get(i)+" with n="+listNlat.get(order-1).get(i)+" and d="+listDlat.get(order-1).get(i));
                         if (listNlat.get(order-1).get(i) == cc.bestIncomingActivatedEdge().source.n && listDlat.get(order-1).get(i) == cc.bestIncomingActivatedEdge().source.day) {
                             myParent = listRlat.get(order-1).get(i);
-                            if (debugLat) System.out.println(" \n\nTHIS ONE ! ");
+                            if (debugLat) System.out.println("Found parent root : " + myParent);
                             break;
                         }
                     }
                 }
 
-                if(debugLat)System.out.println("Found parent root : "+myParent+"\n");
+                if(debugLat){
+                    System.out.println("Found parent root : "+myParent+"\n");
+                    waitForLong();
+                }
 
                 //Identification of connected part of the root
                 CC ccNext = cc;
@@ -3414,11 +3452,11 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
                 if (debugLat){
                     System.out.println("Just added the first CC of lateral root : "+ccNext);
-                    //VitimageUtils.waitFor(60000000);
                 }
                 int ind = 0;
                 while (ccNext.getChild() != null) {
-                    if (ccNext.isHiddenChild()) {
+                    if (ccNext.hasHiddenChild()) {
+                        if(debugLat)System.out.println("Hidden !");
                         llcc.add(new ArrayList<CC>());
                         ind++;
                     }
@@ -3427,27 +3465,25 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     listNlat.get(order).add(ccNext.n);
                     listDlat.get(order).add(ccNext.day);
                     if (debugLat){
-                        System.out.println("Added CC to lateral root : "+ccNext);
-                        
+                        System.out.println("Added CC to lateral root : "+ccNext);                        
                     }
 
 
                     llcc.get(ind).add(ccNext);
-                    //if(debugCC)	System.out.println(" -> Adding "+ccNext+" to array number "+ind);
                 }
-            //Separate dijkstra path processing of the respective parts
-                //LATERAL ROOTS//////////////////////////////////////////////////////////////////////////////////////
-                //Compute starting distance (when be for lateral)
+
+                //Separate dijkstra path processing of the respective parts
                 double startingDistance = 0;
                 ArrayList<Double> distInter = new ArrayList<Double>();
                 ArrayList<Double> timeInter = new ArrayList<Double>();
                 double cumulatedDistance = startingDistance;
-                int[] nextSource = null;
-                int[] previousTarget = null;
-                int[] currentSource = null;
-                int[] currentTarget = null;
+                int[] nextSourceAbs = null;
+                int[] previousTargetAbs = null;
+                int[] currentSourceAbs = null;
+                int[] currentTargetAbs = null;
 
                 for (int indl = 0; indl < llcc.size(); indl++) {
+                    if(debugLat)System.out.println("\n\nStarting processing of segment number"+indl+" of lateral root ");
                     toKeep.add(new ArrayList<Integer>());
                     List<CC> lcc = llcc.get(indl);
                     int nCC = lcc.size();
@@ -3456,59 +3492,64 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     CC ccFuse = CC.fuseListOfCCIntoSingleCC(llcc.get(indl));
                     lccFuse.add(ccFuse);
                     boolean debug = false;
-                    //if(ccLast==getCC(graph, 4245,4237))debug=true;
-                    //System.out.println("Debug !");
+                   
                     //Identify starting point
                     if (indl > 0) {//It is at least the second connected component
-                        currentSource = nextSource;
-                        cumulatedDistance += VitimageUtils.distance(previousTarget[0], previousTarget[1],
-                                currentSource[0] + ccFirst.xMin, currentSource[1] + ccFirst.yMin);
-                    } else currentSource = ccFirst.getExpectedSource();
-
+                        currentSourceAbs = nextSourceAbs;
+                        cumulatedDistance += VitimageUtils.distance(previousTargetAbs[0], previousTargetAbs[1],
+                                currentSourceAbs[0], currentSourceAbs[1]);
+                    } else {
+                        currentSourceAbs = ccFirst.getExpectedSource();
+                        currentSourceAbs = new int[]{currentSourceAbs[0] + ccFirst.xMin, currentSourceAbs[1] + ccFirst.yMin};
+                    }
 
                     if (indl == (llcc.size() - 1)) {
                         //Identify target point
-                        if (debug) System.out.println("End of lateral : " + lcc.get(lcc.size() - 1));
+                        if (debugLat) System.out.println("End of lateral : " + lcc.get(lcc.size() - 1));
                         int[] coords = ccFirst.getNextSourceFromFacetConnexion(ccFirst.bestIncomingActivatedEdge());
-                        //currentSource;
                         coords = new int[]{coords[0] + ccFirst.xMin - ccFuse.xMin, coords[1] + ccFirst.yMin - ccFuse.yMin};
-                        currentTarget = ccFuse.determineTargetGeodesicallyFarestFromTheSource(coords);
-                        currentTarget[0] += (ccFuse.xMin - ccLast.xMin);
-                        currentTarget[1] += (ccFuse.yMin - ccLast.yMin);
-                        if (debug)
-                            System.out.println("Coords target of last = " + currentTarget[0] + "," + currentTarget[1]);
+
+                        currentTargetAbs = ccFuse.determineTargetGeodesicallyFarestFromTheSource(coords);
+                        currentTargetAbs[0] += (ccFuse.xMin);
+                        currentTargetAbs[1] += (ccFuse.yMin);
+                        
                     } else {
-                        //Identify source in next, then target in this
+                        if(debugLat)System.out.println("Hidden connection to next segment of lateral root.");
+                        //Identify source in next, then target in this - use facettes from the edge
                         CC ccFirstNext = ccLast.getChild();
-                        int[] coords = ccLast.getExpectedSource();
-                        int[][] sourceTarget = ccLast.findHiddenStartStopToInOtherCC(ccFirstNext, coords);
-                        nextSource = sourceTarget[1];
-                        currentTarget = sourceTarget[0];
-                        previousTarget = new int[]{sourceTarget[0][0], sourceTarget[0][1]};
-                        previousTarget[0] += ccLast.xMin;
-                        previousTarget[1] += ccLast.yMin;
+                        if(debugLat)System.out.println("ccFirstNext = "+ccFirstNext );
+                        
+                        ConnectionEdge edgeToNext = graph.getEdge(ccLast, ccFirstNext);
+                        if(debugLat)System.out.println("edgeToNext = "+edgeToNext);
+
+                        // Use facette coordinates directly - they are in absolute coordinates
+                        // So we convert them directly to ccFuse-relative coordinates
+                        if(debugLat)System.out.println("Debug : nb of hidden facets = "+edgeToNext.hiddenConnectingFacets.size());
+                        if(debugLat)System.out.println("Debug : first hidden facet = "+Arrays.toString(edgeToNext.hiddenConnectingFacets.get(0)));
+                        if(debugLat)System.out.println("Debug : last hidden facet = "+Arrays.toString(edgeToNext.hiddenConnectingFacets.get(edgeToNext.hiddenConnectingFacets.size()-1)));
+                        Pix p=ccLast.getNearestPix(edgeToNext.hiddenConnectingFacets.get(0)[0], edgeToNext.hiddenConnectingFacets.get(0)[1]);
+                        currentTargetAbs=new int[]{p.x+ccLast.xMin,p.y+ccLast.yMin};
+                        previousTargetAbs = new int[]{currentTargetAbs[0], currentTargetAbs[1]};
+                        if(debugLat)System.out.println("currentTargetAbs = "+Arrays.toString(currentTargetAbs));
+
+                        p=ccFirstNext.getNearestPix(edgeToNext.hiddenConnectingFacets.get(edgeToNext.hiddenConnectingFacets.size()-1)[0], edgeToNext.hiddenConnectingFacets.get(edgeToNext.hiddenConnectingFacets.size()-1)[1]);
+                        nextSourceAbs = new int[]{p.x+ccFirstNext.xMin,p.y+ccFirstNext.yMin};
+                        if(debugLat)System.out.println("nextSourceAbs = "+Arrays.toString(nextSourceAbs));
+                        
+
                     }
 
                     //Compute dijkstra path
-                    currentSource[0] += (ccFirst.xMin - ccFuse.xMin);
-                    currentSource[1] += (ccFirst.yMin - ccFuse.yMin);
-                    currentTarget[0] += (ccLast.xMin - ccFuse.xMin);
-                    currentTarget[1] += (ccLast.yMin - ccFuse.yMin);
-
-                    if (debug) {
-                        ccFuse.drawDist().show();
-                        System.out.println("Coords source of fuse = " + currentSource[0] + "," + currentSource[1]);
-                        System.out.println("Coords target of fuse = " + currentTarget[0] + "," + currentTarget[1]);
-                    }
-
-                    ccFuse.determineVoxelShortestPath(currentSource, currentTarget, 8, null);
+                    int[]sourc=new int[]{currentSourceAbs[0]-ccFuse.xMin,currentSourceAbs[1]-ccFuse.yMin};
+                    int[]targ=new int[]{currentTargetAbs[0]-ccFuse.xMin,currentTargetAbs[1]-ccFuse.yMin};
+                    ccFuse.determineVoxelShortestPath(sourc, targ, 8, null);
+                    if (debugLat) System.out.print("CumulatedDistance = "+cumulatedDistance);
                     cumulatedDistance = ccFuse.setDistancesToMainDijkstraPath(cumulatedDistance);
-                    if (debug) System.out.println("Lenght of path=" + ccFuse.mainDjikstraPath.size());
-                    //(60000000);
+                    if (debugLat) System.out.println("   updated to = "+cumulatedDistance);
+                    if (debugLat) System.out.println("Lenght of the path of this segment=" + ccFuse.mainDjikstraPath.size());
+
 
                     //Evaluate the timing along dijkstra path
-                    //Set first pixel to birthDate of root
-                    //Walking along dijkstraPath, and attribute to each a componentIndex
                     int[] indices = new int[ccFuse.mainDjikstraPath.size()];
                     for (int n = 0; n < ccFuse.mainDjikstraPath.size(); n++) {
                         Pix p = ccFuse.mainDjikstraPath.get(n);
@@ -3528,7 +3569,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                         distInter.add(ccFuse.mainDjikstraPath.get(0).wayFromPrim);
                     }
                     //For each component except the last, identify the last point of it and If necessary, add the last
-    // one (see the for loop condition)
+                    //one (see the for loop condition)
                     for (int i = 0; i < lcc.size() - 1; i++) {
                         double distMax = -1;
                         int indMax = -1;
@@ -3549,6 +3590,7 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                         timeInter.add((double) (lcc.get(lcc.size() - 1).day));
                     }
                 }
+                
                 //Convert results of correspondance into double tabs
                 int N = distInter.size();
                 double[] xPoints = new double[N];
@@ -3558,6 +3600,15 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     xPoints[i] = distInter.get(i);
                     yPoints[i] = timeInter.get(i);
                     yPointsHours[i] = hoursExtremities[(int) Math.round(timeInter.get(i))];
+                }
+                
+                // DEBUG: Display interpolation arrays
+                if (debugLat) {
+                    System.out.println("\n=== DEBUG: Interpolation arrays for lateral root ===");
+                    System.out.println("xPoints (distances) and yPoints (times) for interpolation:");
+                    for (int i = 0; i < N; i++) {
+                        System.out.println("  [" + i + "] xPoints=" + xPoints[i] + ", yPoints=" + yPoints[i] + ", yPointsHours=" + yPointsHours[i]);
+                    }
                 }
 
 
@@ -3576,6 +3627,51 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                         p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
                         p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
                                 yPointsHours);
+                    }
+                    
+                    // IMPORTANT: Also calculate time for pixels in mainDjikstraPath that may not be in pixGraph
+                    // (e.g., pixels added during hidden zone correction)
+                    for (Pix p : ccF.mainDjikstraPath) {
+                        if (p.time == -1.0 || p.time == 0.0) {  // Only update if not already set
+                            p.time = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPoints);
+                            p.timeOut = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints, yPoints);
+                            p.timeHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim, xPoints, yPointsHours);
+                            p.timeOutHours = SplineAndPolyLineUtils.linearInterpolation(p.wayFromPrim + p.distOut, xPoints,
+                                    yPointsHours);
+                        }
+                    }
+                    
+                    // DEBUG: Check for pixels with problematic time values
+                    if (false) {
+                        double minTime = Double.MAX_VALUE;
+                        double maxTime = Double.MIN_VALUE;
+                        double minWayFromPrim = Double.MAX_VALUE;
+                        double maxWayFromPrim = Double.MIN_VALUE;
+                        int negativeTimeCount = 0;
+                        
+                        for (Pix p : ccF.pixGraph.vertexSet()) {
+                            if (p.time < minTime) minTime = p.time;
+                            if (p.time > maxTime) maxTime = p.time;
+                            if (p.wayFromPrim < minWayFromPrim) minWayFromPrim = p.wayFromPrim;
+                            if (p.wayFromPrim > maxWayFromPrim) maxWayFromPrim = p.wayFromPrim;
+                            if (p.time < 0) negativeTimeCount++;
+                        }
+                        
+                        System.out.println("  Component " + li + " pixel statistics:");
+                        System.out.println("    wayFromPrim range: [" + minWayFromPrim + ", " + maxWayFromPrim + "]");
+                        System.out.println("    time range: [" + minTime + ", " + maxTime + "]");
+                        System.out.println("    xPoints range: [" + xPoints[0] + ", " + xPoints[xPoints.length-1] + "]");
+                        if (negativeTimeCount > 0) {
+                            System.out.println("    WARNING: " + negativeTimeCount + " pixels have NEGATIVE time!");
+                        }
+                        if (minWayFromPrim < xPoints[0]) {
+                            System.out.println("    WARNING: Some wayFromPrim values (" + minWayFromPrim + 
+                                             ") are LESS than xPoints[0] (" + xPoints[0] + ") - extrapolation will occur!");
+                        }
+                        if (maxWayFromPrim > xPoints[xPoints.length-1]) {
+                            System.out.println("    WARNING: Some wayFromPrim values (" + maxWayFromPrim + 
+                                             ") are GREATER than xPoints[last] (" + xPoints[xPoints.length-1] + ") - extrapolation will occur!");
+                        }
                     }
 
                     //Back copy to the initial CCs
@@ -3597,12 +3693,16 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                     }
 
                     //Subsample respective dijkstra path with beucker algorithm, and collect RSML points
+                    if(debugLat)System.out.println("Going to simplify a path of size " + ccF.mainDjikstraPath.size());
+                    if(debugLat)System.out.println("simplifying the path \n -> "+ccF.mainDjikstraPath.get(0)+" \n -> "+ccF.mainDjikstraPath.get(ccF.mainDjikstraPath.size()/2)+" \n -> "+ccF.mainDjikstraPath.get(ccF.mainDjikstraPath.size()-1));
+
+                    //Subsample respective dijkstra path with beucker algorithm, and collect RSML points
+
                     List<Pix> list = simplerSimplify ? DouglasPeuckerSimplify.simplifySimpler(ccF.mainDjikstraPath,
                             toKeep.get(li), 3) :
                             DouglasPeuckerSimplify.simplify(ccF.mainDjikstraPath, toKeep.get(li),
                                     toleranceDistToCentralLine);
-                    if (debugLat)
-                        System.out.println("Simplifying a list of " + ccF.mainDjikstraPath.size() + " to list of " + list.size());
+                    if (debugLat) System.out.println("Simplifying a list of " + ccF.mainDjikstraPath.size() + " to list of " + list.size());
                     for (int i = 0; i < list.size() - 1; i++) {
                         Pix p = list.get(i);
                         rLat.addNode(p.x + ccF.xMin, p.y + ccF.yMin, p.time, p.timeHours, (i == 0) && (li == 0));
@@ -3613,14 +3713,23 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
                 }
                 rLat.computeDistances();
                 rLat.order=order;
-                rLat.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
-                if(debugLat) System.out.println("Debug LAT"+myParent);
-                if(myParent==null){
-                    System.out.println("ERROR no parent found for lateral root "+rLat+" corresponding to "+cc+" supposed to start from "+cc.bestIncomingActivatedEdge());
+                
+                // DEBUG: Display all nodes before resampleFlyingPoints to diagnose birthTime issues
+                if (debugLat) {
+                    System.out.println("\n=== DEBUG: Nodes in lateral root BEFORE resampleFlyingPoints ===");
+                    System.out.println("hoursCorrespondingToTimePoints array size: " + rm.hoursCorrespondingToTimePoints.length);
+                    System.out.println("Root nodes description:\n" + rLat.stringNodes());
+                    System.out.println("=== END DEBUG ===\n");
                 }
+                
+                rLat.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
                 myParent.attachChild(rLat);
                 rLat.attachParent(myParent);
                 rm.rootList.add(rLat);
+                if(debugLat){
+                    System.out.println("Finished processing lateral root #" + (incrLat-1) + " : " + cc + "\n\n\n");
+                    
+                }
             }
         }
         rm.standardOrderingOfRoots();
@@ -5028,7 +5137,22 @@ Toto 16 CC  Timestep 16 label68 : 999.0,317.0 (5994.0 - 1902.0) h=174.0 hStart=1
 
 
 
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

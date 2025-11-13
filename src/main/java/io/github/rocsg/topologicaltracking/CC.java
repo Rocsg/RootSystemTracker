@@ -971,11 +971,26 @@ public class CC implements Serializable {
         return ccBest;
     }
 
+    public CC getParent(){
+        CC ccBest=null;
+        for(CC cc : graph.incomingEdgesOf(this).stream().filter(e->e.activated).map(e->e.source).collect(Collectors.toList())){
+            if(cc.order==this.order){ccBest=cc;break;}
+        }
+        return ccBest;
+    }
 
-    public boolean isHiddenChild(){
+    public boolean hasHiddenChild(){
         CC child=this.getChild();
         ConnectionEdge edge=graph.getEdge(this, child);
         if(child==null) return false;
+        return edge.hidden;
+    }
+
+
+    public boolean hasHiddenParent(){
+        CC parent=this.getParent();
+        ConnectionEdge edge=graph.getEdge(parent,this);
+        if(parent==null) return false;
         return edge.hidden;
     }
 
@@ -1376,6 +1391,21 @@ public class CC implements Serializable {
         }
         else return new int[]{(int) Math.round(x0 + dx), (int) Math.round(y0 + dy)};
     }
+
+    public Pix getNearestPix(double xRel, double yRel) {
+        //Get the nearest pixel
+        double distMin=1000000;
+        Pix pixMin=null;
+        for(Pix p : pixGraph.vertexSet()){
+            double dist=VitimageUtils.distance(xRel-xMin,yRel-yMin,p.x,p.y);
+            if(dist<distMin){
+                distMin=dist;
+                pixMin=p;
+            }
+        }
+        return pixMin;
+    }
+
 
     public int[] determineTargetGeodesicallyFarestFromTheSource(int[] start) {
         int x0 = start[0];

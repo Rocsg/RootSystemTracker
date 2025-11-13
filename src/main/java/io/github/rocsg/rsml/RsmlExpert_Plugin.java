@@ -1401,27 +1401,66 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
             return null;
         }
 
-        Node n1 = (Node) obj1[0];
+        Node s1 = (Node) obj1[0];
         Root r1 = (Root) obj1[1];
-        Node n2 = (Node) obj2[0];
+        Node s2 = (Node) obj2[0];
         Root r2 = (Root) obj2[1];
-
-        boolean isFeasible = !(n1.parent.birthTime >= n2.birthTime);
-        if (n2.parent.birthTime >= n1.birthTime) isFeasible = false;
-        if (n1.child.birthTime <= n2.birthTime) isFeasible = false;
-        if (n2.child.birthTime <= n1.birthTime) isFeasible = false;
-        System.out.println("Trying to switch :\n --> Node " + n1 + "\n and node n2 " + n2);
-
+        Node t1=s1.child;
+        Node t2=s2.child;
+        boolean isFeasible=true;
+        if(t1==null && t2==null) isFeasible=false;
+        if(Math.floor(s1.birthTime)>Math.floor(t2.birthTime)){ System.out.println("Because : \n . s1 birthTime = "+s1.birthTime+"\n . t2.birthTime = "+t2.birthTime); isFeasible=false;}
+        if(Math.floor(s2.birthTime)>Math.floor(t1.birthTime)){ System.out.println("Because : \n . s2 birthTime = "+s2.birthTime+"\n . t1.birthTime = "+t1.birthTime); isFeasible=false;}
         if (!isFeasible) {
-            IJ.showMessage("This switch is not possible");
+            IJ.showMessage("New feature dev: This switch is not possible");
+            System.out.println("Because : \n . s1 birthTime = "+s1.birthTime+"\n . s2 birthTime = "+s2.birthTime+
+            "\n . t1.birthTime = "+t1.birthTime+"\n . t2.birthTime = "+t2.birthTime);
             return null;
         }
-        Node par1 = n1.parent;
-        Node chi1 = n1.child;
-        n1.parent = n2.parent;
-        n1.child = n2.child;
-        n2.parent = par1;
-        n2.child = chi1;
+        System.out.println("Trying to switch :\n "+
+        "Former situation was \n . root 1 --> Node " + s1 + " to "+ t1+
+        "\n . root 2 --> Node " + s2 + " to "+ t2);
+
+
+        //Processing root 1 source
+        Node nTmp=s1;
+        s1.birthTime=(float) Math.floor(s1.birthTime);
+        while(nTmp.parent!=null && Math.floor(nTmp.parent.birthTime)==Math.floor(s1.birthTime)){
+            nTmp=nTmp.parent;
+            nTmp.birthTime=(float) Math.floor(s1.birthTime);
+        }
+
+        //Processing root 2 source
+        nTmp=s2;
+        s2.birthTime=(float) Math.floor(s2.birthTime);
+        while(nTmp.parent!=null && Math.floor(nTmp.parent.birthTime)==Math.floor(s2.birthTime)){
+            nTmp=nTmp.parent;
+            nTmp.birthTime=(float) Math.floor(s2.birthTime);
+        }
+
+
+        //Processing root 1 former target
+        nTmp=t1;
+        t1.birthTime=(float) Math.floor(t1.birthTime);
+        while(nTmp.child!=null && Math.floor(nTmp.child.birthTime)==Math.floor(t1.birthTime)){
+            nTmp=nTmp.child;
+            nTmp.birthTime=(float) Math.floor(t1.birthTime);
+        }
+
+        //Processing root 2 target
+        nTmp=t2;
+        t2.birthTime=(float) Math.floor(t2.birthTime);
+        while(nTmp.child!=null && Math.floor(nTmp.child.birthTime)==Math.floor(t2.birthTime)){
+            nTmp=nTmp.child;
+            nTmp.birthTime=(float) Math.floor(t2.birthTime);
+        }
+
+        s1.child=t2;
+        s2.child=t1;
+        t2.parent=s1;
+        t1.parent=s2;
+
+
         r1.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
         r1.updateTiming();
         r2.resampleFlyingPoints(rm.hoursCorrespondingToTimePoints);
@@ -2041,7 +2080,7 @@ public class RsmlExpert_Plugin extends PlugInFrame implements KeyListener, Actio
                 refineSegmentInModel(tabPt, rm);
                 break;// TODO
             case "SWITCHPOINT":
-                switchPointInModel(tabPt, rm);
+                switchFalseCrossInModel(tabPt, rm);
                 break;// TODO
             case "CREATEPRIMARY":
                 createPrimaryInModel(tabPt, rm);
