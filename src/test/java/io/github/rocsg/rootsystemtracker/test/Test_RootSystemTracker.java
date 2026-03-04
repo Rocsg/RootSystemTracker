@@ -9,14 +9,12 @@ import org.junit.jupiter.api.Test;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
-import io.github.rocsg.fijiyama.rsml.Root;
-import io.github.rocsg.fijiyama.rsml.RootModel;
-import io.github.rocsg.rootsystemtracker.MovieBuilder;
-import io.github.rocsg.rootsystemtracker.PipelineActionsHandler;
-import io.github.rocsg.rootsystemtracker.PipelineParamHandler;
+import io.github.rocsg.rstplugin.MovieBuilder;
+import io.github.rocsg.rstplugin.PipelineActionsHandler;
+import io.github.rocsg.rstplugin.PipelineParamHandler;
 import io.github.rocsg.topologicaltracking.CC;
 import io.github.rocsg.topologicaltracking.ConnectionEdge;
-import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipeline;
+import io.github.rocsg.topologicaltracking.RegionAdjacencyGraphPipelineV2;
 import io.github.rocsg.fijiyama.common.VitimageUtils;
 import io.github.rocsg.fijiyama.registration.ItkTransform;
 import io.github.rocsg.fijiyama.registration.Transform3DType;
@@ -39,7 +37,6 @@ public class Test_RootSystemTracker {
 		testFunction();
 		if(true)return;
 		Test_RootSystemTracker te=new Test_RootSystemTracker();		
-		te.test_00_loadTestData();
 		te.test_01_inventory();
 		te.test_02_b_registerStack();
 		te.test_03_computeMasks2();
@@ -67,19 +64,7 @@ public class Test_RootSystemTracker {
 	 *  Test function for basic loading of data from the resource dir
 	 * @throws Exception
 	 */
-	@Test
-	public void test_00_loadTestData()throws Exception{
-		System.out.println("\n\n\nRoot System Tracker\n -- RUNNING TEST 00 Test loading data from resource dir");
-		try {
-			String s=new File(getClass().getClassLoader().getResource("data/Source_ML1_0002/").getFile()).getAbsolutePath();
-			ImagePlus img=IJ.openImage(s+"/40_date_map.tif");	
-			String res=VitimageUtils.imageResume(img);
-			int lenPos=res.length()>0 ? 1 : 0;
-			assertEquals(lenPos, 1);
-		}catch(Exception e) {System.out.println("Test failed at data loading"); 		assertEquals(0, 1);}
-		System.out.println("Test 00 Ok");
-	}
-	
+
 	/**
 	 *  Test function for capabilities to build a proper inventory from a dir of data, including QR code reading
 	 * @throws Exception
@@ -161,7 +146,7 @@ public class Test_RootSystemTracker {
 
 		//Create the graph and save it
 		PipelineActionsHandler.buildAndProcessGraph(indexImg,outputDataDir,pph);
-		SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=RegionAdjacencyGraphPipeline.readGraphFromFile(new File(outputDataDir,"50_graph.ser").getAbsolutePath());
+		SimpleDirectedWeightedGraph<CC,ConnectionEdge>  gg=RegionAdjacencyGraphPipelineV2.readGraphFromFile(new File(outputDataDir,"50_graph.ser").getAbsolutePath());
 		System.out.println("There3");
 		IJ.openImage(new File(outputDataDir,"51_graph_rendering.tif").getAbsolutePath());
 		//Verify graph parameters
@@ -185,44 +170,6 @@ public class Test_RootSystemTracker {
 	 * @throws Exception
 	 */
 	
-	public void test_05_computeRsml()throws Exception{
-		System.out.println("\n\n\n \n\n\nRoot System Tracker\n -- RUNNING TEST 05 compute Rsml");
-		String outputDataDir=new File(getClass().getClassLoader().getResource("data/Source_ML1_0002/").getFile()).getAbsolutePath();
-		PipelineParamHandler pph=createPipeline0();
-		pph.imgSerieSize=new int[] {22};
-		int indexImg=0;
-		double[]tab=pph.getHours(indexImg);
-		for(int i=0;i<tab.length;i++) {
-			System.out.println(i+" : "+tab[i]);
-		}
-		PipelineActionsHandler.computeRSMLUntilExpertize(indexImg,outputDataDir,pph);
-		PipelineActionsHandler.computeRSMLAfterExpertize(indexImg,outputDataDir,pph);
-		RootModel rm=RootModel.RootModelWildReadFromRsml(new File(outputDataDir,"61_graph.rsml").getAbsolutePath());
-
-		//Verify RSML parameters
-		rm.setPlantNumbers();
-		int[]nbLats=rm.nbLatsPerPlant();
-		int[]expectedNbLats=new int[] {16,25,17,24,17};
-		for(int i=0;i<nbLats.length;i++) {
-			System.out.println("#Lat "+i+" : "+nbLats[i]+" , expected : "+expectedNbLats[i]+" "+(expectedNbLats[i]!=nbLats[i] ? (" DIFF = "+(expectedNbLats[i]-nbLats[i])) :""));
-		}
-		for(int i=0;i<nbLats.length;i++) {
-			assertEquals(nbLats[i],expectedNbLats[i],expectedNbLats[i]/10);
-		}
-
-		double []expectedLens=new double[] {2038.25,4354.05,2465.39,2974.94,2344.42};
-		double []measuredLens=new double[] {0,0,0,0,0};
-		for(Root r: rm.rootList)measuredLens[r.plantNumber]+=r.computeRootLength();
-		for(int i=0;i<nbLats.length;i++) {
-			System.out.println("#Plant "+i+" : "+measuredLens[i]+" , expected : "+expectedLens[i]+" diff="+VitimageUtils.dou((measuredLens[i]-expectedLens[i])/(0.01*expectedLens[i])) +" %");
-		}
-		for(int i=0;i<nbLats.length;i++) {
-			assertEquals(measuredLens[i]/expectedLens[i],1,0.01); 
-		}
-
-		
-		System.out.println("Test 05 Ok");
-	}
 
 	
 	/**

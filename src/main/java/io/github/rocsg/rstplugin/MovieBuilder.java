@@ -34,7 +34,7 @@ public class MovieBuilder {
     static double startingBlockRatio = 0.10;//time for a new root to appear, expressed as a ratio of the sequence
 	// length  //TODO : depends on parameters
     static boolean smartHandyStart = true;// Make a progressive start to make the movie more friendly
-    static double timeStep = -1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph
+    static double timeStep = 1;//It is hours/keyframe. The initial timeseries have a timeStep roughly equals to pph
 	// .nTypicalHours 
     //if set in main, be put in activation
 
@@ -104,8 +104,6 @@ public class MovieBuilder {
         ImagePlus mixFgBg = mixFgAndBgFromMaskAndStack(maskFgBgGauss, imgReg, maskUpLeaves);
         IJ.run(mixFgBg, "8-bit", "");
 
-        mixFgBg.show();
-        VitimageUtils.waitFor(100000);
         maskFgBgGauss.setDisplayRange(0, 1);
         IJ.run(maskFgBgGauss, "8-bit", "");
 

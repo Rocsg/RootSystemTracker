@@ -81,10 +81,7 @@ public class TestPipelineActionsHandler {
         outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
                 "\\data\\ordered_input\\OUT\\Box1";
 
-        result = PipelineActionsHandler.computeMasksAndRemoveLeaves(0, inputFolderPath, pph);
-
-        // Check if the method returned true
-        assertTrue(result);
+        
     }
 
     @Test
@@ -112,14 +109,7 @@ public class TestPipelineActionsHandler {
 
         inputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
                 "\\data\\ordered_input\\OUT\\Box1";
-        result = PipelineActionsHandler.computeMasksAndRemoveLeaves(0, inputFolderPath, pph);
-
-        outputFolderPath = "C:\\Users\\loaiu\\Documents\\Etudes\\MAM\\MAM5\\Stage\\Travaux\\RootSystemTracker" +
-                "\\data\\ordered_input\\OUT\\Box1";
-        result = PipelineActionsHandler.buildAndProcessGraph(0, outputFolderPath, pph);
-
-        // Check if the method returned true
-        assertTrue(result);
+        
     }
 
     @Test

@@ -11,7 +11,7 @@ import io.github.rocsg.rsml.Root;
 import io.github.rocsg.rsml.RootModel;
 import io.github.rocsg.rstplugin.PipelineParamHandler;
 import io.github.rocsg.rstplugin.PipelineActionsHandler;
-import io.github.ro.stringNodes()csg.rstutils.MorphoUtils;
+import io.github.rocsg.rstutils.MorphoUtils;
 import io.github.rocsg.rstutils.SplineAndPolyLineUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -116,14 +116,17 @@ est ce que la vitesse typique et le rayon et la longueur ne peuvent pas etre li√
 
 
     public static void main(String[] args) {
-            
+        System.out.println("Starting step888...");  
+        System.out.println("");
+        System.out.println("");
+        System.out.println("");
         new ImageJ();
         String inventoryDir="/home/rfernandez/Bureau/A_Test/RootSystemTracker/JeanTrap/test2/Jean_trap-test/Inventory_of_jean_trap_out";
         String processingDir="/home/rfernandez/Bureau/A_Test/RootSystemTracker/JeanTrap/test2/Jean_trap-test/Processing";
         PipelineParamHandler pph=new PipelineParamHandler(inventoryDir, processingDir);
-        PipelineActionsHandler.doStepOnImg(4, 1, pph);
-        PipelineActionsHandler.doStepOnImg(5, 1, pph);
-        PipelineActionsHandler.doStepOnImg(7, 1, pph);
+//        PipelineActionsHandler.doStepOnImg(4, 1, pph);
+ //       PipelineActionsHandler.doStepOnImg(5, 1, pph);
+        PipelineActionsHandler.doStepOnImg(8, 1, pph);
         System.out.println("Done");
     }
 
